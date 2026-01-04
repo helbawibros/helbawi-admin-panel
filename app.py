@@ -10,12 +10,10 @@ def get_gspread_client():
     try:
         scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
         raw_json = st.secrets["gcp_service_account"]["json_data"].strip()
-        service_account_info = json.loads(raw_json, strict=False)
-        creds = Credentials.from_service_account_info(service_account_info, scopes=scope)
+        info = json.loads(raw_json, strict=False)
+        creds = Credentials.from_service_account_info(info, scopes=scope)
         return gspread.authorize(creds)
-    except Exception as e:
-        st.error(f"خطأ في الاتصال: {e}")
-        return None
+    except: return None
 
 st.title("🛠️ نظام إدارة الطلبيات المركزي")
 
@@ -24,52 +22,40 @@ client = get_gspread_client()
 if client:
     SHEET_ID = "1-Abj-Kvbe02az8KYZfQL0eal2arKw_wgjVQdJX06IA0"
     spreadsheet = client.open_by_key(SHEET_ID)
-    
     all_worksheets = [sh.title for sh in spreadsheet.worksheets()]
-    # نبدأ القراءة من بعد أول 4 صفحات
     delegates_pages = all_worksheets[4:] 
     
-    if not delegates_pages:
-        st.warning("لم يتم العثور على صفحات مناديب.")
-    else:
-        selected_rep = st.sidebar.selectbox("اختر المندوب", delegates_pages)
+    selected_rep = st.sidebar.selectbox("اختر المندوب", delegates_pages)
+    
+    try:
+        worksheet = spreadsheet.worksheet(selected_rep)
+        data = worksheet.get_all_values()
         
-        try:
-            worksheet = spreadsheet.worksheet(selected_rep)
-            # جلب البيانات كقائمة صفوف لتجنب مشاكل العناوين
-            rows = worksheet.get_all_values()
+        if len(data) > 1:
+            # تحويل البيانات لجدول
+            df = pd.DataFrame(data[1:], columns=data[0])
             
-            if len(rows) > 1:
-                # تحويل البيانات إلى DataFrame وتسمية الأعمدة يدوياً لضمان الدقة
-                df = pd.DataFrame(rows[1:], columns=rows[0])
+            # ميزة البحث الشامل: ابحث عن كلمة "بانتظار التصديق" في كل الخلايا
+            mask = df.apply(lambda row: row.astype(str).str.contains('بانتظار التصديق').any(), axis=1)
+            pending = df[mask]
+            
+            if not pending.empty:
+                st.success(f"📦 يوجد {len(pending)} طلبات معلقة لـ {selected_rep}")
+                st.table(pending)
                 
-                # تنظيف أسماء الأعمدة من المسافات المخفية
-                df.columns = [c.strip() for c in df.columns]
-                
-                if 'الحالة' in df.columns:
-                    # فلترة الطلبات التي تحتوي على "بانتظار التصديق"
-                    pending = df[df['الحالة'].str.contains("بانتظار التصديق", na=False)]
+                if st.button(f"✅ تصديق طلبات {selected_rep}"):
+                    # تحديث الحالة: سنبحث في كل صف وكل عمود عن الكلمة ونغيرها
+                    for i, row in enumerate(data):
+                        if i == 0: continue
+                        for j, cell_value in enumerate(row):
+                            if "بانتظار التصديق" in cell_value:
+                                worksheet.update_cell(i + 1, j + 1, "تم التصديق")
                     
-                    if not pending.empty:
-                        st.success(f"📦 يوجد {len(pending)} طلبات معلقة لـ {selected_rep}")
-                        st.table(pending)
-                        
-                        if st.button(f"✅ تصديق طلبات {selected_rep}"):
-                            # البحث عن كل صف حالته "بانتظار التصديق" وتحديثه
-                            all_data = worksheet.get_all_values()
-                            for i, row in enumerate(all_data):
-                                if i == 0: continue # تخطي العنوان
-                                # إذا كان العمود الرابع (D) هو الحالة
-                                if "بانتظار التصديق" in row[3]: 
-                                    worksheet.update_cell(i + 1, 4, "تم التصديق")
-                            
-                            st.success("تم التصديق بنجاح!")
-                            st.rerun()
-                    else:
-                        st.info(f"لا توجد طلبات معلقة حالياً لـ {selected_rep}")
-                else:
-                    st.error("لم أجد عمود باسم 'الحالة'. تأكد أن الخانة D1 مكتوب فيها كلمة: الحالة")
+                    st.success("✅ تم التصديق وتحديث الإكسل!")
+                    st.rerun()
             else:
-                st.write("الصفحة فارغة.")
-        except Exception as e:
-            st.error(f"حدث خطأ: {e}")
+                st.info(f"لا توجد طلبات معلقة حالياً لـ {selected_rep}")
+        else:
+            st.write("الصفحة فارغة.")
+    except Exception as e:
+        st.error(f"حدث خطأ: {e}")
