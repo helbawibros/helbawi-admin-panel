@@ -6,7 +6,6 @@ from google.oauth2.service_account import Credentials
 
 st.set_page_config(page_title="إدارة حلباوي إخوان", layout="wide")
 
-# أسماء الصفحات التي نريد إخفاءها (لأنها ليست مناديب)
 EXCLUDE_SHEETS = ["طلبات", "الأسعار", "البيانات", "الزبائن", "Sheet1"]
 
 def get_gspread_client():
@@ -18,62 +17,70 @@ def get_gspread_client():
         return gspread.authorize(creds)
     except: return None
 
-st.title("🛠️ نظام إدارة الطلبيات المركزي")
+st.title("🛠️ نظام إدارة وتعديل الطلبيات")
 
 client = get_gspread_client()
 
 if client:
     SHEET_ID = "1-Abj-Kvbe02az8KYZfQL0eal2arKw_wgjVQdJX06IA0"
     spreadsheet = client.open_by_key(SHEET_ID)
-    
-    # جلب كل الصفحات وفلترة الصفحات الإدارية
     all_worksheets = [sh.title for sh in spreadsheet.worksheets()]
     delegates_pages = [name for name in all_worksheets if name not in EXCLUDE_SHEETS]
     
-    # --- تعديل: وضع الاختيار في منتصف الصفحة بدلاً من الجانب ---
-    st.markdown("### 👤 اختر المندوب من القائمة أدناه:")
-    selected_rep = st.selectbox("قائمة المناديب:", delegates_pages)
+    selected_rep = st.selectbox("اختر المندوب لمراجعة أو تعديل طلبيته:", delegates_pages)
     
     if selected_rep:
         st.divider()
-        st.header(f"📋 طلبات المندوب: {selected_rep}")
-        
         try:
             worksheet = spreadsheet.worksheet(selected_rep)
             data = worksheet.get_all_values()
             
             if len(data) > 1:
                 df = pd.DataFrame(data[1:], columns=data[0])
+                # إضافة عمود لرقم السطر الحقيقي في الإكسل (مهم جداً للحذف)
+                df['row_idx'] = range(2, len(df) + 2) 
                 
-                # فحص الطلبات المعلقة
-                mask = df.apply(lambda row: row.astype(str).str.contains('بانتظار التصديق').any(), axis=1)
-                pending = df[mask]
+                # فلترة الطلبات المعلقة فقط
+                pending = df[df.apply(lambda row: 'بانتظار التصديق' in str(row['الحالة']), axis=1)]
                 
                 if not pending.empty:
-                    st.success(f"📦 يوجد {len(pending)} طلبات معلقة")
-                    st.table(pending)
+                    st.subheader(f"📦 طلبات معلقة لـ {selected_rep}")
                     
-                    if st.button(f"✅ تصديق كل طلبات {selected_rep}", use_container_width=True):
-                        # تحديث الحالة مباشرة في الإكسل
-                        for i, row in enumerate(data):
+                    # عرض الطلبات مع خيار الحذف لكل سطر
+                    for index, row in pending.iterrows():
+                        col1, col2, col3, col4 = st.columns([3, 1, 1, 1])
+                        with col1: st.write(f"🔹 **{row['اسم الصنف']}**")
+                        with col2: st.write(f"الكمية: {row['الكميه المطلوبه']}")
+                        with col3:
+                            # زر الحذف الفردي
+                            if st.button(f"شطب 🗑️", key=f"del_{row['row_idx']}"):
+                                worksheet.delete_rows(int(row['row_idx']))
+                                st.warning(f"تم حذف {row['اسم الصنف']}")
+                                st.rerun()
+                        with col4:
+                            # زر تصديق فردي (اختياري)
+                            if st.button(f"موافقة ✅", key=f"app_{row['row_idx']}"):
+                                # تحديث خلية الحالة في العمود D (الرابع)
+                                worksheet.update_cell(int(row['row_idx']), 4, "تم التصديق")
+                                st.success("تم!")
+                                st.rerun()
+                    
+                    st.divider()
+                    if st.button(f"✅ تصديق جميع طلبات {selected_rep} المتبقية", use_container_width=True):
+                        # تحديث الكل كما كان سابقاً
+                        data_refresh = worksheet.get_all_values()
+                        for i, r in enumerate(data_refresh):
                             if i == 0: continue
-                            for j, cell_value in enumerate(row):
-                                if "بانتظار التصديق" in cell_value:
-                                    worksheet.update_cell(i + 1, j + 1, "تم التصديق")
-                        st.success("✅ تم التصديق بنجاح!")
+                            if "بانتظار التصديق" in r[3]: # نعتبر الحالة في العمود الرابع
+                                worksheet.update_cell(i + 1, 4, "تم التصديق")
+                        st.success("تم تصديق الكل")
                         st.rerun()
                 else:
-                    st.info(f"لا توجد طلبات معلقة حالياً لـ {selected_rep}")
-                
-                # أرشيف الطلبات
-                with st.expander("📄 أرشيف آخر الطلبات المصدقة"):
-                    done_mask = df.apply(lambda row: row.astype(str).str.contains('تم التصديق').any(), axis=1)
-                    st.table(df[done_mask].tail(15))
+                    st.info("لا توجد طلبات معلقة حالياً.")
             else:
-                st.warning("هذه الصفحة لا تحتوي على بيانات بعد.")
-                
+                st.write("الصفحة فارغة.")
         except Exception as e:
             st.error(f"حدث خطأ: {e}")
 
-if st.button("🔄 تحديث البيانات"):
+if st.button("🔄 تحديث"):
     st.rerun()
