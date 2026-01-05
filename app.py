@@ -17,7 +17,7 @@ def get_gspread_client():
         return gspread.authorize(creds)
     except: return None
 
-st.title("🛠️ نظام إدارة وتعديل الطلبيات")
+st.title("🏭 إدارة طلبيات المعمل - تعديل سريع")
 
 client = get_gspread_client()
 
@@ -27,60 +27,60 @@ if client:
     all_worksheets = [sh.title for sh in spreadsheet.worksheets()]
     delegates_pages = [name for name in all_worksheets if name not in EXCLUDE_SHEETS]
     
-    selected_rep = st.selectbox("اختر المندوب لمراجعة أو تعديل طلبيته:", delegates_pages)
+    selected_rep = st.selectbox("اختر المندوب:", delegates_pages)
     
     if selected_rep:
-        st.divider()
         try:
             worksheet = spreadsheet.worksheet(selected_rep)
             data = worksheet.get_all_values()
             
             if len(data) > 1:
-                df = pd.DataFrame(data[1:], columns=data[0])
-                # إضافة عمود لرقم السطر الحقيقي في الإكسل (مهم جداً للحذف)
-                df['row_idx'] = range(2, len(df) + 2) 
+                full_df = pd.DataFrame(data[1:], columns=data[0])
+                # إضافة عمود لرقم السطر الأصلي للرجوع إليه عند الحفظ
+                full_df['row_no'] = range(2, len(full_df) + 2)
                 
-                # فلترة الطلبات المعلقة فقط
-                pending = df[df.apply(lambda row: 'بانتظار التصديق' in str(row['الحالة']), axis=1)]
+                # تصفية الطلبات التي بانتظار التصديق فقط
+                pending_mask = full_df['الحالة'] == "بانتظار التصديق"
+                pending_df = full_df[pending_mask].copy()
                 
-                if not pending.empty:
-                    st.subheader(f"📦 طلبات معلقة لـ {selected_rep}")
+                if not pending_df.empty:
+                    st.warning(f"ملاحظة: يمكنك تعديل 'الكمية' أو 'اسم الصنف' مباشرة من الجدول أدناه.")
                     
-                    # عرض الطلبات مع خيار الحذف لكل سطر
-                    for index, row in pending.iterrows():
-                        col1, col2, col3, col4 = st.columns([3, 1, 1, 1])
-                        with col1: st.write(f"🔹 **{row['اسم الصنف']}**")
-                        with col2: st.write(f"الكمية: {row['الكميه المطلوبه']}")
-                        with col3:
-                            # زر الحذف الفردي
-                            if st.button(f"شطب 🗑️", key=f"del_{row['row_idx']}"):
-                                worksheet.delete_rows(int(row['row_idx']))
-                                st.warning(f"تم حذف {row['اسم الصنف']}")
-                                st.rerun()
-                        with col4:
-                            # زر تصديق فردي (اختياري)
-                            if st.button(f"موافقة ✅", key=f"app_{row['row_idx']}"):
-                                # تحديث خلية الحالة في العمود D (الرابع)
-                                worksheet.update_cell(int(row['row_idx']), 4, "تم التصديق")
-                                st.success("تم!")
-                                st.rerun()
+                    # --- الجدول التفاعلي السريع ---
+                    # نعرض فقط الأعمدة المهمة للتعديل
+                    edited_df = st.data_editor(
+                        pending_df[['row_no', 'التاريخ و الوقت', 'اسم الصنف', 'الكميه المطلوبه']],
+                        column_config={
+                            "row_no": None, # إخفاء رقم السطر عن المستخدم
+                            "التاريخ و الوقت": st.column_config.Column(disabled=True),
+                            "اسم الصنف": st.column_config.TextColumn("الصنف"),
+                            "الكميه المطلوبه": st.column_config.TextColumn("الكمية")
+                        },
+                        hide_index=True,
+                        use_container_width=True,
+                        key="editor"
+                    )
                     
                     st.divider()
-                    if st.button(f"✅ تصديق جميع طلبات {selected_rep} المتبقية", use_container_width=True):
-                        # تحديث الكل كما كان سابقاً
-                        data_refresh = worksheet.get_all_values()
-                        for i, r in enumerate(data_refresh):
-                            if i == 0: continue
-                            if "بانتظار التصديق" in r[3]: # نعتبر الحالة في العمود الرابع
-                                worksheet.update_cell(i + 1, 4, "تم التصديق")
-                        st.success("تم تصديق الكل")
-                        st.rerun()
+                    
+                    if st.button("🚀 اعتماد التعديلات وتصديق الطلبية", use_container_width=True, type="primary"):
+                        with st.spinner("جاري تحديث البيانات في الإكسل..."):
+                            # 1. تحديث الأسطر المعدلة (الكمية أو الصنف) وتغيير الحالة
+                            for index, row in edited_df.iterrows():
+                                r_idx = int(row['row_no'])
+                                # تحديث اسم الصنف (العمود B) والكمية (العمود C) والحالة (العمود D)
+                                worksheet.update_cell(r_idx, 2, row['اسم الصنف'])
+                                worksheet.update_cell(r_idx, 3, row['الكميه المطلوبه'])
+                                worksheet.update_cell(r_idx, 4, "تم التصديق")
+                            
+                            st.success("✅ تم تعديل وتصديق الطلبية بنجاح!")
+                            st.rerun()
                 else:
                     st.info("لا توجد طلبات معلقة حالياً.")
             else:
                 st.write("الصفحة فارغة.")
         except Exception as e:
-            st.error(f"حدث خطأ: {e}")
+            st.error(f"خطأ: {e}")
 
-if st.button("🔄 تحديث"):
+if st.button("🔄 تحديث الصفحة"):
     st.rerun()
