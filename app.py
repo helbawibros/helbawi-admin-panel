@@ -6,32 +6,31 @@ from google.oauth2.service_account import Credentials
 from datetime import datetime
 import time
 
-# --- 1. إعدادات الصفحة والتنسيق الفائق للطباعة ---
+# --- 1. إعدادات الصفحة وتنسيق الطباعة الفائق ---
 st.set_page_config(page_title="إدارة حلباوي إخوان", layout="wide")
 
-# تصميم الطباعة A4 (الاسم يمين، التاريخ يسار، خطوط ضخمة)
 st.markdown("""
     <style>
     @media print {
-        header, footer, .no-print, [data-testid="stSidebar"] { display: none !important; }
+        header, footer, .no-print, [data-testid="stSidebar"], .stButton { display: none !important; }
         .print-only { display: block !important; direction: rtl !important; }
         @page { size: A4; margin: 1cm; }
-        body { background-color: white !important; font-family: 'Arial', sans-serif; }
+        body { background-color: white !important; color: black !important; font-family: 'Arial', sans-serif; }
         
-        .header-box { display: flex; justify-content: space-between; align-items: center; border-bottom: 5px solid black; padding-bottom: 10px; margin-bottom: 30px; }
-        .rep-title { font-size: 50px !important; font-weight: bold; text-align: right; }
-        .date-title { font-size: 25px !important; text-align: left; }
+        .header-box { display: flex; justify-content: space-between; align-items: center; border-bottom: 5px solid black; padding-bottom: 10px; margin-bottom: 30px; width: 100%; }
+        .rep-title { font-size: 45px !important; font-weight: bold; text-align: right; flex: 1; }
+        .date-title { font-size: 22px !important; text-align: left; flex: 1; white-space: nowrap; }
 
-        .main-table { width: 100%; border-collapse: collapse; border: 4px solid black; }
-        .main-table th, .main-table td { border: 4px solid black; padding: 15px; text-align: center; font-weight: bold; }
+        .main-table { width: 100%; border-collapse: collapse; border: 4px solid black; margin-top: 20px; }
+        .main-table th, .main-table td { border: 4px solid black; padding: 12px; text-align: center; font-weight: bold; }
         
         /* أحجام الخانات المطلوبة */
-        .th-qty { width: 80px; font-size: 35px !important; } /* العدد صغير */
-        .th-item { font-size: 40px !important; } /* الصنف كبير بالوسط */
-        .th-check { width: 120px; font-size: 30px !important; } /* التأكيس */
+        .th-qty { width: 10%; font-size: 30px !important; } /* العدد صغير */
+        .th-item { width: 65%; font-size: 35px !important; } /* الصنف وسط */
+        .th-check { width: 25%; font-size: 30px !important; } /* التأكيس */
         
-        .td-qty { font-size: 45px !important; }
-        .td-item { font-size: 45px !important; text-align: right; padding-right: 20px; }
+        .td-qty { font-size: 40px !important; }
+        .td-item { font-size: 40px !important; text-align: right; padding-right: 15px; }
     }
     .print-only { display: none; }
     </style>
@@ -62,31 +61,36 @@ if client:
     EXCLUDE_SHEETS = ["طلبات", "الأسعار", "البيانات", "الزبائن", "Sheet1"]
     delegates = [sh.title for sh in spreadsheet.worksheets() if sh.title not in EXCLUDE_SHEETS]
 
-    st.markdown('<h1 class="no-print">🏭 لوحة تحكم الإدارة - شركة حلباوي</h1>', unsafe_allow_html=True)
+    st.markdown('<h1 class="no-print">🏭 لوحة تحكم الإدارة</h1>', unsafe_allow_html=True)
 
-    # --- 3. نظام الإشعارات الذكي (بدون صفحة سوداء) ---
+    # --- 3. نظام الإشعارات مع الوقت والتاريخ ---
     if st.button("🔔 فحص الطلبات الجديدة", use_container_width=True):
         st.session_state.notifications = []
         with st.spinner("جاري الفحص..."):
             for rep in delegates:
                 ws = spreadsheet.worksheet(rep)
-                if "بانتظار التصديق" in ws.col_values(4):
-                    st.session_state.notifications.append(rep)
+                data = ws.get_all_values()
+                # البحث عن أسطر "بانتظار التصديق" لجلب تاريخها
+                for row in data:
+                    if len(row) > 3 and row[3] == "بانتظار التصديق":
+                        arrival_time = row[0] # العمود الأول هو التاريخ والساعة
+                        st.session_state.notifications.append({"name": rep, "time": arrival_time})
+                        break 
                 time.sleep(0.1)
 
     if 'notifications' in st.session_state and st.session_state.notifications:
-        for rep_name in st.session_state.notifications:
+        for note in st.session_state.notifications:
             col_notif, col_go = st.columns([3, 1])
-            col_notif.warning(f"📦 المندوب **{rep_name}** أرسل طلبية جديدة!")
-            if col_go.button(f"فتح طلب {rep_name}", key=f"go_{rep_name}"):
-                st.session_state.active_rep = rep_name
+            col_notif.warning(f"📦 المندوب **{note['name']}** أرسل طلبية بتاريخ: {note['time']}")
+            if col_go.button(f"فتح طلب {note['name']}", key=f"go_{note['name']}"):
+                st.session_state.active_rep = note['name']
                 st.rerun()
 
     st.divider()
 
     # اختيار المندوب
     current_rep = st.session_state.get('active_rep', "-- اختر --")
-    selected_rep = st.selectbox("اختر المندوب لمراجعة طلبيته:", ["-- اختر --"] + delegates, 
+    selected_rep = st.selectbox("اختر المندوب:", ["-- اختر --"] + delegates, 
                                 index=(delegates.index(current_rep) + 1 if current_rep in delegates else 0))
 
     if selected_rep != "-- اختر --":
@@ -104,28 +108,26 @@ if client:
 
             c1, c2 = st.columns(2)
             with c1:
-                if st.button("🚀 تصديق وحفظ في الإكسل", type="primary", use_container_width=True):
+                if st.button("🚀 تصديق وحفظ", type="primary", use_container_width=True):
                     for _, r in edited_df.iterrows():
-                        ws.update_cell(int(r['row_no']), 2, r['اسم الصنف'])
-                        ws.update_cell(int(r['row_no']), 3, r['الكميه المطلوبه'])
                         ws.update_cell(int(r['row_no']), 4, "تم التصديق")
                     st.success("✅ تم التصديق!")
                     if 'active_rep' in st.session_state: del st.session_state.active_rep
                     st.rerun()
             
             with c2:
-                if st.button("🖨️ طباعة فورية A4", use_container_width=True):
-                    now = datetime.now().strftime("%Y-%m-%d | %H:%M")
+                if st.button("🖨️ طباعة الطلبية (A4)", use_container_width=True):
+                    # نستخدم تاريخ الطلبية الأصلي من أول سطر بانتظار التصديق
+                    order_date = pending.iloc[0]['التاريخ و الوقت']
                     rows_html = "".join([f"<tr><td class='td-qty'>{r['الكميه المطلوبه']}</td><td class='td-item'>{r['اسم الصنف']}</td><td></td></tr>" for _, r in edited_df.iterrows()])
                     
-                    # قالب الطباعة النهائي
                     st.markdown(f"""
                         <div class="print-only" dir="rtl">
                             <div class="header-box">
                                 <div class="rep-title">المندوب: {selected_rep}</div>
-                                <div class="date-title">التاريخ: {now}</div>
+                                <div class="date-title">التاريخ: {order_date}</div>
                             </div>
-                            <h1 style="text-align:center; font-size:45px; text-decoration: underline;">طلبية بضاعة للمعمل</h1>
+                            <h1 style="text-align:center; font-size:45px; margin-bottom:10px;">طلب بضاعة من المعمل</h1>
                             <table class="main-table">
                                 <thead>
                                     <tr>
@@ -141,9 +143,9 @@ if client:
                     """, unsafe_allow_html=True)
                     st.markdown("<script>window.print();</script>", unsafe_allow_html=True)
         else:
-            st.info("لا توجد طلبات جديدة لهذا المندوب.")
+            st.info("لا توجد طلبات جديدة.")
 
 # خروج
-if st.sidebar.button("تسجيل الخروج"):
+if st.sidebar.button("خروج"):
     st.session_state.clear()
     st.rerun()
