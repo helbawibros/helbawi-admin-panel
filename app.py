@@ -5,14 +5,20 @@ import gspread
 from google.oauth2.service_account import Credentials
 import time
 
-# --- 1. إعدادات الصفحة والتنسيق ---
+# --- 1. إعدادات الصفحة والتنسيق الفني ---
 st.set_page_config(page_title="إدارة حلباوي", layout="wide")
 
 st.markdown("""
     <style>
-    /* تنسيق الشاشة */
+    /* تنسيق الشاشة - اللوغو على كامل العرض */
+    .full-width-logo {
+        width: 100%;
+        max-height: 250px;
+        object-fit: contain;
+        margin-bottom: 20px;
+    }
     .screen-info { color: white; font-size: 18px; text-align: right; }
-    .main-title-screen { font-size: 35px !important; font-weight: 900; color: white; text-align: center; margin: 20px 0; }
+    .main-title-screen { font-size: 35px !important; font-weight: 900; color: white; text-align: center; margin: 10px 0; }
     
     @media print {
         header, footer, .no-print, [data-testid="stSidebar"], .stButton, .stSelectbox { display: none !important; }
@@ -27,32 +33,33 @@ st.markdown("""
             padding-bottom: 10px !important;
             width: 100% !important;
         }
-        .rep-name-print { font-size: 60px !important; font-weight: 900; line-height: 1.1; }
+        .rep-name-print { font-size: 65px !important; font-weight: 900; line-height: 1.1; }
         .date-print { font-size: 25px !important; font-weight: bold; margin-top: 5px; }
 
         /* الجدول الضخم */
         .main-table-print { width: 100% !important; border-collapse: collapse !important; border: 6px solid black !important; }
         .main-table-print th, .main-table-print td { border: 6px solid black !important; padding: 20px !important; font-weight: 900 !important; text-align: center; }
         .th-style { background-color: #eee !important; font-size: 35px !important; }
-        .td-qty { font-size: 65px !important; width: 15%; }
-        .td-item { font-size: 50px !important; width: 60%; text-align: right !important; }
+        .td-qty { font-size: 70px !important; width: 15%; }
+        .td-item { font-size: 55px !important; width: 60%; text-align: right !important; }
         .td-check { width: 25%; }
     }
     </style>
 """, unsafe_allow_html=True)
 
-# --- 2. صفحة الدخول مع اللوغو ---
+# --- 2. صفحة الدخول مع اللوغو الجديد بعرض الشاشة ---
 if 'admin_logged_in' not in st.session_state: st.session_state.admin_logged_in = False
 
 if not st.session_state.admin_logged_in:
-    col1, col2, col3 = st.columns([1, 1, 1])
-    with col2:
-        try:
-            st.image("Lgo.png", width=200) # سيظهر اللوغو هنا قبل كلمة السر
-        except:
-            st.warning("يرجى التأكد من وجود ملف Lgo.png في مجلد البرنامج")
+    # عرض اللوغو بعرض الشاشة في صفحة الدخول
+    try:
+        st.image("Logo.JPG", use_container_width=True)
+    except:
+        st.warning("يرجى التأكد من رفع ملف Logo.JPG")
         
-        st.title("دخول الإدارة")
+    col1, col2, col3 = st.columns([1, 2, 1])
+    with col2:
+        st.markdown("<h2 style='text-align: center;'>دخول الإدارة</h2>", unsafe_allow_html=True)
         pwd = st.text_input("كلمة السر", type="password")
         if st.button("دخول", use_container_width=True):
             if pwd == "Hlb_Admin_2024":
@@ -60,7 +67,7 @@ if not st.session_state.admin_logged_in:
                 st.rerun()
     st.stop()
 
-# --- 3. الربط مع البيانات ---
+# --- 3. الربط وجلب البيانات ---
 def get_client():
     info = json.loads(st.secrets["gcp_service_account"]["json_data"].strip(), strict=False)
     creds = Credentials.from_service_account_info(info, scopes=["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"])
@@ -71,8 +78,8 @@ if client:
     spreadsheet = client.open_by_key("1-Abj-Kvbe02az8KYZfQL0eal2arKw_wgjVQdJX06IA0")
     delegates = [sh.title for sh in spreadsheet.worksheets() if sh.title not in ["طلبات", "الأسعار", "البيانات", "الزبائن", "Sheet1"]]
 
-    # عرض اللوغو والعنوان الرئيسي
-    st.image("Lgo.png", width=100)
+    # اللوغو بعرض الشاشة في الصفحة الرئيسية
+    st.image("Logo.JPG", use_container_width=True)
     st.markdown('<div class="main-title-screen no-print">طلبيات المندوبين</div>', unsafe_allow_html=True)
 
     # فحص الإشعارات
@@ -85,7 +92,7 @@ if client:
 
     if 'orders' in st.session_state:
         for name in st.session_state.orders:
-            if st.button(f"📦 طلبية جديدة: {name}", key=name, use_container_width=True):
+            if st.button(f"📦 طلبية جديدة من: {name}", key=name, use_container_width=True):
                 st.session_state.active_rep = name
                 st.rerun()
 
@@ -117,7 +124,7 @@ if client:
                 if st.button("🚀 تصديق وإرسال", type="primary", use_container_width=True):
                     for _, r in edited.iterrows():
                         ws.update_cell(int(r['row_no']), 4, "تم التصديق")
-                    st.success("تم!")
+                    st.success("تم الحفظ!")
                     st.rerun()
             
             with c2:
@@ -129,7 +136,7 @@ if client:
                                 <div class="rep-name-print">{selected_rep}</div>
                                 <div class="date-print">تاريخ الطلب: {order_time}</div>
                             </div>
-                            <h2 style="text-align:center; font-size:45px; margin:10px 0;">طلب مبيعات</h2>
+                            <h2 style="text-align:center; font-size:50px; margin:10px 0;">طلب مبيعات</h2>
                             <table class="main-table-print">
                                 <thead>
                                     <tr>
@@ -147,4 +154,3 @@ if client:
 if st.sidebar.button("خروج"):
     st.session_state.clear()
     st.rerun()
-
