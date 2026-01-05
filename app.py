@@ -6,37 +6,41 @@ from google.oauth2.service_account import Credentials
 from datetime import datetime
 import time
 
-# --- 1. إعدادات الصفحة وتنسيق الطباعة ---
-st.set_page_config(page_title="إدارة حلباوي إخوان", layout="wide")
+# --- 1. إعدادات الصفحة وتنسيق الخط العملاق ---
+st.set_page_config(page_title="إدارة حلباوي", layout="wide")
 
 st.markdown("""
     <style>
     /* التنسيق على الشاشة */
-    .screen-date { color: #ff4b4b; font-size: 24px; font-weight: bold; margin-bottom: 10px; }
+    .screen-date { color: #ff4b4b; font-size: 30px; font-weight: bold; margin-bottom: 10px; text-align: right; }
+    .rep-title-screen { font-size: 45px !important; font-weight: 900; color: #1E1E1E; text-align: right; margin-top: -20px; }
     
     @media print {
         header, footer, .no-print, [data-testid="stSidebar"], .stButton, .stSelectbox { display: none !important; }
         .print-only { display: block !important; direction: rtl !important; }
-        @page { size: A4; margin: 1cm; }
-        body { background-color: white !important; color: black !important; font-family: 'Arial', sans-serif; }
+        @page { size: A4; margin: 0.5cm; }
         
+        /* ترويسة الطباعة: الاسم يمين - التاريخ يسار */
         .header-print {
             display: flex !important;
             justify-content: space-between !important;
             align-items: baseline !important;
-            border-bottom: 8px solid black !important;
+            border-bottom: 10px solid black !important;
             margin-bottom: 30px !important;
+            padding-bottom: 10px !important;
             width: 100% !important;
         }
-        .rep-name-big { font-size: 55px !important; font-weight: 900; text-align: right; }
-        .date-time-left { font-size: 28px !important; font-weight: bold; text-align: left; }
+        .rep-name-print { font-size: 70px !important; font-weight: 900; text-align: right; }
+        .date-print { font-size: 30px !important; font-weight: bold; text-align: left; }
 
-        .main-table-print { width: 100% !important; border-collapse: collapse !important; border: 6px solid black !important; }
-        .main-table-print th, .main-table-print td { border: 6px solid black !important; padding: 15px !important; font-weight: 900 !important; }
-        .td-qty { font-size: 50px !important; width: 15%; text-align: center !important; }
-        .td-item { font-size: 45px !important; width: 60%; text-align: right !important; }
+        /* الجدول ضخم جداً وعريض */
+        .main-table-print { width: 100% !important; border-collapse: collapse !important; border: 8px solid black !important; }
+        .main-table-print th, .main-table-print td { border: 8px solid black !important; padding: 20px !important; font-weight: 900 !important; }
+        .th-style { background-color: #ddd !important; font-size: 40px !important; }
+        .td-qty { font-size: 65px !important; width: 15%; text-align: center !important; }
+        .td-item { font-size: 55px !important; width: 60%; text-align: right !important; }
+        .td-check { width: 25%; }
     }
-    .print-only { display: none; }
     </style>
 """, unsafe_allow_html=True)
 
@@ -61,7 +65,7 @@ if client:
     delegates = [sh.title for sh in spreadsheet.worksheets() if sh.title not in ["طلبات", "الأسعار", "البيانات", "الزبائن", "Sheet1"]]
 
     # --- 3. الإشعارات ---
-    if st.button("🔔 فحص الإشعارات"):
+    if st.button("🔔 فحص الإشعارات", use_container_width=True):
         st.session_state.orders = []
         for rep in delegates:
             ws = spreadsheet.worksheet(rep)
@@ -79,7 +83,7 @@ if client:
 
     st.divider()
 
-    # --- 4. العرض (هنا التعديل المهم) ---
+    # --- 4. العرض الصافي ---
     active = st.session_state.get('active_rep', "-- اختر --")
     selected_rep = st.selectbox("المندوب:", ["-- اختر --"] + delegates, 
                                 index=(delegates.index(active)+1 if active in delegates else 0))
@@ -92,31 +96,37 @@ if client:
         pending = df[df['الحالة'] == "بانتظار التصديق"].copy()
 
         if not pending.empty:
-            # إظهار التاريخ على الشاشة فوراً
             order_time = pending.iloc[0]['التاريخ و الوقت']
-            st.markdown(f'<div class="screen-date">📅 تاريخ الطلب: {order_time}</div>', unsafe_allow_html=True)
-            st.header(f"طلبية المندوب: {selected_rep}")
+            # الاسم والتاريخ فوق بعض على الشاشة للتوضيح
+            st.markdown(f'<div class="screen-date">📅 التاريخ: {order_time}</div>', unsafe_allow_html=True)
+            st.markdown(f'<div class="rep-title-screen">{selected_rep}</div>', unsafe_allow_html=True)
             
             edited = st.data_editor(pending[['row_no', 'اسم الصنف', 'الكميه المطلوبه']], 
-                                    column_config={"row_no": None}, hide_index=True)
+                                    column_config={"row_no": None, "اسم الصنف": "الصنف", "الكميه المطلوبه": "العدد"}, 
+                                    hide_index=True, use_container_width=True)
 
-            if st.button("🚀 تصديق وإرسال", type="primary", use_container_width=True):
+            if st.button("🚀 تصديق وإرسال للإكسل", type="primary", use_container_width=True):
                 for _, r in edited.iterrows():
                     ws.update_cell(int(r['row_no']), 4, "تم التصديق")
-                st.success("تم!")
+                st.success("تم الحفظ!")
                 st.rerun()
             
-            if st.button("🖨️ طباعة الطلبية", use_container_width=True):
-                rows_html = "".join([f"<tr><td class='td-qty'>{r['الكميه المطلوبه']}</td><td class='td-item'>{r['اسم الصنف']}</td><td></td></tr>" for _, r in edited.iterrows()])
+            if st.button("🖨️ طباعة الطلبية (خط عملاق)", use_container_width=True):
+                rows_html = "".join([f"<tr><td class='td-qty'>{r['الكميه المطلوبه']}</td><td class='td-item'>{r['اسم الصنف']}</td><td class='td-check'></td></tr>" for _, r in edited.iterrows()])
                 st.markdown(f"""
                     <div class="print-only">
                         <div class="header-print">
-                            <div class="rep-name-big">المندوب: {selected_rep}</div>
-                            <div class="date-time-left">{order_time}</div>
+                            <div class="rep-name-print">{selected_rep}</div>
+                            <div class="date-print">{order_time}</div>
                         </div>
-                        <h1 style="text-align:center;">طلب بضاعة للمعمل</h1>
                         <table class="main-table-print">
-                            <thead><tr><th>العدد</th><th>الصنف</th><th>تأكيس</th></tr></thead>
+                            <thead>
+                                <tr>
+                                    <th class="th-style">العدد</th>
+                                    <th class="th-style">الصنف</th>
+                                    <th class="th-style">تأكيس</th>
+                                </tr>
+                            </thead>
                             <tbody>{rows_html}</tbody>
                         </table>
                     </div>
