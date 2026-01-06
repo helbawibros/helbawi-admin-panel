@@ -30,14 +30,14 @@ st.markdown("""
         .rep-name-print { font-size: 70px !important; font-weight: 900; line-height: 1.1; }
         .date-print { font-size: 28px !important; font-weight: bold; margin-top: 5px; }
 
-        /* الجدول: تم تعديله ليكون بجهة اليمين وليس بكامل العرض */
+        /* الجدول: تم تعديله ليكون 50% بجهة اليمين */
         .main-table-print { 
-            width: 70% !important; /* تقليل العرض ليظهر بجهة اليمين */
+            width: 50% !important; /* الجدول يأخذ نصف عرض الورقة فقط */
             margin-right: 0 !important; 
             margin-left: auto !important; 
             border-collapse: collapse !important; 
             border: 6px solid black !important; 
-            float: right; /* ضمان التموضع جهة اليمين */
+            float: right; 
         }
         .main-table-print th, .main-table-print td { 
             border: 6px solid black !important; 
@@ -45,9 +45,9 @@ st.markdown("""
             font-weight: 900 !important; 
             text-align: center; 
         }
-        .th-style { background-color: #eee !important; font-size: 35px !important; }
-        .td-qty { font-size: 65px !important; width: 20%; }
-        .td-item { font-size: 50px !important; width: 60%; text-align: right !important; }
+        .th-style { background-color: #eee !important; font-size: 30px !important; }
+        .td-qty { font-size: 60px !important; width: 20%; }
+        .td-item { font-size: 45px !important; width: 60%; text-align: right !important; }
         .td-check { width: 20%; }
     }
     </style>
@@ -63,7 +63,7 @@ def show_full_logo():
             found = True
             break
     if not found:
-        st.info("⚠️ اللوغو غير موجود في المجلد، يرجى رفعه باسم Logo.JPG")
+        st.info("⚠️ يرجى التأكد من رفع صورة Logo.JPG")
 
 # --- 2. صفحة الدخول ---
 if 'admin_logged_in' not in st.session_state: 
@@ -88,7 +88,6 @@ def get_client():
         creds = Credentials.from_service_account_info(info, scopes=["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"])
         return gspread.authorize(creds)
     except Exception as e:
-        st.error("خطأ في الربط")
         return None
 
 client = get_client()
@@ -155,7 +154,7 @@ if client:
                                 <thead>
                                     <tr>
                                         <th class="th-style">العدد</th>
-                                        <th class="th-style">اسم الصنف</th>
+                                        <th class="th-style">الصنف</th>
                                         <th class="th-style">تأكيس</th>
                                     </tr>
                                 </thead>
@@ -168,3 +167,4 @@ if client:
 if st.sidebar.button("خروج"):
     st.session_state.clear()
     st.rerun()
+
