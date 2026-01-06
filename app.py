@@ -19,29 +19,42 @@ st.markdown("""
         .print-only { display: block !important; direction: rtl !important; }
         @page { size: A4; margin: 1cm; }
         
+        /* ترويسة الطباعة: الاسم يمين وتحته التاريخ */
         .header-print {
             text-align: right !important;
             border-bottom: 5px solid black !important;
-            margin-bottom: 20px !important;
-            padding-bottom: 10px !important;
+            margin-bottom: 30px !important;
+            padding-bottom: 15px !important;
             width: 100% !important;
         }
-        .rep-name-print { font-size: 60px !important; font-weight: 900; line-height: 1.1; }
-        .date-print { font-size: 25px !important; font-weight: bold; margin-top: 5px; }
+        .rep-name-print { font-size: 70px !important; font-weight: 900; line-height: 1.1; }
+        .date-print { font-size: 28px !important; font-weight: bold; margin-top: 5px; }
 
-        .main-table-print { width: 100% !important; border-collapse: collapse !important; border: 6px solid black !important; }
-        .main-table-print th, .main-table-print td { border: 6px solid black !important; padding: 20px !important; font-weight: 900 !important; text-align: center; }
+        /* الجدول: تم تعديله ليكون بجهة اليمين وليس بكامل العرض */
+        .main-table-print { 
+            width: 70% !important; /* تقليل العرض ليظهر بجهة اليمين */
+            margin-right: 0 !important; 
+            margin-left: auto !important; 
+            border-collapse: collapse !important; 
+            border: 6px solid black !important; 
+            float: right; /* ضمان التموضع جهة اليمين */
+        }
+        .main-table-print th, .main-table-print td { 
+            border: 6px solid black !important; 
+            padding: 15px !important; 
+            font-weight: 900 !important; 
+            text-align: center; 
+        }
         .th-style { background-color: #eee !important; font-size: 35px !important; }
-        .td-qty { font-size: 65px !important; width: 15%; }
+        .td-qty { font-size: 65px !important; width: 20%; }
         .td-item { font-size: 50px !important; width: 60%; text-align: right !important; }
-        .td-check { width: 25%; }
+        .td-check { width: 20%; }
     }
     </style>
 """, unsafe_allow_html=True)
 
-# دالة لعرض اللوغو بأمان لمنع الشاشة الحمراء
+# دالة لعرض اللوغو بأمان
 def show_full_logo():
-    # حاولنا تغطية كل احتمالات كتابة الاسم (بمسافة أو بدون)
     possible_names = ["Logo.JPG", "Logo .JPG", "logo.jpg"]
     found = False
     for name in possible_names:
@@ -57,8 +70,7 @@ if 'admin_logged_in' not in st.session_state:
     st.session_state.admin_logged_in = False
 
 if not st.session_state.admin_logged_in:
-    show_full_logo()  # اللوغو بعرض الشاشة قبل كلمة السر
-    
+    show_full_logo()
     col1, col2, col3 = st.columns([1, 2, 1])
     with col2:
         st.markdown("<h1 style='text-align: center;'>دخول الإدارة</h1>", unsafe_allow_html=True)
@@ -76,7 +88,7 @@ def get_client():
         creds = Credentials.from_service_account_info(info, scopes=["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"])
         return gspread.authorize(creds)
     except Exception as e:
-        st.error("خطأ في الربط مع جوجل: تأكد من ملف secrets")
+        st.error("خطأ في الربط")
         return None
 
 client = get_client()
@@ -84,11 +96,9 @@ if client:
     spreadsheet = client.open_by_key("1-Abj-Kvbe02az8KYZfQL0eal2arKw_wgjVQdJX06IA0")
     delegates = [sh.title for sh in spreadsheet.worksheets() if sh.title not in ["طلبات", "الأسعار", "البيانات", "الزبائن", "Sheet1"]]
 
-    # اللوغو بعرض الشاشة بعد الدخول
     show_full_logo()
     st.markdown('<div class="main-title-screen no-print">طلبيات المندوبين</div>', unsafe_allow_html=True)
 
-    # فحص الإشعارات
     if st.button("🔔 فحص الإشعارات الجديدة", use_container_width=True):
         st.session_state.orders = []
         for rep in delegates:
@@ -104,7 +114,6 @@ if client:
 
     st.divider()
 
-    # معالجة الطلب
     active = st.session_state.get('active_rep', "-- اختر مندوب --")
     selected_rep = st.selectbox("المندوب المختار:", ["-- اختر مندوب --"] + delegates, 
                                 index=(delegates.index(active)+1 if active in delegates else 0))
@@ -134,15 +143,14 @@ if client:
                     st.rerun()
             
             with c2:
-                if st.button("🖨️ طباعة (طلب مبيعات)", use_container_width=True):
+                if st.button("🖨️ طباعة الطلبية", use_container_width=True):
                     rows_html = "".join([f"<tr><td class='td-qty'>{r['الكميه المطلوبه']}</td><td class='td-item'>{r['اسم الصنف']}</td><td class='td-check'></td></tr>" for _, r in edited.iterrows()])
                     st.markdown(f"""
                         <div class="print-only">
                             <div class="header-print">
                                 <div class="rep-name-print">{selected_rep}</div>
-                                <div class="date-print">تاريخ الطلب: {order_time}</div>
+                                <div class="date-print">{order_time}</div>
                             </div>
-                            <h2 style="text-align:center; font-size:45px; margin:10px 0;">طلب مبيعات</h2>
                             <table class="main-table-print">
                                 <thead>
                                     <tr>
@@ -160,4 +168,3 @@ if client:
 if st.sidebar.button("خروج"):
     st.session_state.clear()
     st.rerun()
-
