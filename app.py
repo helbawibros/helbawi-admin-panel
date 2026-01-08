@@ -15,40 +15,40 @@ st.markdown("""
     .main-title-screen { font-size: 40px !important; font-weight: 900; color: white; text-align: center; margin: 10px 0; }
     
     @media print {
-        header, footer, .no-print, [data-testid="stSidebar"], .stButton, .stSelectbox { display: none !important; }
+        header, footer, .no-print, [data-testid="stSidebar"], .stButton, .stSelectbox, .stDataEditor { display: none !important; }
         .print-only { display: block !important; direction: rtl !important; }
-        @page { size: A4; margin: 1cm; }
+        @page { size: A4; margin: 1.5cm; }
         
         /* ترويسة الطباعة: الاسم يمين وتحته التاريخ */
         .header-print {
             text-align: right !important;
-            border-bottom: 5px solid black !important;
+            border-bottom: 8px solid black !important;
             margin-bottom: 30px !important;
             padding-bottom: 15px !important;
             width: 100% !important;
         }
-        .rep-name-print { font-size: 70px !important; font-weight: 900; line-height: 1.1; }
-        .date-print { font-size: 28px !important; font-weight: bold; margin-top: 5px; }
+        .rep-name-print { font-size: 80px !important; font-weight: 900; line-height: 1.1; color: black; }
+        .date-print { font-size: 30px !important; font-weight: bold; margin-top: 5px; color: black; }
 
-        /* الجدول: تم تعديله ليكون 50% بجهة اليمين */
+        /* الجدول: تم تعديله ليناسب طابعة الكانون A4 والعرض الكامل */
         .main-table-print { 
-            width: 50% !important; /* الجدول يأخذ نصف عرض الورقة فقط */
+            width: 100% !important; 
             margin-right: 0 !important; 
             margin-left: auto !important; 
             border-collapse: collapse !important; 
-            border: 6px solid black !important; 
-            float: right; 
+            border: 4px solid black !important; 
         }
         .main-table-print th, .main-table-print td { 
-            border: 6px solid black !important; 
+            border: 4px solid black !important; 
             padding: 15px !important; 
             font-weight: 900 !important; 
             text-align: center; 
+            color: black;
         }
-        .th-style { background-color: #eee !important; font-size: 30px !important; }
-        .td-qty { font-size: 60px !important; width: 20%; }
-        .td-item { font-size: 45px !important; width: 60%; text-align: right !important; }
-        .td-check { width: 20%; }
+        .th-style { background-color: #eee !important; font-size: 35px !important; }
+        .td-qty { font-size: 75px !important; width: 20%; background-color: #fafafa; }
+        .td-item { font-size: 55px !important; width: 65%; text-align: right !important; padding-right: 30px !important; }
+        .td-check { font-size: 40px !important; width: 15%; }
     }
     </style>
 """, unsafe_allow_html=True)
@@ -143,7 +143,7 @@ if client:
             
             with c2:
                 if st.button("🖨️ طباعة الطلبية", use_container_width=True):
-                    rows_html = "".join([f"<tr><td class='td-qty'>{r['الكميه المطلوبه']}</td><td class='td-item'>{r['اسم الصنف']}</td><td class='td-check'></td></tr>" for _, r in edited.iterrows()])
+                    rows_html = "".join([f"<tr><td class='td-qty'>{r['الكميه المطلوبه']}</td><td class='td-item'>{r['اسم الصنف']}</td><td class='td-check'>[ ]</td></tr>" for _, r in edited.iterrows()])
                     st.markdown(f"""
                         <div class="print-only">
                             <div class="header-print">
@@ -167,4 +167,3 @@ if client:
 if st.sidebar.button("خروج"):
     st.session_state.clear()
     st.rerun()
-
