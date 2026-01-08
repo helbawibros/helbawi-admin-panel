@@ -168,6 +168,7 @@ if client:
                 # محتوى الطباعة
                 rows_html = "".join([f"<tr><td class='td-qty'>{r['الكميه المطلوبه']}</td><td class='td-item'>{r['اسم الصنف']}</td><td class='td-check'>[ ]</td></tr>" for _, r in edited.iterrows()])
                 
+                # --- التعديل السحري لضمان عمل الطباعة وتخطي حظر المتصفح ---
                 print_layout = f"""
                 <div class="print-only">
                     <div class="header-print">
@@ -182,9 +183,18 @@ if client:
                     </table>
                 </div>
                 
-                <button onclick="window.print()" class="no-print print-button-real">
+                <button type="button" onclick="window.print()" class="no-print print-button-real">
                    🖨️ اضغط هنا لطباعة الطلبية على Canon
                 </button>
+                
+                <script>
+                // هذا الجزء يضمن تفعيل أمر الطباعة حتى لو كان المتصفح يحاول حظره
+                document.addEventListener('click', function (e) {{
+                    if (e.target.classList.contains('print-button-real')) {{
+                        window.print();
+                    }}
+                }});
+                </script>
                 """
                 st.markdown(print_layout, unsafe_allow_html=True)
 
