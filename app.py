@@ -14,7 +14,7 @@ st.markdown("""
     .screen-info { color: white; font-size: 18px; text-align: right; }
     .main-title-screen { font-size: 40px !important; font-weight: 900; color: white; text-align: center; margin: 10px 0; }
     
-    /* إعدادات الطباعة المخصصة لورق A4 وطابعات الشبكة */
+    /* إعدادات الطباعة المخصصة لورق A4 */
     @media print {
         header, footer, .no-print, [data-testid="stSidebar"], .stButton, .stSelectbox, .stDataEditor { 
             display: none !important; 
@@ -24,14 +24,8 @@ st.markdown("""
             direction: rtl !important; 
             width: 100% !important;
         }
-        @page { 
-            size: A4; 
-            margin: 1.5cm; 
-        }
-        body {
-            background-color: white !important;
-            color: black !important;
-        }
+        @page { size: A4; margin: 1.5cm; }
+        body { background-color: white !important; color: black !important; }
         
         .header-print {
             text-align: right !important;
@@ -39,8 +33,8 @@ st.markdown("""
             margin-bottom: 30px !important;
             padding-bottom: 10px !important;
         }
-        .rep-name-print { font-size: 60px !important; font-weight: 900; color: black !important; }
-        .date-print { font-size: 25px !important; font-weight: bold; color: black !important; }
+        .rep-name-print { font-size: 60px !important; font-weight: 900; }
+        .date-print { font-size: 25px !important; font-weight: bold; }
 
         .main-table-print { 
             width: 100% !important; 
@@ -50,7 +44,6 @@ st.markdown("""
         .main-table-print th, .main-table-print td { 
             border: 3px solid black !important; 
             padding: 12px !important; 
-            color: black !important;
             text-align: center; 
         }
         .th-style { background-color: #f0f0f0 !important; font-size: 28px !important; font-weight: bold; }
@@ -88,14 +81,13 @@ if not st.session_state.admin_logged_in:
                 st.rerun()
     st.stop()
 
-# --- 3. الاتصال بقاعدة البيانات (Google Sheets) ---
+# --- 3. الاتصال بقاعدة البيانات ---
 def get_client():
     try:
         info = json.loads(st.secrets["gcp_service_account"]["json_data"].strip(), strict=False)
         creds = Credentials.from_service_account_info(info, scopes=["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"])
         return gspread.authorize(creds)
     except Exception as e:
-        st.error("خطأ في الاتصال بالسحابة")
         return None
 
 client = get_client()
@@ -146,50 +138,32 @@ if client:
                 if st.button("🚀 تصديق وإرسال", type="primary", use_container_width=True):
                     for _, r in edited.iterrows():
                         ws.update_cell(int(r['row_no']), 4, "تم التصديق")
-                    st.success("تم تصديق الطلبية بنجاح!")
+                    st.success("تم!")
                     st.rerun()
             
             with c2:
-                if st.button("🖨️ تنفيذ الطباعة على Canon", use_container_width=True):
-                    # بناء محتوى الجدول للطباعة
-                    rows_html = "".join([
-                        f"<tr>"
-                        f"<td class='td-qty'>{r['الكميه المطلوبه']}</td>"
-                        f"<td class='td-item'>{r['اسم الصنف']}</td>"
-                        f"<td class='td-check'>[ ]</td>"
-                        f"</tr>" 
-                        for _, r in edited.iterrows()
-                    ])
-                    
-                    # عرض قالب الطباعة المخفي عن الشاشة والظاهر للورق
-                    st.markdown(f"""
-                        <div class="print-only">
-                            <div class="header-print">
-                                <div class="rep-name-print">{selected_rep}</div>
-                                <div class="date-print">وقت الطلب: {order_time}</div>
-                            </div>
-                            <table class="main-table-print">
-                                <thead>
-                                    <tr>
-                                        <th class="th-style">العدد</th>
-                                        <th class="th-style">الصنف</th>
-                                        <th class="th-style">تأكيد</th>
-                                    </tr>
-                                </thead>
-                                <tbody>{rows_html}</tbody>
-                            </table>
-                        </div>
-                    """, unsafe_allow_html=True)
-                    
-                    # السكربت الذي يستدعي نافذة الطباعة
-                    st.markdown("""
-                        <script>
-                        setTimeout(function(){
-                            window.print();
-                        }, 500);
-                        </script>
-                    """, unsafe_allow_html=True)
+                # زر الطباعة المطور (HTML Button) لضمان العمل على الكمبيوتر
+                rows_html = "".join([f"<tr><td class='td-qty'>{r['الكميه المطلوبه']}</td><td class='td-item'>{r['اسم الصنف']}</td><td class='td-check'>[ ]</td></tr>" for _, r in edited.iterrows()])
+                
+                print_layout = f"""
+                <div class="print-only">
+                    <div class="header-print">
+                        <div class="rep-name-print">{selected_rep}</div>
+                        <div class="date-print">وقت الطلب: {order_time}</div>
+                    </div>
+                    <table class="main-table-print">
+                        <thead>
+                            <tr><th class="th-style">العدد</th><th class="th-style">الصنف</th><th class="th-style">تأكيد</th></tr>
+                        </thead>
+                        <tbody>{rows_html}</tbody>
+                    </table>
+                </div>
+                <button onclick="window.print()" class="no-print" style="width:100%; height:45px; background-color:#1E3A8A; color:white; border:none; border-radius:5px; cursor:pointer; font-weight:bold; font-size:18px;">
+                   🖨️ اضغط هنا لطباعة الطلبية على Canon
+                </button>
+                """
+                st.markdown(print_layout, unsafe_allow_html=True)
 
-if st.sidebar.button("خروج من النظام"):
+if st.sidebar.button("خروج"):
     st.session_state.clear()
     st.rerun()
