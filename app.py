@@ -14,7 +14,7 @@ st.markdown("""
     .screen-info { color: white; font-size: 18px; text-align: right; }
     .main-title-screen { font-size: 40px !important; font-weight: 900; color: white; text-align: center; margin: 10px 0; }
     
-    /* تنسيق الزر ليصبح تفاعلياً تماماً */
+    /* تنسيق الزر ليصبح تفاعلياً ويشعر بالماوس */
     .print-button-custom {
         width: 100%; 
         height: 60px; 
@@ -179,7 +179,7 @@ if client:
                     </table>
                 </div>
                 
-                <button onclick="console.log('Printing...'); window.print(); return false;" class="no-print print-button-custom">
+                <button onclick="window.print(); return false;" class="no-print print-button-custom">
                    🖨️ اضغط هنا لفتح نافذة الطابعة (Canon)
                 </button>
                 """
