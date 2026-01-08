@@ -14,6 +14,25 @@ st.markdown("""
     .screen-info { color: white; font-size: 18px; text-align: right; }
     .main-title-screen { font-size: 40px !important; font-weight: 900; color: white; text-align: center; margin: 10px 0; }
     
+    /* جعل زر الطباعة يشعر بالماوس (تفاعلي) */
+    .print-button-custom {
+        width: 100%; 
+        height: 50px; 
+        background-color: #1E3A8A; 
+        color: white; 
+        border: 2px solid white; 
+        border-radius: 8px; 
+        cursor: pointer; 
+        font-weight: bold; 
+        font-size: 20px;
+        transition: 0.3s;
+    }
+    .print-button-custom:hover {
+        background-color: #152a61;
+        border-color: #ffd700;
+        transform: scale(1.01);
+    }
+
     /* إعدادات الطباعة المخصصة لورق A4 */
     @media print {
         header, footer, .no-print, [data-testid="stSidebar"], .stButton, .stSelectbox, .stDataEditor { 
@@ -142,7 +161,7 @@ if client:
                     st.rerun()
             
             with c2:
-                # زر الطباعة المطور (HTML Button) لضمان العمل على الكمبيوتر
+                # زر الطباعة المطور (تم تعديل الكلاس ليصبح تفاعلياً)
                 rows_html = "".join([f"<tr><td class='td-qty'>{r['الكميه المطلوبه']}</td><td class='td-item'>{r['اسم الصنف']}</td><td class='td-check'>[ ]</td></tr>" for _, r in edited.iterrows()])
                 
                 print_layout = f"""
@@ -158,7 +177,7 @@ if client:
                         <tbody>{rows_html}</tbody>
                     </table>
                 </div>
-                <button onclick="window.print()" class="no-print" style="width:100%; height:45px; background-color:#1E3A8A; color:white; border:none; border-radius:5px; cursor:pointer; font-weight:bold; font-size:18px;">
+                <button onclick="window.print()" class="no-print print-button-custom">
                    🖨️ اضغط هنا لطباعة الطلبية على Canon
                 </button>
                 """
