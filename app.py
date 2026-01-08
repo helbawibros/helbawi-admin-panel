@@ -14,23 +14,24 @@ st.markdown("""
     .screen-info { color: white; font-size: 18px; text-align: right; }
     .main-title-screen { font-size: 40px !important; font-weight: 900; color: white; text-align: center; margin: 10px 0; }
     
-    /* جعل زر الطباعة يشعر بالماوس (تفاعلي) */
+    /* تنسيق الزر ليصبح تفاعلياً تماماً */
     .print-button-custom {
         width: 100%; 
-        height: 50px; 
+        height: 60px; 
         background-color: #1E3A8A; 
-        color: white; 
-        border: 2px solid white; 
-        border-radius: 8px; 
+        color: white !important; 
+        border: 3px solid #FFD700; 
+        border-radius: 10px; 
         cursor: pointer; 
         font-weight: bold; 
-        font-size: 20px;
+        font-size: 24px;
         transition: 0.3s;
+        box-shadow: 0px 4px 15px rgba(0,0,0,0.3);
     }
     .print-button-custom:hover {
         background-color: #152a61;
-        border-color: #ffd700;
-        transform: scale(1.01);
+        transform: translateY(-2px);
+        box-shadow: 0px 6px 20px rgba(0,0,0,0.4);
     }
 
     /* إعدادات الطباعة المخصصة لورق A4 */
@@ -161,7 +162,7 @@ if client:
                     st.rerun()
             
             with c2:
-                # زر الطباعة المطور (تم تعديل الكلاس ليصبح تفاعلياً)
+                # محتوى الطباعة
                 rows_html = "".join([f"<tr><td class='td-qty'>{r['الكميه المطلوبه']}</td><td class='td-item'>{r['اسم الصنف']}</td><td class='td-check'>[ ]</td></tr>" for _, r in edited.iterrows()])
                 
                 print_layout = f"""
@@ -177,8 +178,9 @@ if client:
                         <tbody>{rows_html}</tbody>
                     </table>
                 </div>
-                <button onclick="window.print()" class="no-print print-button-custom">
-                   🖨️ اضغط هنا لطباعة الطلبية على Canon
+                
+                <button onclick="console.log('Printing...'); window.print(); return false;" class="no-print print-button-custom">
+                   🖨️ اضغط هنا لفتح نافذة الطابعة (Canon)
                 </button>
                 """
                 st.markdown(print_layout, unsafe_allow_html=True)
