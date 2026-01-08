@@ -14,24 +14,29 @@ st.markdown("""
     .screen-info { color: white; font-size: 18px; text-align: right; }
     .main-title-screen { font-size: 40px !important; font-weight: 900; color: white; text-align: center; margin: 10px 0; }
     
-    /* تنسيق الزر ليصبح تفاعلياً ويشعر بالماوس */
+    /* تنسيق الزر ليصبح تفاعلياً وقوياً في الاستجابة */
     .print-button-custom {
+        display: block;
         width: 100%; 
-        height: 60px; 
+        height: 65px; 
         background-color: #1E3A8A; 
         color: white !important; 
-        border: 3px solid #FFD700; 
-        border-radius: 10px; 
+        border: 4px solid #FFD700; 
+        border-radius: 12px; 
         cursor: pointer; 
         font-weight: bold; 
-        font-size: 24px;
+        font-size: 26px;
+        text-align: center;
+        line-height: 60px;
+        text-decoration: none;
         transition: 0.3s;
-        box-shadow: 0px 4px 15px rgba(0,0,0,0.3);
+        box-shadow: 0px 5px 15px rgba(0,0,0,0.4);
+        margin-top: 20px;
     }
     .print-button-custom:hover {
         background-color: #152a61;
-        transform: translateY(-2px);
-        box-shadow: 0px 6px 20px rgba(0,0,0,0.4);
+        transform: scale(1.02);
+        box-shadow: 0px 8px 25px rgba(0,0,0,0.5);
     }
 
     /* إعدادات الطباعة المخصصة لورق A4 */
@@ -179,9 +184,9 @@ if client:
                     </table>
                 </div>
                 
-                <button onclick="window.print(); return false;" class="no-print print-button-custom">
-                   🖨️ اضغط هنا لفتح نافذة الطابعة (Canon)
-                </button>
+                <a href="javascript:void(0)" onclick="window.print()" class="no-print print-button-custom">
+                   🖨️ اضغط هنا لطباعة الطلبية على Canon
+                </a>
                 """
                 st.markdown(print_layout, unsafe_allow_html=True)
 
