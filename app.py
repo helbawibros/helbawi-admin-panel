@@ -5,7 +5,7 @@ import gspread
 from google.oauth2.service_account import Credentials
 import os
 
-# --- 1. إعدادات الصفحة والتنسيق المزدوج مع "أرقام فائقة الوضوح" ---
+# --- 1. إعدادات الصفحة والتنسيق المزدوج (تركيز سماكة الخط للجدول كاملاً) ---
 st.set_page_config(page_title="إدارة حلباوي", layout="wide")
 
 st.markdown("""
@@ -81,29 +81,29 @@ st.markdown("""
             border: 3px solid #000 !important; 
         }
         
+        /* تعديل شامل: كل خلية في الجدول ستكون بولد فاحم وعريض */
         .table-style th, .table-style td {
             border: 2px solid #000 !important; 
             padding: 8px !important;
             text-align: center;
-            font-size: 17px !important;
-            font-weight: 900 !important; 
+            font-size: 18px !important; /* حجم خط موحد وواضح */
+            font-weight: 950 !important; /* أقصى سماكة للخط */
             color: #000000 !important;
+            /* تأثير القلم العريض على كل نصوص الجدول (أصناف وأرقام) */
+            -webkit-text-stroke: 0.8px black;
+            text-shadow: 0.5px 0px 0px #000;
         }
         
         .th-bg { 
             background-color: #d0d0d0 !important; 
-            font-weight: 900 !important; 
+            font-weight: 950 !important; 
         }
         
-        /* تركيز فائق على سماكة ووضوح الأرقام */
+        /* تمييز إضافي لعمود العدد ليبقى الأكبر حجماً */
         .col-qty { 
-            width: 20%; 
-            font-size: 28px !important; /* تكبير الرقم أكثر */
-            font-weight: 950 !important; /* أقصى بولد ممكن */
-            color: #000000 !important;
-            /* رسم حدود إضافية حول الرقم برمجياً لزيادة سماكته (Stroke Effect) */
-            -webkit-text-stroke: 1px black;
-            text-shadow: 1px 1px 0px #000;
+            width: 18%; 
+            font-size: 26px !important; 
+            -webkit-text-stroke: 1.2px black; /* سماكة أكبر للأرقام الأساسية */
         }
     }
     </style>
@@ -186,7 +186,7 @@ if client:
                 for _, r in edited.iterrows(): ws.update_cell(int(r['row_no']), 4, "تم التصديق")
                 st.success("تم!"); st.rerun()
             
-            rows_html = "".join([f"<tr><td class='col-qty'>{r['الكميه المطلوبه']}</td><td>{r['اسم الصنف']}</td><td style='width:12%'></td></tr>" for _, r in edited.iterrows()])
+            rows_html = "".join([f"<tr><td class='col-qty'>{r['الكميه المطلوبه']}</td><td style='text-align:right;'>{r['اسم الصنف']}</td><td style='width:10%'></td></tr>" for _, r in edited.iterrows()])
             
             half_view = f"""
             <div class="header-box">
@@ -205,7 +205,7 @@ if client:
                     <div class="print-half">{half_view}</div>
                 </div>
                 <button onclick="window.print()" class="print-button-real no-print">
-                   🖨️ طباعة (أرقام سميكة جداً)
+                   🖨️ طباعة الطلب (تغميق شامل للأصناف والأرقام)
                 </button>
             """, unsafe_allow_html=True)
 
