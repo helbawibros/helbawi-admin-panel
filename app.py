@@ -25,7 +25,7 @@ st.markdown("""
         
         .print-main-wrapper, .print-main-wrapper * { 
             visibility: visible !important; 
-            color: #000000 !important; /* أسود صريح */
+            color: #000000 !important; 
             -webkit-print-color-adjust: exact;
         }
 
@@ -47,7 +47,7 @@ st.markdown("""
             width: 49% !important;
             padding: 10px !important;
             box-sizing: border-box !important;
-            border-left: 2px dashed #000 !important; /* خط القص أوضح */
+            border-left: 2px dashed #000 !important;
         }
 
         header, footer, .no-print, [data-testid="stSidebar"], [data-testid="stHeader"] { 
@@ -57,13 +57,12 @@ st.markdown("""
         @page { size: A4 portrait; margin: 0; }
 
         .header-box {
-            border-bottom: 4px solid #000 !important; /* زيادة سماكة الخط تحت الاسم */
+            border-bottom: 4px solid #000 !important; 
             padding-bottom: 5px;
             margin-bottom: 10px;
             text-align: right;
         }
 
-        /* اسم المندوب غامق جداً */
         .name-txt { 
             font-size: 24px !important; 
             font-weight: 900 !important; 
@@ -79,16 +78,15 @@ st.markdown("""
         .table-style { 
             width: 100%; 
             border-collapse: collapse; 
-            border: 3px solid #000 !important; /* حدود الجدول الخارجية */
+            border: 3px solid #000 !important; 
         }
         
-        /* جعل نصوص الجدول والحدود والارقام عريضة جداً (Heavy Bold) */
         .table-style th, .table-style td {
             border: 2px solid #000 !important; 
-            padding: 6px !important;
+            padding: 8px !important;
             text-align: center;
             font-size: 17px !important;
-            font-weight: 900 !important; /* أقصى سماكة خط */
+            font-weight: 900 !important; 
             color: #000000 !important;
         }
         
@@ -97,13 +95,15 @@ st.markdown("""
             font-weight: 900 !important; 
         }
         
-        /* خانة العدد: تكبير وتغميق إضافي للأرقام لضمان ظهورها */
+        /* تركيز فائق على سماكة ووضوح الأرقام */
         .col-qty { 
             width: 20%; 
-            font-size: 24px !important; 
-            font-weight: 900 !important;
-            /* إضافة ظل خفيف للنص لتقوية الحبر في الطباعة */
-            text-shadow: 0.5px 0px 0px black; 
+            font-size: 28px !important; /* تكبير الرقم أكثر */
+            font-weight: 950 !important; /* أقصى بولد ممكن */
+            color: #000000 !important;
+            /* رسم حدود إضافية حول الرقم برمجياً لزيادة سماكته (Stroke Effect) */
+            -webkit-text-stroke: 1px black;
+            text-shadow: 1px 1px 0px #000;
         }
     }
     </style>
@@ -186,7 +186,6 @@ if client:
                 for _, r in edited.iterrows(): ws.update_cell(int(r['row_no']), 4, "تم التصديق")
                 st.success("تم!"); st.rerun()
             
-            # عمود العدد (col-qty) مبرمج ليكون عريض جداً
             rows_html = "".join([f"<tr><td class='col-qty'>{r['الكميه المطلوبه']}</td><td>{r['اسم الصنف']}</td><td style='width:12%'></td></tr>" for _, r in edited.iterrows()])
             
             half_view = f"""
@@ -206,7 +205,7 @@ if client:
                     <div class="print-half">{half_view}</div>
                 </div>
                 <button onclick="window.print()" class="print-button-real no-print">
-                   🖨️ طباعة الطلب (أرقام غامقة جداً)
+                   🖨️ طباعة (أرقام سميكة جداً)
                 </button>
             """, unsafe_allow_html=True)
 
