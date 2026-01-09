@@ -5,73 +5,80 @@ import gspread
 from google.oauth2.service_account import Credentials
 import os
 
-# --- 1. إعدادات الصفحة والتنسيق الاحترافي للطباعة ---
+# --- 1. إعدادات الصفحة والتنسيق الاحترافي المرتب للطباعة ---
 st.set_page_config(page_title="إدارة حلباوي", layout="wide")
 
 st.markdown("""
     <style>
-    /* تنسيق الشاشة الافتراضي للبرنامج */
+    /* تنسيق الشاشة الافتراضي */
     .screen-info { color: white; font-size: 18px; text-align: right; }
-    .main-title-screen { font-size: 40px !important; font-weight: 900; color: white; text-align: center; margin: 10px 0; }
+    .main-title-screen { font-size: 35px !important; font-weight: 900; color: white; text-align: center; margin: 10px 0; }
     
-    /* تنسيق الزر ليفتح نافذة الطباعة مباشرة */
+    /* تنسيق زر الطباعة ليفتح النافذة فوراً */
     .print-button-real {
-        display: block; width: 100%; height: 75px; 
+        display: block; width: 100%; height: 60px; 
         background-color: #28a745; color: white !important; 
-        border: 4px solid #ffffff; border-radius: 15px; cursor: pointer; 
-        font-weight: bold; font-size: 30px; margin-top: 20px;
-        box-shadow: 0px 4px 10px rgba(0,0,0,0.3);
+        border: none; border-radius: 10px; cursor: pointer; 
+        font-weight: bold; font-size: 24px; margin-top: 20px;
     }
-    .print-button-real:hover { background-color: #218838; }
 
-    /* --- إعدادات الطباعة (ما يظهر على الورق فقط) --- */
+    /* --- إعدادات الطباعة الدقيقة --- */
     @media print {
-        /* إخفاء كل العناصر غير الضرورية والصور */
-        header, footer, .no-print, [data-testid="stSidebar"], 
-        .stButton, .stSelectbox, .stDataEditor, img, .stImage, .main-title-screen { 
-            display: none !important; 
-        }
+        /* إخفاء كل شيء ما عدا منطقة الطباعة المحددة */
+        body * { visibility: hidden; }
+        .print-area, .print-area * { visibility: visible; }
         
-        /* إظهار حاوية الطباعة وتوسيعها */
-        .print-only { 
-            display: block !important; 
-            direction: rtl !important; 
+        /* تحديد مكان منطقة الطباعة في أعلى الورقة تماماً */
+        .print-area {
+            position: absolute;
+            left: 0;
+            top: 0;
             width: 100% !important;
-            background-color: white !important;
+            direction: rtl !important;
+        }
+
+        header, footer, .no-print, [data-testid="stSidebar"], img, .stImage { 
+            display: none !important; 
         }
 
         @page { size: A4; margin: 1cm; }
-        
-        /* تنسيق اسم المندوب والتاريخ في الورقة */
+
+        /* تنسيق الاسم والوقت (رأس الصفحة) */
         .header-print {
-            text-align: right !important;
-            border-bottom: 10px solid black !important;
-            margin-bottom: 30px !important;
+            text-align: center !important; /* جعل الاسم في المنتصف لترتيب أفضل */
+            border-bottom: 3px solid black !important;
+            margin-bottom: 20px !important;
             padding-bottom: 10px !important;
         }
-        .rep-name-print { font-size: 80px !important; font-weight: 900; line-height: 1.1; }
-        .date-print { font-size: 35px !important; margin-top: 10px; }
+        .rep-name-print { 
+            font-size: 45px !important; /* حجم وسط كما طلبت */
+            font-weight: 900; 
+            margin: 0 !important;
+            line-height: 1.2;
+        }
+        .date-print { 
+            font-size: 22px !important; 
+            margin-top: 5px !important;
+        }
 
-        /* تنسيق الجدول ليكون عملاق وواضح */
+        /* تنسيق الجدول المرتب */
         .main-table-print { 
             width: 100% !important; 
             border-collapse: collapse !important; 
-            margin-top: 20px;
         }
         .main-table-print th, .main-table-print td { 
-            border: 5px solid black !important; 
-            padding: 20px !important; 
+            border: 2px solid black !important; 
+            padding: 10px !important; 
             text-align: center; 
         }
-        .th-style { background-color: #f0f0f0 !important; font-size: 40px !important; font-weight: bold; }
-        .td-qty { font-size: 100px !important; font-weight: 900 !important; width: 25%; } /* رقم الكمية ضخم */
-        .td-item { font-size: 60px !important; font-weight: bold !important; text-align: right !important; width: 75%; }
+        .th-style { background-color: #f2f2f2 !important; font-size: 24px !important; }
+        .td-qty { font-size: 35px !important; font-weight: bold; width: 20%; } 
+        .td-item { font-size: 28px !important; text-align: right !important; width: 80%; }
     }
     </style>
 """, unsafe_allow_html=True)
 
 def show_full_logo():
-    # وسم no-print يضمن عدم ظهور الصورة عند الطباعة حتى لو كانت ظاهرة على الشاشة
     st.markdown('<div class="no-print">', unsafe_allow_html=True)
     possible_names = ["Logo.JPG", "Logo .JPG", "logo.jpg"]
     found = False
@@ -161,15 +168,14 @@ if client:
                     st.rerun()
             
             with c2:
-                # إنشاء محتوى الجدول للطباعة بأحجام كبيرة
                 rows_html = "".join([
                     f"<tr><td class='td-qty'>{r['الكميه المطلوبه']}</td><td class='td-item'>{r['اسم الصنف']}</td></tr>" 
                     for _, r in edited.iterrows()
                 ])
                 
-                # تخطيط الطباعة المخفي عن الشاشة والظاهر للبرنتر
+                # طبقة الطباعة المنظمة (print-area)
                 print_layout = f"""
-                <div class="print-only" style="display:none;">
+                <div class="print-area">
                     <div class="header-print">
                         <div class="rep-name-print">{selected_rep}</div>
                         <div class="date-print">وقت الطلب: {order_time}</div>
@@ -177,7 +183,7 @@ if client:
                     <table class="main-table-print">
                         <thead>
                             <tr>
-                                <th class="th-style">الكمية</th>
+                                <th class="th-style">العدد</th>
                                 <th class="th-style">الصنف</th>
                             </tr>
                         </thead>
