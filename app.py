@@ -5,11 +5,13 @@ import gspread
 from google.oauth2.service_account import Credentials
 import os
 
-# --- 1. إعدادات الصفحة والتنسيق (التركيز على سماكة الأرقام) ---
+# --- 1. إعدادات الصفحة والتنسيق المزدوج مع "أرقام فائقة الوضوح" ---
 st.set_page_config(page_title="إدارة حلباوي", layout="wide")
 
 st.markdown("""
     <style>
+    .screen-info { color: white; font-size: 18px; text-align: right; }
+    
     .print-button-real {
         display: block; width: 100%; height: 60px; 
         background-color: #28a745; color: white !important; 
@@ -17,30 +19,35 @@ st.markdown("""
         cursor: pointer; font-weight: bold; font-size: 22px; margin-top: 20px;
     }
 
+    /* --- كود الطباعة المحسن للوضوح العالي جداً --- */
     @media print {
         body * { visibility: hidden !important; }
         
         .print-main-wrapper, .print-main-wrapper * { 
             visibility: visible !important; 
-            color: #000000 !important; 
+            color: #000000 !important; /* أسود صريح */
+            -webkit-print-color-adjust: exact;
         }
 
         .print-main-wrapper {
             position: fixed !important;
-            top: 0 !important; left: 0 !important;
+            top: 0 !important;
+            left: 0 !important;
             width: 100% !important;
             display: flex !important;
             flex-direction: row !important;
             justify-content: space-between !important;
             background-color: white !important;
             direction: rtl !important;
+            margin: 0 !important;
+            padding: 0 !important;
         }
 
         .print-half {
             width: 49% !important;
             padding: 10px !important;
             box-sizing: border-box !important;
-            border-left: 2px dashed #000 !important;
+            border-left: 2px dashed #000 !important; /* خط القص أوضح */
         }
 
         header, footer, .no-print, [data-testid="stSidebar"], [data-testid="stHeader"] { 
@@ -50,39 +57,85 @@ st.markdown("""
         @page { size: A4 portrait; margin: 0; }
 
         .header-box {
-            border-bottom: 4px solid #000 !important;
-            padding-bottom: 5px; margin-bottom: 10px;
+            border-bottom: 4px solid #000 !important; /* زيادة سماكة الخط تحت الاسم */
+            padding-bottom: 5px;
+            margin-bottom: 10px;
             text-align: right;
         }
 
-        .name-txt { font-size: 22px !important; font-weight: 900 !important; }
-
-        .table-style { 
-            width: 100%; border-collapse: collapse; 
-            border: 3px solid #000 !important; 
+        /* اسم المندوب غامق جداً */
+        .name-txt { 
+            font-size: 24px !important; 
+            font-weight: 900 !important; 
+            margin: 0; 
         }
         
-        /* تفعيل البولد العريض جداً للأرقام والنصوص */
+        .date-txt { 
+            font-size: 14px !important; 
+            font-weight: 900 !important; 
+            margin: 0; 
+        }
+
+        .table-style { 
+            width: 100%; 
+            border-collapse: collapse; 
+            border: 3px solid #000 !important; /* حدود الجدول الخارجية */
+        }
+        
+        /* جعل نصوص الجدول والحدود والارقام عريضة جداً (Heavy Bold) */
         .table-style th, .table-style td {
             border: 2px solid #000 !important; 
             padding: 6px !important;
             text-align: center;
-            font-size: 16px !important;
-            font-weight: 900 !important; /* عريض جداً */
+            font-size: 17px !important;
+            font-weight: 900 !important; /* أقصى سماكة خط */
+            color: #000000 !important;
         }
         
-        /* تركيز خاص على عمود العدد ليكون أوضح شيء في الورقة */
+        .th-bg { 
+            background-color: #d0d0d0 !important; 
+            font-weight: 900 !important; 
+        }
+        
+        /* خانة العدد: تكبير وتغميق إضافي للأرقام لضمان ظهورها */
         .col-qty { 
             width: 20%; 
-            font-size: 26px !important; /* تكبير الرقم */
-            font-weight: 900 !important; /* بولد فائق */
-            background-color: #f9f9f9 !important;
+            font-size: 24px !important; 
+            font-weight: 900 !important;
+            /* إضافة ظل خفيف للنص لتقوية الحبر في الطباعة */
+            text-shadow: 0.5px 0px 0px black; 
         }
     }
     </style>
 """, unsafe_allow_html=True)
 
-# --- 2. نظام الدخول والاتصال ---
+def show_full_logo():
+    st.markdown('<div class="no-print">', unsafe_allow_html=True)
+    possible_names = ["Logo.JPG", "Logo .JPG", "logo.jpg"]
+    found = False
+    for name in possible_names:
+        if os.path.exists(name):
+            st.image(name, use_container_width=True)
+            found = True
+            break
+    if not found:
+        st.info("⚠️ يرجى التأكد من رفع صورة Logo.JPG")
+    st.markdown('</div>', unsafe_allow_html=True)
+
+# --- نظام الدخول والاتصال ---
+if 'admin_logged_in' not in st.session_state: st.session_state.admin_logged_in = False
+if not st.session_state.admin_logged_in:
+    show_full_logo()
+    col1, col2, col3 = st.columns([1, 2, 1])
+    with col2:
+        st.markdown("<h1 style='text-align: center;'>دخول الإدارة</h1>", unsafe_allow_html=True)
+        pwd = st.text_input("كلمة السر", type="password")
+        if st.button("دخول", use_container_width=True):
+            if pwd == "Hlb_Admin_2024":
+                st.session_state.admin_logged_in = True
+                st.rerun()
+    st.stop()
+
 def get_client():
     try:
         info = json.loads(st.secrets["gcp_service_account"]["json_data"].strip(), strict=False)
@@ -95,33 +148,15 @@ client = get_client()
 if client:
     spreadsheet = client.open_by_key("1-Abj-Kvbe02az8KYZfQL0eal2arKw_wgjVQdJX06IA0")
     delegates = [sh.title for sh in spreadsheet.worksheets() if sh.title not in ["طلبات", "الأسعار", "البيانات", "الزبائن", "Sheet1"]]
+    show_full_logo()
     
-    # شعار الشركة
-    st.markdown('<div class="no-print">', unsafe_allow_html=True)
-    if os.path.exists("Logo.JPG"):
-        st.image("Logo.JPG", use_container_width=True)
-    st.markdown('</div>', unsafe_allow_html=True)
-
-    if 'admin_logged_in' not in st.session_state: st.session_state.admin_logged_in = False
-    if not st.session_state.admin_logged_in:
-        col1, col2, col3 = st.columns([1, 2, 1])
-        with col2:
-            st.markdown("<h3 style='text-align: center;'>دخول الإدارة</h3>", unsafe_allow_html=True)
-            pwd = st.text_input("كلمة السر", type="password")
-            if st.button("دخول", use_container_width=True):
-                if pwd == "Hlb_Admin_2024":
-                    st.session_state.admin_logged_in = True
-                    st.rerun()
-        st.stop()
-
-    # --- إعادة نظام الإشعارات (الجرس) ---
+    # --- نظام الإشعارات (الجرس) ---
     st.markdown('<div class="no-print">', unsafe_allow_html=True)
     if st.button("🔔 فحص الإشعارات الجديدة", use_container_width=True):
         st.session_state.orders = []
         for rep in delegates:
             ws = spreadsheet.worksheet(rep)
-            if "بانتظار التصديق" in ws.col_values(4):
-                st.session_state.orders.append(rep)
+            if "بانتظار التصديق" in ws.col_values(4): st.session_state.orders.append(rep)
         if not st.session_state.orders:
             st.toast("لا توجد طلبيات جديدة حالياً")
 
@@ -132,7 +167,6 @@ if client:
                 st.rerun()
     st.markdown('</div>', unsafe_allow_html=True)
 
-    # اختيار المندوب
     active = st.session_state.get('active_rep', "-- اختر مندوب --")
     selected_rep = st.selectbox("المندوب المختار:", ["-- اختر مندوب --"] + delegates, 
                                 index=(delegates.index(active)+1 if active in delegates else 0))
@@ -152,16 +186,16 @@ if client:
                 for _, r in edited.iterrows(): ws.update_cell(int(r['row_no']), 4, "تم التصديق")
                 st.success("تم!"); st.rerun()
             
-            # محتوى الطباعة (أرقام بولد فائق)
-            rows_html = "".join([f"<tr><td class='col-qty'>{r['الكميه المطلوبه']}</td><td>{r['اسم الصنف']}</td><td style='width:10%'></td></tr>" for _, r in edited.iterrows()])
+            # عمود العدد (col-qty) مبرمج ليكون عريض جداً
+            rows_html = "".join([f"<tr><td class='col-qty'>{r['الكميه المطلوبه']}</td><td>{r['اسم الصنف']}</td><td style='width:12%'></td></tr>" for _, r in edited.iterrows()])
             
             half_view = f"""
             <div class="header-box">
                 <p class="name-txt">{selected_rep}</p>
-                <p style="margin:0; font-weight:bold;">وقت الطلب: {order_time}</p>
+                <p class="date-txt">وقت الطلب: {order_time}</p>
             </div>
             <table class="table-style">
-                <thead><tr><th style="background:#eee;">العدد</th><th style="background:#eee;">الصنف</th><th style="background:#eee;">✓</th></tr></thead>
+                <thead><tr><th class="th-bg">العدد</th><th class="th-bg">الصنف</th><th class="th-bg">✓</th></tr></thead>
                 <tbody>{rows_html}</tbody>
             </table>
             """
@@ -172,7 +206,7 @@ if client:
                     <div class="print-half">{half_view}</div>
                 </div>
                 <button onclick="window.print()" class="print-button-real no-print">
-                   🖨️ طباعة (أرقام بولد عريض)
+                   🖨️ طباعة الطلب (أرقام غامقة جداً)
                 </button>
             """, unsafe_allow_html=True)
 
