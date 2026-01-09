@@ -12,76 +12,64 @@ st.markdown("""
     <style>
     /* تنسيق الشاشة الافتراضي */
     .screen-info { color: white; font-size: 18px; text-align: right; }
-    .main-title-screen { font-size: 30px !important; font-weight: 900; color: white; text-align: center; }
+    .main-title-screen { font-size: 35px !important; font-weight: 900; color: white; text-align: center; margin: 10px 0; }
     
-    /* تنسيق زر الطباعة */
+    /* تنسيق الزر ليصبح حقيقي وقابل للتفاعل */
     .print-button-real {
-        display: block; width: 100%; height: 60px; 
+        display: block; width: 100%; height: 65px; 
         background-color: #28a745; color: white !important; 
-        border: none; border-radius: 10px; cursor: pointer; 
-        font-weight: bold; font-size: 24px; margin-top: 20px;
+        border: 4px solid #ffffff; border-radius: 12px; 
+        cursor: pointer; font-weight: bold; font-size: 26px;
+        text-align: center; margin-top: 20px;
     }
 
-    /* --- كود الطباعة الاحترافي --- */
+    /* --- كود الطباعة الحاسم لإلغاء الفراغ العلوي --- */
     @media print {
-        /* إخفاء كل شيء في الموقع تماماً */
-        body * { visibility: hidden; }
-        
-        /* إظهار حاوية الطباعة فقط وإلغاء أي إزاحة */
-        .print-container, .print-container * { visibility: visible; }
-        
-        .print-container {
-            position: absolute;
-            top: 0 !important;
-            left: 0;
-            width: 100%;
-            margin: 0;
-            padding: 0;
-            direction: rtl !important;
-        }
-
-        /* إخفاء الصور والأزرار والجانبيات */
-        header, footer, .no-print, [data-testid="stSidebar"], img, .stImage { 
+        /* إخفاء كل شيء يخص الموقع */
+        header, footer, .no-print, [data-testid="stSidebar"], [data-testid="stHeader"],
+        .stButton, .stSelectbox, .stDataEditor, img, .stImage, .main-title-screen { 
             display: none !important; 
+            height: 0 !important;
+            margin: 0 !important;
         }
 
-        @page { 
-            size: A4; 
-            margin: 0.5cm; /* تقليل الهامش لاستغلال المساحة */
+        /* إجبار محتوى الطباعة على الالتصاق برأس الصفحة */
+        .print-container {
+            display: block !important;
+            position: absolute !important;
+            top: -120px !important; /* إزاحة سالبة لإلغاء فراغ المتصفح الأبيض */
+            left: 0;
+            width: 100% !important;
+            direction: rtl !important;
+            background-color: white !important;
         }
 
-        /* تنسيق الاسم والوقت في سطر واحد أو سطرين متقاربين */
-        .header-section {
-            text-align: right;
-            border-bottom: 2px solid #000;
-            margin-bottom: 15px;
-            padding-bottom: 5px;
+        @page { size: A4; margin: 0.5cm; }
+        
+        /* تنسيق الاسم والوقت (وسط) */
+        .header-print {
+            text-align: right !important;
+            border-bottom: 3px solid black !important;
+            margin-bottom: 15px !important;
+            padding-bottom: 5px !important;
         }
-        .rep-name { 
-            font-size: 32px !important; 
-            font-weight: bold; 
-            margin: 0; 
-        }
-        .order-date { 
-            font-size: 18px !important; 
-            margin: 0;
-        }
+        .rep-name-print { font-size: 35px !important; font-weight: bold; }
+        .date-print { font-size: 18px !important; }
 
-        /* تنسيق الجدول "الوسط" */
-        .print-table {
-            width: 100%;
-            border-collapse: collapse;
+        /* تنسيق الجدول المرتب */
+        .main-table-print { 
+            width: 100% !important; 
+            border-collapse: collapse !important; 
         }
-        .print-table th, .print-table td {
-            border: 1px solid black;
-            padding: 8px;
-            text-align: center;
+        .main-table-print th, .main-table-print td { 
+            border: 2px solid black !important; 
+            padding: 8px !important; 
+            text-align: center; 
         }
-        .print-table th { background-color: #f2f2f2; font-size: 20px; }
-        .print-table td { font-size: 22px; }
-        .col-qty { width: 15%; font-weight: bold; }
-        .col-item { width: 70%; text-align: right; }
-        .col-check { width: 15%; }
+        .th-style { background-color: #f2f2f2 !important; font-size: 22px !important; }
+        .td-qty { font-size: 32px !important; font-weight: bold; width: 15%; }
+        .td-item { font-size: 24px !important; text-align: right !important; width: 70%; }
+        .td-check { width: 15%; }
     }
     </style>
 """, unsafe_allow_html=True)
@@ -118,10 +106,12 @@ if not st.session_state.admin_logged_in:
 # --- 3. الاتصال بقاعدة البيانات ---
 def get_client():
     try:
+        # التأكد من وجود أسرار الاتصال بجوجل
         info = json.loads(st.secrets["gcp_service_account"]["json_data"].strip(), strict=False)
         creds = Credentials.from_service_account_info(info, scopes=["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"])
         return gspread.authorize(creds)
     except Exception as e:
+        st.error(f"خطأ في الاتصال بالقاعدة: {e}")
         return None
 
 client = get_client()
@@ -176,25 +166,25 @@ if client:
                     st.rerun()
             
             with c2:
-                # محتوى الجدول للطباعة
+                # تجهيز محتوى الجدول
                 rows_html = "".join([
-                    f"<tr><td class='col-qty'>{r['الكميه المطلوبه']}</td><td class='col-item'>{r['اسم الصنف']}</td><td class='col-check'></td></tr>" 
+                    f"<tr><td class='td-qty'>{r['الكميه المطلوبه']}</td><td class='td-item'>{r['اسم الصنف']}</td><td class='td-check'></td></tr>" 
                     for _, r in edited.iterrows()
                 ])
                 
-                # بناء هيكل الطباعة الجديد والمحكم
-                print_content = f"""
+                # حاوية الطباعة النهائية المحمية بـ JavaScript لفتح النافذة
+                print_layout = f"""
                 <div class="print-container">
-                    <div class="header-section">
-                        <p class="rep-name">{selected_rep}</p>
-                        <p class="order-date">وقت الطلب: {order_time}</p>
+                    <div class="header-print">
+                        <div class="rep-name-print">{selected_rep}</div>
+                        <div class="date-print">وقت الطلب: {order_time}</div>
                     </div>
-                    <table class="print-table">
+                    <table class="main-table-print">
                         <thead>
                             <tr>
-                                <th style="width:15%">العدد</th>
-                                <th style="width:70%">الصنف</th>
-                                <th style="width:15%">تأكيد</th>
+                                <th class="th-style">العدد</th>
+                                <th class="th-style">الصنف</th>
+                                <th class="th-style">تأكيد</th>
                             </tr>
                         </thead>
                         <tbody>{rows_html}</tbody>
@@ -202,10 +192,10 @@ if client:
                 </div>
                 
                 <button onclick="window.print()" class="print-button-real no-print">
-                   🖨️ طباعة الطلب
+                   🖨️ طباعة الطلبية (Canon)
                 </button>
                 """
-                st.markdown(print_content, unsafe_allow_html=True)
+                st.markdown(print_layout, unsafe_allow_html=True)
 
 if st.sidebar.button("خروج"):
     st.session_state.clear()
