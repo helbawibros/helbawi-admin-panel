@@ -5,12 +5,11 @@ import gspread
 from google.oauth2.service_account import Credentials
 import os
 
-# --- 1. إعدادات الصفحة والتنسيق المزدوج الصارم ---
+# --- 1. إعدادات الصفحة والتنسيق المزدوج مع "خط غامق جداً" ---
 st.set_page_config(page_title="إدارة حلباوي", layout="wide")
 
 st.markdown("""
     <style>
-    /* تنسيق الشاشة الافتراضي */
     .screen-info { color: white; font-size: 18px; text-align: right; }
     
     .print-button-real {
@@ -20,14 +19,15 @@ st.markdown("""
         cursor: pointer; font-weight: bold; font-size: 22px; margin-top: 20px;
     }
 
-    /* --- كود الطباعة الاحترافي للتقسيم الطولي --- */
+    /* --- كود الطباعة المحسن للوضوح العالي --- */
     @media print {
-        /* إخفاء شامل لكل شيء في المتصفح لمنع النصوص الزائدة */
         body * { visibility: hidden !important; }
         
-        /* إظهار حاوية الطباعة فقط وتثبيتها في قمة الورقة */
+        /* ضمان اللون الأسود الخالص للأرقام والنصوص */
         .print-main-wrapper, .print-main-wrapper * { 
             visibility: visible !important; 
+            color: #000000 !important; 
+            -webkit-print-color-adjust: exact;
         }
 
         .print-main-wrapper {
@@ -44,43 +44,65 @@ st.markdown("""
             padding: 0 !important;
         }
 
-        /* تنسيق النصف الواحد (يغطي نصف الورقة طولياً) */
         .print-half {
             width: 49% !important;
             padding: 10px !important;
             box-sizing: border-box !important;
-            border-left: 1px dashed #eee; /* خط خفيف جداً لمكان القص */
+            border-left: 1px dashed #000 !important;
         }
 
-        /* إغلاق كل فجوات Streamlit */
         header, footer, .no-print, [data-testid="stSidebar"], [data-testid="stHeader"] { 
             display: none !important; 
         }
 
         @page { size: A4 portrait; margin: 0; }
 
-        /* تنسيق الرأس المصغر جداً */
         .header-box {
-            border-bottom: 2px solid black;
+            border-bottom: 3px solid #000 !important; /* خط تحت الاسم سميك */
             padding-bottom: 5px;
             margin-bottom: 10px;
             text-align: right;
         }
-        /* تصغير الخطوط بناءً على طلبك (40% أصغر) */
-        .name-txt { font-size: 20px !important; font-weight: bold; margin: 0; }
-        .date-txt { font-size: 12px !important; margin: 0; color: #333; }
 
-        /* تنسيق الجدول ليناسب نصف الورقة */
-        .table-style { width: 100%; border-collapse: collapse; }
-        .table-style th, .table-style td {
-            border: 1px solid black !important;
-            padding: 4px !important;
-            text-align: center;
-            font-size: 14px !important; /* خط صغير وواضح */
+        /* اسم المندوب: عريض وواضح */
+        .name-txt { 
+            font-size: 22px !important; 
+            font-weight: 900 !important; 
+            margin: 0; 
         }
-        .th-bg { background-color: #f0f0f0 !important; font-size: 13px !important; }
-        .col-qty { width: 15%; font-weight: bold; font-size: 18px !important; }
-        .col-check { width: 12%; }
+        
+        .date-txt { 
+            font-size: 13px !important; 
+            font-weight: bold !important; 
+            margin: 0; 
+        }
+
+        .table-style { 
+            width: 100%; 
+            border-collapse: collapse; 
+            border: 2px solid #000 !important; 
+        }
+        
+        /* نصوص الجدول والأرقام: Bold وأسود قاتم */
+        .table-style th, .table-style td {
+            border: 2px solid #000 !important; 
+            padding: 6px !important;
+            text-align: center;
+            font-size: 16px !important;
+            font-weight: 900 !important; /* زيادة سماكة الخط للكل */
+        }
+        
+        .th-bg { 
+            background-color: #e0e0e0 !important; 
+            font-weight: 900 !important; 
+        }
+        
+        /* خانة العدد: تم تكبير الخط والسمك للوضوح */
+        .col-qty { 
+            width: 18%; 
+            font-size: 22px !important; 
+            font-weight: 900 !important; 
+        }
     }
     </style>
 """, unsafe_allow_html=True)
@@ -98,7 +120,7 @@ def show_full_logo():
         st.info("⚠️ يرجى التأكد من رفع صورة Logo.JPG")
     st.markdown('</div>', unsafe_allow_html=True)
 
-# --- نظام الدخول والاتصال (لا تغيير) ---
+# --- نظام الدخول والاتصال ---
 if 'admin_logged_in' not in st.session_state: st.session_state.admin_logged_in = False
 if not st.session_state.admin_logged_in:
     show_full_logo()
@@ -157,8 +179,7 @@ if client:
                 for _, r in edited.iterrows(): ws.update_cell(int(r['row_no']), 4, "تم التصديق")
                 st.success("تم!"); st.rerun()
             
-            # محتوى النصف الواحد للطباعة
-            rows_html = "".join([f"<tr><td class='col-qty'>{r['الكميه المطلوبه']}</td><td>{r['اسم الصنف']}</td><td class='col-check'></td></tr>" for _, r in edited.iterrows()])
+            rows_html = "".join([f"<tr><td class='col-qty'>{r['الكميه المطلوبه']}</td><td>{r['اسم الصنف']}</td><td style='width:12%'></td></tr>" for _, r in edited.iterrows()])
             
             half_view = f"""
             <div class="header-box">
@@ -166,19 +187,18 @@ if client:
                 <p class="date-txt">وقت الطلب: {order_time}</p>
             </div>
             <table class="table-style">
-                <thead><tr><th class="th-bg">العدد</th><th class="th-bg">الصنف</th><th class="th-bg">تأكيد</th></tr></thead>
+                <thead><tr><th class="th-bg">العدد</th><th class="th-bg">الصنف</th><th class="th-bg">✓</th></tr></thead>
                 <tbody>{rows_html}</tbody>
             </table>
             """
 
-            # دمج النسختين يمين ويسار
             st.markdown(f"""
                 <div class="print-main-wrapper">
                     <div class="print-half">{half_view}</div>
                     <div class="print-half">{half_view}</div>
                 </div>
                 <button onclick="window.print()" class="print-button-real no-print">
-                   🖨️ طباعة (نسخة تحضير + نسخة فلترة)
+                   🖨️ طباعة (خط أسود غامق)
                 </button>
             """, unsafe_allow_html=True)
 
