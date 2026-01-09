@@ -5,7 +5,7 @@ import gspread
 from google.oauth2.service_account import Credentials
 import os
 
-# --- 1. إعدادات الصفحة والتنسيق المزدوج مع دعم الصفحات المتعددة ---
+# --- 1. إعدادات الصفحة والتنسيق (حل نهائي وشامل لمشكلة الصفحات المتعددة والوضوح) ---
 st.set_page_config(page_title="إدارة حلباوي", layout="wide")
 
 st.markdown("""
@@ -19,43 +19,41 @@ st.markdown("""
         cursor: pointer; font-weight: bold; font-size: 22px; margin-top: 20px;
     }
 
-    /* --- كود الطباعة المطور ليدعم أكثر من صفحة --- */
+    /* --- كود الطباعة الاحترافي المعدل --- */
     @media print {
         body * { visibility: hidden !important; }
         
-        /* إظهار المحتوى وضمان اللون الأسود الفاحم */
         .print-main-wrapper, .print-main-wrapper * { 
             visibility: visible !important; 
-            color: #000000 !important; 
+            color: #000000 !important;
             -webkit-print-color-adjust: exact;
         }
 
         .print-main-wrapper {
-            display: flex !important;
-            flex-direction: row !important;
-            justify-content: space-between !important;
-            background-color: white !important;
-            direction: rtl !important;
-            width: 100% !important;
-            position: absolute !important; /* السماح بالامتداد لأسفل */
+            position: absolute !important;
             top: 0 !important;
             left: 0 !important;
+            width: 100% !important;
+            display: block !important; 
+            direction: rtl !important;
         }
 
+        /* تنسيق النصفين: اليمين واليسار مع السماح بالامتداد لصفحات جديدة */
         .print-half {
-            width: 48.5% !important; /* تقليل العرض قليلاً لتجنب الهوامش */
+            display: inline-block !important;
+            vertical-align: top !important;
+            width: 48% !important;
+            margin: 0.5% !important;
             padding: 5px !important;
             box-sizing: border-box !important;
             border-left: 2px dashed #000 !important;
-        }
-
-        header, footer, .no-print, [data-testid="stSidebar"], [data-testid="stHeader"] { 
-            display: none !important; 
+            /* السماح للجدول بالانقسام بين الصفحات */
+            page-break-inside: auto !important; 
         }
 
         @page { 
             size: A4 portrait; 
-            margin: 0.5cm; /* هامش بسيط لضمان عدم القص عند الانتقال لصفحة جديدة */
+            margin: 0.8cm !important; 
         }
 
         .header-box {
@@ -72,50 +70,43 @@ st.markdown("""
             width: 100%; 
             border-collapse: collapse; 
             border: 3px solid #000 !important; 
-            page-break-inside: auto; /* السماح للجدول بالانقسام */
         }
         
-        .table-style tr { 
-            page-break-inside: avoid !important; /* منع انقسام السطر الواحد بين صفحتين */
-            page-break-after: auto; 
-        }
-
+        /* تغميق فائق لكل نصوص الجدول لضمان الوضوح */
         .table-style th, .table-style td {
             border: 2px solid #000 !important; 
             padding: 8px !important;
             text-align: center;
             font-size: 18px !important; 
             font-weight: 950 !important; 
-            color: #000000 !important;
-            -webkit-text-stroke: 0.8px black; /* تغميق الخط كأنه مكتوب بقلم عريض */
+            -webkit-text-stroke: 0.8px black; /* تأثير قلم الحبر العريض */
             text-shadow: 0.5px 0px 0px #000;
         }
         
-        .th-bg { background-color: #d0d0d0 !important; font-weight: 950 !important; }
-        
+        /* عمود العدد: أكبر وأوضح شيء */
         .col-qty { 
-            width: 18%; 
-            font-size: 26px !important; 
+            width: 18%;
+            font-size: 28px !important; 
             -webkit-text-stroke: 1.2px black; 
         }
+
+        header, footer, .no-print, [data-testid="stSidebar"], [data-testid="stHeader"] { 
+            display: none !important; 
+        }
+        
+        /* منع قص السطر الواحد بين الصفحات */
+        tr { page-break-inside: avoid !important; }
     }
     </style>
 """, unsafe_allow_html=True)
 
 def show_full_logo():
     st.markdown('<div class="no-print">', unsafe_allow_html=True)
-    possible_names = ["Logo.JPG", "Logo .JPG", "logo.jpg"]
-    found = False
-    for name in possible_names:
-        if os.path.exists(name):
-            st.image(name, use_container_width=True)
-            found = True
-            break
-    if not found:
-        st.info("⚠️ يرجى التأكد من رفع صورة Logo.JPG")
+    if os.path.exists("Logo.JPG"):
+        st.image("Logo.JPG", use_container_width=True)
     st.markdown('</div>', unsafe_allow_html=True)
 
-# --- نظام الدخول والاتصال ---
+# --- 2. نظام الدخول والاتصال ---
 if 'admin_logged_in' not in st.session_state: st.session_state.admin_logged_in = False
 if not st.session_state.admin_logged_in:
     show_full_logo()
@@ -149,9 +140,7 @@ if client:
         for rep in delegates:
             ws = spreadsheet.worksheet(rep)
             if "بانتظار التصديق" in ws.col_values(4): st.session_state.orders.append(rep)
-        if not st.session_state.orders:
-            st.toast("لا توجد طلبيات جديدة حالياً")
-
+    
     if 'orders' in st.session_state:
         for name in st.session_state.orders:
             if st.button(f"📦 طلبية جديدة من: {name}", key=f"btn_{name}", use_container_width=True):
@@ -186,7 +175,7 @@ if client:
                 <p class="date-txt">وقت الطلب: {order_time}</p>
             </div>
             <table class="table-style">
-                <thead><tr><th class="th-bg">العدد</th><th class="th-bg">الصنف</th><th class="th-bg">✓</th></tr></thead>
+                <thead><tr><th style="background:#eee;">العدد</th><th style="background:#eee;">الصنف</th><th style="background:#eee;">✓</th></tr></thead>
                 <tbody>{rows_html}</tbody>
             </table>
             """
@@ -195,9 +184,10 @@ if client:
                 <div class="print-main-wrapper">
                     <div class="print-half">{half_view}</div>
                     <div class="print-half">{half_view}</div>
+                    <div style="clear: both;"></div>
                 </div>
                 <button onclick="window.print()" class="print-button-real no-print">
-                   🖨️ طباعة الطلب (يدعم صفحات متعددة + خط عريض)
+                   🖨️ طباعة (يدعم عدة صفحات + خط عريض جداً)
                 </button>
             """, unsafe_allow_html=True)
 
