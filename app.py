@@ -5,7 +5,7 @@ import gspread
 from google.oauth2.service_account import Credentials
 import os
 
-# --- 1. إعدادات الصفحة والتنسيق القسري للطباعة النظيفة ---
+# --- 1. إعدادات الصفحة والتنسيق المزدوج (نصفين) ---
 st.set_page_config(page_title="إدارة حلباوي", layout="wide")
 
 st.markdown("""
@@ -20,54 +20,62 @@ st.markdown("""
         cursor: pointer; font-weight: bold; font-size: 26px; margin-top: 20px;
     }
 
-    /* --- كود الطباعة "الصارم" لإزالة النصوص الزائدة --- */
+    /* --- كود الطباعة المزدوج (نصفين طولياً) --- */
     @media print {
-        /* إخفاء كلي وشامل لكل شيء في الصفحة بلا استثناء */
         body * { visibility: hidden !important; }
         
-        /* إظهار فقط حاوية الطباعة وجعلها ثابتة في القمة */
-        .print-final-container, .print-final-container * { 
-            visibility: visible !important; 
-        }
-
-        .print-final-container {
-            position: fixed !important; /* تثبيت فوق كل شيء */
+        /* الحاوية الرئيسية التي ستجمع النسختين */
+        .print-main-wrapper {
+            visibility: visible !important;
+            display: flex !important;
+            flex-direction: row !important;
+            justify-content: space-between !important;
+            position: fixed !important;
             top: 0 !important;
             left: 0 !important;
-            right: 0 !important;
             width: 100% !important;
-            padding: 0 !important;
-            margin: 0 !important;
-            background-color: white !important;
+            height: 100% !important;
             direction: rtl !important;
-            z-index: 9999;
+            background-color: white !important;
         }
 
-        /* منع المتصفح من حجز مساحات للعناصر المخفية */
+        /* تنسيق كل نصف من الورقة */
+        .print-half {
+            width: 48% !important; /* أقل من 50% لترك مساحة للقص */
+            padding: 5px !important;
+            box-sizing: border-box !important;
+            border-left: 1px dashed #ccc !important; /* خط وهمي بسيط للقص */
+        }
+
         header, footer, .no-print, [data-testid="stSidebar"], img, .stImage, .stDataEditor { 
             display: none !important; 
         }
 
-        @page { size: A4; margin: 0.5cm; }
+        @page { size: A4; margin: 0.3cm; }
 
+        /* رأس الصفحة المصغر */
         .header-box {
-            border-bottom: 4px solid black;
-            padding-bottom: 10px;
-            margin-bottom: 20px;
+            border-bottom: 2px solid black;
+            padding-bottom: 5px;
+            margin-bottom: 10px;
             text-align: right;
         }
-        .name-txt { font-size: 40px !important; font-weight: bold; margin: 0; }
-        .date-txt { font-size: 20px !important; margin: 0; }
+        /* تصغير الخط بنسبة 40% (كان 40px أصبح 24px) */
+        .name-txt { font-size: 24px !important; font-weight: bold; margin: 0; }
+        .date-txt { font-size: 14px !important; margin: 0; }
 
+        /* جدول مصغر واضح */
         .table-style { width: 100%; border-collapse: collapse; }
         .table-style th, .table-style td {
-            border: 2px solid black !important;
-            padding: 12px !important;
+            border: 1px solid black !important;
+            padding: 5px !important;
             text-align: center;
-            font-size: 26px !important;
+            /* تصغير خط الجدول بنسبة 40% (كان 26px أصبح 16px) */
+            font-size: 16px !important; 
         }
-        .th-bg { background-color: #eee !important; font-size: 24px !important; }
-        .col-qty { width: 15%; font-weight: 900; font-size: 38px !important; }
+        .th-bg { background-color: #eee !important; font-size: 14px !important; }
+        /* تصغير خط الكمية (كان 38px أصبح 22px) */
+        .col-qty { width: 20%; font-weight: 900; font-size: 22px !important; }
     }
     </style>
 """, unsafe_allow_html=True)
@@ -162,31 +170,37 @@ if client:
             
             with c2:
                 rows_html = "".join([
-                    f"<tr><td class='col-qty'>{r['الكميه المطلوبه']}</td><td>{r['اسم الصنف']}</td><td style='width:15%'></td></tr>" 
+                    f"<tr><td class='col-qty'>{r['الكميه المطلوبه']}</td><td>{r['اسم الصنف']}</td><td style='width:10%'></td></tr>" 
                     for _, r in edited.iterrows()
                 ])
                 
-                # --- الهيكل النهائي المضمون ---
+                # إنشاء محتوى النصف الواحد
+                half_content = f"""
+                <div class="header-box">
+                    <p class="name-txt">{selected_rep}</p>
+                    <p class="date-txt">الطلب: {order_time}</p>
+                </div>
+                <table class="table-style">
+                    <thead>
+                        <tr>
+                            <th class="th-bg">العدد</th>
+                            <th class="th-bg">الصنف</th>
+                            <th class="th-bg">✓</th>
+                        </tr>
+                    </thead>
+                    <tbody>{rows_html}</tbody>
+                </table>
+                """
+
+                # الدمج في نسختين (Wrapper)
                 final_print_html = f"""
-                <div class="print-final-container">
-                    <div class="header-box">
-                        <p class="name-txt">{selected_rep}</p>
-                        <p class="date-txt">وقت الطلب: {order_time}</p>
-                    </div>
-                    <table class="table-style">
-                        <thead>
-                            <tr>
-                                <th class="th-bg">العدد</th>
-                                <th class="th-bg">الصنف</th>
-                                <th class="th-bg">تأكيد</th>
-                            </tr>
-                        </thead>
-                        <tbody>{rows_html}</tbody>
-                    </table>
+                <div class="print-main-wrapper">
+                    <div class="print-half">{half_content}</div>
+                    <div class="print-half">{half_content}</div>
                 </div>
                 
                 <button onclick="window.print()" class="print-button-real no-print">
-                   🖨️ طباعة الطلب الآن
+                   🖨️ طباعة (نسختين في ورقة)
                 </button>
                 """
                 st.markdown(final_print_html, unsafe_allow_html=True)
