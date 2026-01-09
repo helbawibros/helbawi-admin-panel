@@ -5,16 +5,16 @@ import gspread
 from google.oauth2.service_account import Credentials
 import os
 
-# --- 1. إعدادات الصفحة والتنسيق الاحترافي المرتب للطباعة ---
+# --- 1. إعدادات الصفحة والتنسيق النهائي الموجه للطابعة ---
 st.set_page_config(page_title="إدارة حلباوي", layout="wide")
 
 st.markdown("""
     <style>
     /* تنسيق الشاشة الافتراضي */
     .screen-info { color: white; font-size: 18px; text-align: right; }
-    .main-title-screen { font-size: 35px !important; font-weight: 900; color: white; text-align: center; margin: 10px 0; }
+    .main-title-screen { font-size: 30px !important; font-weight: 900; color: white; text-align: center; }
     
-    /* تنسيق زر الطباعة ليفتح النافذة فوراً */
+    /* تنسيق زر الطباعة */
     .print-button-real {
         display: block; width: 100%; height: 60px; 
         background-color: #28a745; color: white !important; 
@@ -22,58 +22,66 @@ st.markdown("""
         font-weight: bold; font-size: 24px; margin-top: 20px;
     }
 
-    /* --- إعدادات الطباعة الدقيقة --- */
+    /* --- كود الطباعة الاحترافي --- */
     @media print {
-        /* إخفاء كل شيء ما عدا منطقة الطباعة المحددة */
+        /* إخفاء كل شيء في الموقع تماماً */
         body * { visibility: hidden; }
-        .print-area, .print-area * { visibility: visible; }
         
-        /* تحديد مكان منطقة الطباعة في أعلى الورقة تماماً */
-        .print-area {
+        /* إظهار حاوية الطباعة فقط وإلغاء أي إزاحة */
+        .print-container, .print-container * { visibility: visible; }
+        
+        .print-container {
             position: absolute;
+            top: 0 !important;
             left: 0;
-            top: 0;
-            width: 100% !important;
+            width: 100%;
+            margin: 0;
+            padding: 0;
             direction: rtl !important;
         }
 
+        /* إخفاء الصور والأزرار والجانبيات */
         header, footer, .no-print, [data-testid="stSidebar"], img, .stImage { 
             display: none !important; 
         }
 
-        @page { size: A4; margin: 1cm; }
-
-        /* تنسيق الاسم والوقت (رأس الصفحة) */
-        .header-print {
-            text-align: center !important; /* جعل الاسم في المنتصف لترتيب أفضل */
-            border-bottom: 3px solid black !important;
-            margin-bottom: 20px !important;
-            padding-bottom: 10px !important;
-        }
-        .rep-name-print { 
-            font-size: 45px !important; /* حجم وسط كما طلبت */
-            font-weight: 900; 
-            margin: 0 !important;
-            line-height: 1.2;
-        }
-        .date-print { 
-            font-size: 22px !important; 
-            margin-top: 5px !important;
+        @page { 
+            size: A4; 
+            margin: 0.5cm; /* تقليل الهامش لاستغلال المساحة */
         }
 
-        /* تنسيق الجدول المرتب */
-        .main-table-print { 
-            width: 100% !important; 
-            border-collapse: collapse !important; 
+        /* تنسيق الاسم والوقت في سطر واحد أو سطرين متقاربين */
+        .header-section {
+            text-align: right;
+            border-bottom: 2px solid #000;
+            margin-bottom: 15px;
+            padding-bottom: 5px;
         }
-        .main-table-print th, .main-table-print td { 
-            border: 2px solid black !important; 
-            padding: 10px !important; 
-            text-align: center; 
+        .rep-name { 
+            font-size: 32px !important; 
+            font-weight: bold; 
+            margin: 0; 
         }
-        .th-style { background-color: #f2f2f2 !important; font-size: 24px !important; }
-        .td-qty { font-size: 35px !important; font-weight: bold; width: 20%; } 
-        .td-item { font-size: 28px !important; text-align: right !important; width: 80%; }
+        .order-date { 
+            font-size: 18px !important; 
+            margin: 0;
+        }
+
+        /* تنسيق الجدول "الوسط" */
+        .print-table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        .print-table th, .print-table td {
+            border: 1px solid black;
+            padding: 8px;
+            text-align: center;
+        }
+        .print-table th { background-color: #f2f2f2; font-size: 20px; }
+        .print-table td { font-size: 22px; }
+        .col-qty { width: 15%; font-weight: bold; }
+        .col-item { width: 70%; text-align: right; }
+        .col-check { width: 15%; }
     }
     </style>
 """, unsafe_allow_html=True)
@@ -168,23 +176,25 @@ if client:
                     st.rerun()
             
             with c2:
+                # محتوى الجدول للطباعة
                 rows_html = "".join([
-                    f"<tr><td class='td-qty'>{r['الكميه المطلوبه']}</td><td class='td-item'>{r['اسم الصنف']}</td></tr>" 
+                    f"<tr><td class='col-qty'>{r['الكميه المطلوبه']}</td><td class='col-item'>{r['اسم الصنف']}</td><td class='col-check'></td></tr>" 
                     for _, r in edited.iterrows()
                 ])
                 
-                # طبقة الطباعة المنظمة (print-area)
-                print_layout = f"""
-                <div class="print-area">
-                    <div class="header-print">
-                        <div class="rep-name-print">{selected_rep}</div>
-                        <div class="date-print">وقت الطلب: {order_time}</div>
+                # بناء هيكل الطباعة الجديد والمحكم
+                print_content = f"""
+                <div class="print-container">
+                    <div class="header-section">
+                        <p class="rep-name">{selected_rep}</p>
+                        <p class="order-date">وقت الطلب: {order_time}</p>
                     </div>
-                    <table class="main-table-print">
+                    <table class="print-table">
                         <thead>
                             <tr>
-                                <th class="th-style">العدد</th>
-                                <th class="th-style">الصنف</th>
+                                <th style="width:15%">العدد</th>
+                                <th style="width:70%">الصنف</th>
+                                <th style="width:15%">تأكيد</th>
                             </tr>
                         </thead>
                         <tbody>{rows_html}</tbody>
@@ -192,10 +202,10 @@ if client:
                 </div>
                 
                 <button onclick="window.print()" class="print-button-real no-print">
-                   🖨️ طباعة الطلبية (Canon)
+                   🖨️ طباعة الطلب
                 </button>
                 """
-                st.markdown(print_layout, unsafe_allow_html=True)
+                st.markdown(print_content, unsafe_allow_html=True)
 
 if st.sidebar.button("خروج"):
     st.session_state.clear()
