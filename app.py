@@ -5,7 +5,7 @@ import gspread
 from google.oauth2.service_account import Credentials
 import os
 
-# --- 1. إعدادات الصفحة والتنسيق المزدوج مع دعم الصفحات المتعددة ---
+# --- 1. إعدادات الصفحة والتنسيق المزدوج (تركيز سماكة الخط للجدول كاملاً) ---
 st.set_page_config(page_title="إدارة حلباوي", layout="wide")
 
 st.markdown("""
@@ -19,11 +19,10 @@ st.markdown("""
         cursor: pointer; font-weight: bold; font-size: 22px; margin-top: 20px;
     }
 
-    /* --- كود الطباعة المطور ليدعم أكثر من صفحة --- */
+    /* --- كود الطباعة المحسن للوضوح العالي جداً --- */
     @media print {
         body * { visibility: hidden !important; }
         
-        /* إظهار المحتوى وضمان اللون الأسود الفاحم */
         .print-main-wrapper, .print-main-wrapper * { 
             visibility: visible !important; 
             color: #000000 !important; 
@@ -31,20 +30,22 @@ st.markdown("""
         }
 
         .print-main-wrapper {
+            position: fixed !important;
+            top: 0 !important;
+            left: 0 !important;
+            width: 100% !important;
             display: flex !important;
             flex-direction: row !important;
             justify-content: space-between !important;
             background-color: white !important;
             direction: rtl !important;
-            width: 100% !important;
-            position: absolute !important; /* السماح بالامتداد لأسفل */
-            top: 0 !important;
-            left: 0 !important;
+            margin: 0 !important;
+            padding: 0 !important;
         }
 
         .print-half {
-            width: 48.5% !important; /* تقليل العرض قليلاً لتجنب الهوامش */
-            padding: 5px !important;
+            width: 49% !important;
+            padding: 10px !important;
             box-sizing: border-box !important;
             border-left: 2px dashed #000 !important;
         }
@@ -53,10 +54,7 @@ st.markdown("""
             display: none !important; 
         }
 
-        @page { 
-            size: A4 portrait; 
-            margin: 0.5cm; /* هامش بسيط لضمان عدم القص عند الانتقال لصفحة جديدة */
-        }
+        @page { size: A4 portrait; margin: 0; }
 
         .header-box {
             border-bottom: 4px solid #000 !important; 
@@ -65,38 +63,47 @@ st.markdown("""
             text-align: right;
         }
 
-        .name-txt { font-size: 24px !important; font-weight: 900 !important; margin: 0; }
-        .date-txt { font-size: 14px !important; font-weight: 900 !important; margin: 0; }
+        .name-txt { 
+            font-size: 24px !important; 
+            font-weight: 900 !important; 
+            margin: 0; 
+        }
+        
+        .date-txt { 
+            font-size: 14px !important; 
+            font-weight: 900 !important; 
+            margin: 0; 
+        }
 
         .table-style { 
             width: 100%; 
             border-collapse: collapse; 
             border: 3px solid #000 !important; 
-            page-break-inside: auto; /* السماح للجدول بالانقسام */
         }
         
-        .table-style tr { 
-            page-break-inside: avoid !important; /* منع انقسام السطر الواحد بين صفحتين */
-            page-break-after: auto; 
-        }
-
+        /* تعديل شامل: كل خلية في الجدول ستكون بولد فاحم وعريض */
         .table-style th, .table-style td {
             border: 2px solid #000 !important; 
             padding: 8px !important;
             text-align: center;
-            font-size: 18px !important; 
-            font-weight: 950 !important; 
+            font-size: 18px !important; /* حجم خط موحد وواضح */
+            font-weight: 950 !important; /* أقصى سماكة للخط */
             color: #000000 !important;
-            -webkit-text-stroke: 0.8px black; /* تغميق الخط كأنه مكتوب بقلم عريض */
+            /* تأثير القلم العريض على كل نصوص الجدول (أصناف وأرقام) */
+            -webkit-text-stroke: 0.8px black;
             text-shadow: 0.5px 0px 0px #000;
         }
         
-        .th-bg { background-color: #d0d0d0 !important; font-weight: 950 !important; }
+        .th-bg { 
+            background-color: #d0d0d0 !important; 
+            font-weight: 950 !important; 
+        }
         
+        /* تمييز إضافي لعمود العدد ليبقى الأكبر حجماً */
         .col-qty { 
             width: 18%; 
             font-size: 26px !important; 
-            -webkit-text-stroke: 1.2px black; 
+            -webkit-text-stroke: 1.2px black; /* سماكة أكبر للأرقام الأساسية */
         }
     }
     </style>
@@ -143,6 +150,7 @@ if client:
     delegates = [sh.title for sh in spreadsheet.worksheets() if sh.title not in ["طلبات", "الأسعار", "البيانات", "الزبائن", "Sheet1"]]
     show_full_logo()
     
+    # --- نظام الإشعارات (الجرس) ---
     st.markdown('<div class="no-print">', unsafe_allow_html=True)
     if st.button("🔔 فحص الإشعارات الجديدة", use_container_width=True):
         st.session_state.orders = []
@@ -197,7 +205,7 @@ if client:
                     <div class="print-half">{half_view}</div>
                 </div>
                 <button onclick="window.print()" class="print-button-real no-print">
-                   🖨️ طباعة الطلب (يدعم صفحات متعددة + خط عريض)
+                   🖨️ طباعة الطلب (تغميق شامل للأصناف والأرقام)
                 </button>
             """, unsafe_allow_html=True)
 
