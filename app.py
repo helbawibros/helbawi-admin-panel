@@ -5,79 +5,74 @@ import gspread
 from google.oauth2.service_account import Credentials
 import os
 
-# --- 1. إعدادات الصفحة والتنسيق الاحترافي للطباعة على Canon ---
+# --- 1. إعدادات الصفحة والتنسيق الاحترافي للطباعة ---
 st.set_page_config(page_title="إدارة حلباوي", layout="wide")
 
 st.markdown("""
     <style>
-    /* تنسيق الشاشة الافتراضي */
+    /* تنسيق الشاشة الافتراضي للبرنامج */
     .screen-info { color: white; font-size: 18px; text-align: right; }
     .main-title-screen { font-size: 40px !important; font-weight: 900; color: white; text-align: center; margin: 10px 0; }
     
-    /* تنسيق الزر ليصبح حقيقي وقابل للتفاعل */
+    /* تنسيق الزر ليفتح نافذة الطباعة مباشرة */
     .print-button-real {
-        display: block;
-        width: 100%; 
-        height: 65px; 
-        background-color: #1E3A8A; 
-        color: white !important; 
-        border: 4px solid #FFD700; 
-        border-radius: 12px; 
-        cursor: pointer; 
-        font-weight: bold; 
-        font-size: 26px;
-        text-align: center;
-        transition: 0.3s;
-        box-shadow: 0px 5px 15px rgba(0,0,0,0.4);
-        margin-top: 20px;
+        display: block; width: 100%; height: 75px; 
+        background-color: #28a745; color: white !important; 
+        border: 4px solid #ffffff; border-radius: 15px; cursor: pointer; 
+        font-weight: bold; font-size: 30px; margin-top: 20px;
+        box-shadow: 0px 4px 10px rgba(0,0,0,0.3);
     }
-    .print-button-real:hover {
-        background-color: #152a61;
-        transform: scale(1.01);
-        box-shadow: 0px 8px 25px rgba(0,0,0,0.5);
-    }
+    .print-button-real:hover { background-color: #218838; }
 
-    /* إعدادات الطباعة المخصصة لورق A4 */
+    /* --- إعدادات الطباعة (ما يظهر على الورق فقط) --- */
     @media print {
-        header, footer, .no-print, [data-testid="stSidebar"], .stButton, .stSelectbox, .stDataEditor { 
+        /* إخفاء كل العناصر غير الضرورية والصور */
+        header, footer, .no-print, [data-testid="stSidebar"], 
+        .stButton, .stSelectbox, .stDataEditor, img, .stImage, .main-title-screen { 
             display: none !important; 
         }
+        
+        /* إظهار حاوية الطباعة وتوسيعها */
         .print-only { 
             display: block !important; 
             direction: rtl !important; 
             width: 100% !important;
+            background-color: white !important;
         }
-        @page { size: A4; margin: 1.5cm; }
-        body { background-color: white !important; color: black !important; }
+
+        @page { size: A4; margin: 1cm; }
         
+        /* تنسيق اسم المندوب والتاريخ في الورقة */
         .header-print {
             text-align: right !important;
-            border-bottom: 5px solid black !important;
+            border-bottom: 10px solid black !important;
             margin-bottom: 30px !important;
             padding-bottom: 10px !important;
         }
-        .rep-name-print { font-size: 60px !important; font-weight: 900; }
-        .date-print { font-size: 25px !important; font-weight: bold; }
+        .rep-name-print { font-size: 80px !important; font-weight: 900; line-height: 1.1; }
+        .date-print { font-size: 35px !important; margin-top: 10px; }
 
+        /* تنسيق الجدول ليكون عملاق وواضح */
         .main-table-print { 
             width: 100% !important; 
             border-collapse: collapse !important; 
-            border: 3px solid black !important; 
+            margin-top: 20px;
         }
         .main-table-print th, .main-table-print td { 
-            border: 3px solid black !important; 
-            padding: 12px !important; 
+            border: 5px solid black !important; 
+            padding: 20px !important; 
             text-align: center; 
         }
-        .th-style { background-color: #f0f0f0 !important; font-size: 28px !important; font-weight: bold; }
-        .td-qty { font-size: 65px !important; font-weight: 900 !important; width: 20%; }
-        .td-item { font-size: 45px !important; font-weight: bold !important; width: 65%; text-align: right !important; }
-        .td-check { width: 15%; font-size: 30px; }
+        .th-style { background-color: #f0f0f0 !important; font-size: 40px !important; font-weight: bold; }
+        .td-qty { font-size: 100px !important; font-weight: 900 !important; width: 25%; } /* رقم الكمية ضخم */
+        .td-item { font-size: 60px !important; font-weight: bold !important; text-align: right !important; width: 75%; }
     }
     </style>
 """, unsafe_allow_html=True)
 
 def show_full_logo():
+    # وسم no-print يضمن عدم ظهور الصورة عند الطباعة حتى لو كانت ظاهرة على الشاشة
+    st.markdown('<div class="no-print">', unsafe_allow_html=True)
     possible_names = ["Logo.JPG", "Logo .JPG", "logo.jpg"]
     found = False
     for name in possible_names:
@@ -87,6 +82,7 @@ def show_full_logo():
             break
     if not found:
         st.info("⚠️ يرجى التأكد من رفع صورة Logo.JPG")
+    st.markdown('</div>', unsafe_allow_html=True)
 
 # --- 2. نظام الدخول ---
 if 'admin_logged_in' not in st.session_state: 
@@ -165,36 +161,33 @@ if client:
                     st.rerun()
             
             with c2:
-                # محتوى الطباعة
-                rows_html = "".join([f"<tr><td class='td-qty'>{r['الكميه المطلوبه']}</td><td class='td-item'>{r['اسم الصنف']}</td><td class='td-check'>[ ]</td></tr>" for _, r in edited.iterrows()])
+                # إنشاء محتوى الجدول للطباعة بأحجام كبيرة
+                rows_html = "".join([
+                    f"<tr><td class='td-qty'>{r['الكميه المطلوبه']}</td><td class='td-item'>{r['اسم الصنف']}</td></tr>" 
+                    for _, r in edited.iterrows()
+                ])
                 
-                # --- التعديل السحري لضمان عمل الطباعة وتخطي حظر المتصفح ---
+                # تخطيط الطباعة المخفي عن الشاشة والظاهر للبرنتر
                 print_layout = f"""
-                <div class="print-only">
+                <div class="print-only" style="display:none;">
                     <div class="header-print">
                         <div class="rep-name-print">{selected_rep}</div>
                         <div class="date-print">وقت الطلب: {order_time}</div>
                     </div>
                     <table class="main-table-print">
                         <thead>
-                            <tr><th class="th-style">العدد</th><th class="th-style">الصنف</th><th class="th-style">تأكيد</th></tr>
+                            <tr>
+                                <th class="th-style">الكمية</th>
+                                <th class="th-style">الصنف</th>
+                            </tr>
                         </thead>
                         <tbody>{rows_html}</tbody>
                     </table>
                 </div>
                 
-                <button type="button" onclick="window.print()" class="no-print print-button-real">
-                   🖨️ اضغط هنا لطباعة الطلبية على Canon
+                <button onclick="window.print()" class="print-button-real no-print">
+                   🖨️ طباعة الطلبية (Canon)
                 </button>
-                
-                <script>
-                // هذا الجزء يضمن تفعيل أمر الطباعة حتى لو كان المتصفح يحاول حظره
-                document.addEventListener('click', function (e) {{
-                    if (e.target.classList.contains('print-button-real')) {{
-                        window.print();
-                    }}
-                }});
-                </script>
                 """
                 st.markdown(print_layout, unsafe_allow_html=True)
 
