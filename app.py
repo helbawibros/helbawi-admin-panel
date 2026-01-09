@@ -5,71 +5,69 @@ import gspread
 from google.oauth2.service_account import Credentials
 import os
 
-# --- 1. إعدادات الصفحة والتنسيق النهائي الموجه للطابعة ---
+# --- 1. إعدادات الصفحة والتنسيق القسري للطباعة النظيفة ---
 st.set_page_config(page_title="إدارة حلباوي", layout="wide")
 
 st.markdown("""
     <style>
-    /* تنسيق الشاشة الافتراضي */
+    /* تنسيق الشاشة */
     .screen-info { color: white; font-size: 18px; text-align: right; }
-    .main-title-screen { font-size: 35px !important; font-weight: 900; color: white; text-align: center; margin: 10px 0; }
     
-    /* تنسيق الزر ليصبح حقيقي وقابل للتفاعل */
     .print-button-real {
         display: block; width: 100%; height: 65px; 
         background-color: #28a745; color: white !important; 
-        border: 4px solid #ffffff; border-radius: 12px; 
-        cursor: pointer; font-weight: bold; font-size: 26px;
-        text-align: center; margin-top: 20px;
+        border: 3px solid #ffffff; border-radius: 12px; 
+        cursor: pointer; font-weight: bold; font-size: 26px; margin-top: 20px;
     }
 
-    /* --- كود الطباعة الحاسم لإلغاء الفراغ العلوي --- */
+    /* --- كود الطباعة "الصارم" لإزالة النصوص الزائدة --- */
     @media print {
-        /* إخفاء كل شيء يخص الموقع */
-        header, footer, .no-print, [data-testid="stSidebar"], [data-testid="stHeader"],
-        .stButton, .stSelectbox, .stDataEditor, img, .stImage, .main-title-screen { 
-            display: none !important; 
-            height: 0 !important;
-            margin: 0 !important;
+        /* إخفاء كلي وشامل لكل شيء في الصفحة بلا استثناء */
+        body * { visibility: hidden !important; }
+        
+        /* إظهار فقط حاوية الطباعة وجعلها ثابتة في القمة */
+        .print-final-container, .print-final-container * { 
+            visibility: visible !important; 
         }
 
-        /* إجبار محتوى الطباعة على الالتصاق برأس الصفحة */
-        .print-container {
-            display: block !important;
-            position: absolute !important;
-            top: -120px !important; /* إزاحة سالبة لإلغاء فراغ المتصفح الأبيض */
-            left: 0;
+        .print-final-container {
+            position: fixed !important; /* تثبيت فوق كل شيء */
+            top: 0 !important;
+            left: 0 !important;
+            right: 0 !important;
             width: 100% !important;
-            direction: rtl !important;
+            padding: 0 !important;
+            margin: 0 !important;
             background-color: white !important;
+            direction: rtl !important;
+            z-index: 9999;
+        }
+
+        /* منع المتصفح من حجز مساحات للعناصر المخفية */
+        header, footer, .no-print, [data-testid="stSidebar"], img, .stImage, .stDataEditor { 
+            display: none !important; 
         }
 
         @page { size: A4; margin: 0.5cm; }
-        
-        /* تنسيق الاسم والوقت (وسط) */
-        .header-print {
-            text-align: right !important;
-            border-bottom: 3px solid black !important;
-            margin-bottom: 15px !important;
-            padding-bottom: 5px !important;
-        }
-        .rep-name-print { font-size: 35px !important; font-weight: bold; }
-        .date-print { font-size: 18px !important; }
 
-        /* تنسيق الجدول المرتب */
-        .main-table-print { 
-            width: 100% !important; 
-            border-collapse: collapse !important; 
+        .header-box {
+            border-bottom: 4px solid black;
+            padding-bottom: 10px;
+            margin-bottom: 20px;
+            text-align: right;
         }
-        .main-table-print th, .main-table-print td { 
-            border: 2px solid black !important; 
-            padding: 8px !important; 
-            text-align: center; 
+        .name-txt { font-size: 40px !important; font-weight: bold; margin: 0; }
+        .date-txt { font-size: 20px !important; margin: 0; }
+
+        .table-style { width: 100%; border-collapse: collapse; }
+        .table-style th, .table-style td {
+            border: 2px solid black !important;
+            padding: 12px !important;
+            text-align: center;
+            font-size: 26px !important;
         }
-        .th-style { background-color: #f2f2f2 !important; font-size: 22px !important; }
-        .td-qty { font-size: 32px !important; font-weight: bold; width: 15%; }
-        .td-item { font-size: 24px !important; text-align: right !important; width: 70%; }
-        .td-check { width: 15%; }
+        .th-bg { background-color: #eee !important; font-size: 24px !important; }
+        .col-qty { width: 15%; font-weight: 900; font-size: 38px !important; }
     }
     </style>
 """, unsafe_allow_html=True)
@@ -106,12 +104,10 @@ if not st.session_state.admin_logged_in:
 # --- 3. الاتصال بقاعدة البيانات ---
 def get_client():
     try:
-        # التأكد من وجود أسرار الاتصال بجوجل
         info = json.loads(st.secrets["gcp_service_account"]["json_data"].strip(), strict=False)
         creds = Credentials.from_service_account_info(info, scopes=["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"])
         return gspread.authorize(creds)
     except Exception as e:
-        st.error(f"خطأ في الاتصال بالقاعدة: {e}")
         return None
 
 client = get_client()
@@ -151,7 +147,6 @@ if client:
 
         if not pending.empty:
             order_time = pending.iloc[0]['التاريخ و الوقت']
-            st.markdown(f'<div class="screen-info no-print">المندوب: {selected_rep} | التاريخ: {order_time}</div>', unsafe_allow_html=True)
             
             edited = st.data_editor(pending[['row_no', 'اسم الصنف', 'الكميه المطلوبه']], 
                                     column_config={"row_no": None, "اسم الصنف": "الصنف", "الكميه المطلوبه": "العدد"}, 
@@ -166,25 +161,24 @@ if client:
                     st.rerun()
             
             with c2:
-                # تجهيز محتوى الجدول
                 rows_html = "".join([
-                    f"<tr><td class='td-qty'>{r['الكميه المطلوبه']}</td><td class='td-item'>{r['اسم الصنف']}</td><td class='td-check'></td></tr>" 
+                    f"<tr><td class='col-qty'>{r['الكميه المطلوبه']}</td><td>{r['اسم الصنف']}</td><td style='width:15%'></td></tr>" 
                     for _, r in edited.iterrows()
                 ])
                 
-                # حاوية الطباعة النهائية المحمية بـ JavaScript لفتح النافذة
-                print_layout = f"""
-                <div class="print-container">
-                    <div class="header-print">
-                        <div class="rep-name-print">{selected_rep}</div>
-                        <div class="date-print">وقت الطلب: {order_time}</div>
+                # --- الهيكل النهائي المضمون ---
+                final_print_html = f"""
+                <div class="print-final-container">
+                    <div class="header-box">
+                        <p class="name-txt">{selected_rep}</p>
+                        <p class="date-txt">وقت الطلب: {order_time}</p>
                     </div>
-                    <table class="main-table-print">
+                    <table class="table-style">
                         <thead>
                             <tr>
-                                <th class="th-style">العدد</th>
-                                <th class="th-style">الصنف</th>
-                                <th class="th-style">تأكيد</th>
+                                <th class="th-bg">العدد</th>
+                                <th class="th-bg">الصنف</th>
+                                <th class="th-bg">تأكيد</th>
                             </tr>
                         </thead>
                         <tbody>{rows_html}</tbody>
@@ -192,10 +186,10 @@ if client:
                 </div>
                 
                 <button onclick="window.print()" class="print-button-real no-print">
-                   🖨️ طباعة الطلبية (Canon)
+                   🖨️ طباعة الطلب الآن
                 </button>
                 """
-                st.markdown(print_layout, unsafe_allow_html=True)
+                st.markdown(final_print_html, unsafe_allow_html=True)
 
 if st.sidebar.button("خروج"):
     st.session_state.clear()
