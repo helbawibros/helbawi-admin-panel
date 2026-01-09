@@ -5,13 +5,11 @@ import gspread
 from google.oauth2.service_account import Credentials
 import os
 
-# --- 1. إعدادات الصفحة والتنسيق المزدوج مع دعم حقيقي للصفحات المتعددة ---
+# --- 1. إعدادات الصفحة والتنسيق (حل مشكلة النقص وتعدد الصفحات) ---
 st.set_page_config(page_title="إدارة حلباوي", layout="wide")
 
 st.markdown("""
     <style>
-    .screen-info { color: white; font-size: 18px; text-align: right; }
-    
     .print-button-real {
         display: block; width: 100%; height: 60px; 
         background-color: #28a745; color: white !important; 
@@ -19,13 +17,12 @@ st.markdown("""
         cursor: pointer; font-weight: bold; font-size: 22px; margin-top: 20px;
     }
 
-    /* --- كود الطباعة المطور لمنع نقص الأسطر --- */
     @media print {
         body * { visibility: hidden !important; }
         
         .print-main-wrapper, .print-main-wrapper * { 
             visibility: visible !important; 
-            color: #000000 !important; 
+            color: #000000 !important;
             -webkit-print-color-adjust: exact;
         }
 
@@ -34,75 +31,67 @@ st.markdown("""
             top: 0 !important;
             left: 0 !important;
             width: 100% !important;
-            display: block !important; /* تغيير من flex إلى block للسماح بالتمدد الطبيعي */
+            display: block !important; 
             direction: rtl !important;
-            background-color: white !important;
         }
 
-        .print-half {
-            float: right !important; /* وضع النسختين جنباً إلى جنب بطريقة الانسياب */
-            width: 48.5% !important;
-            padding: 5px !important;
-            box-sizing: border-box !important;
-            border-left: 2px dashed #000 !important;
-            min-height: 100px;
+        /* النسخة تأخذ كامل العرض لضمان عدم نقص أي سطر */
+        .order-copy {
+            width: 100% !important;
+            margin-bottom: 50px !important;
+            page-break-after: auto !important;
         }
 
-        header, footer, .no-print, [data-testid="stSidebar"], [data-testid="stHeader"] { 
-            display: none !important; 
+        .copy-label {
+            text-align: center;
+            font-size: 20px;
+            font-weight: bold;
+            border: 2px solid #000;
+            margin-bottom: 10px;
+            padding: 5px;
+            background-color: #eee !important;
         }
 
         @page { 
             size: A4 portrait; 
-            margin: 0.8cm; /* هامش لضمان عدم قص الجداول في الصفحات التالية */
+            margin: 1cm !important; 
         }
 
         .header-box {
             border-bottom: 4px solid #000 !important; 
-            padding-bottom: 5px;
-            margin-bottom: 10px;
-            text-align: right;
+            margin-bottom: 15px;
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-end;
         }
 
-        .name-txt { font-size: 24px !important; font-weight: 900 !important; margin: 0; }
-        .date-txt { font-size: 14px !important; font-weight: 900 !important; margin: 0; }
-
+        .name-txt { font-size: 28px !important; font-weight: 900 !important; margin:0; }
+        
         .table-style { 
             width: 100%; 
             border-collapse: collapse; 
-            border: 3px solid #000 !important; 
-            page-break-inside: auto; /* السماح للجدول بالانتقسام تلقائياً */
+            border: 3px solid #000 !important;
         }
         
-        .table-style tr { 
-            page-break-inside: avoid !important; /* منع انقسام السطر الواحد */
-            page-break-after: auto; 
-        }
-
         .table-style th, .table-style td {
             border: 2px solid #000 !important; 
-            padding: 8px !important;
-            text-align: center;
-            font-size: 19px !important; 
+            padding: 12px !important;
+            font-size: 20px !important; 
             font-weight: 950 !important; 
-            color: #000000 !important;
             -webkit-text-stroke: 0.8px black;
-            text-shadow: 0.5px 0px 0px #000;
         }
-        
-        .th-bg { background-color: #d0d0d0 !important; font-weight: 950 !important; }
         
         .col-qty { 
-            width: 20%; 
-            font-size: 28px !important; 
+            width: 15%;
+            font-size: 30px !important; 
             -webkit-text-stroke: 1.2px black; 
         }
-        
-        /* إضافة فاصل تنظيف بعد النسختين لضمان انتهاء الصفحة بشكل صحيح */
-        .clearfix::after {
-            content: "";
-            clear: both;
-            display: table;
+
+        /* منع انقسام السطر الواحد */
+        tr { page-break-inside: avoid !important; }
+
+        header, footer, .no-print, [data-testid="stSidebar"], [data-testid="stHeader"] { 
+            display: none !important; 
         }
     }
     </style>
@@ -110,29 +99,19 @@ st.markdown("""
 
 def show_full_logo():
     st.markdown('<div class="no-print">', unsafe_allow_html=True)
-    possible_names = ["Logo.JPG", "Logo .JPG", "logo.jpg"]
-    found = False
-    for name in possible_names:
-        if os.path.exists(name):
-            st.image(name, use_container_width=True)
-            found = True
-            break
-    if not found:
-        st.info("⚠️ يرجى التأكد من رفع صورة Logo.JPG")
+    if os.path.exists("Logo.JPG"):
+        st.image("Logo.JPG", use_container_width=True)
     st.markdown('</div>', unsafe_allow_html=True)
 
 # --- نظام الدخول والاتصال ---
 if 'admin_logged_in' not in st.session_state: st.session_state.admin_logged_in = False
 if not st.session_state.admin_logged_in:
     show_full_logo()
-    col1, col2, col3 = st.columns([1, 2, 1])
-    with col2:
-        st.markdown("<h1 style='text-align: center;'>دخول الإدارة</h1>", unsafe_allow_html=True)
-        pwd = st.text_input("كلمة السر", type="password")
-        if st.button("دخول", use_container_width=True):
-            if pwd == "Hlb_Admin_2024":
-                st.session_state.admin_logged_in = True
-                st.rerun()
+    pwd = st.text_input("كلمة السر", type="password")
+    if st.button("دخول", use_container_width=True):
+        if pwd == "Hlb_Admin_2024":
+            st.session_state.admin_logged_in = True
+            st.rerun()
     st.stop()
 
 def get_client():
@@ -155,12 +134,10 @@ if client:
         for rep in delegates:
             ws = spreadsheet.worksheet(rep)
             if "بانتظار التصديق" in ws.col_values(4): st.session_state.orders.append(rep)
-        if not st.session_state.orders:
-            st.toast("لا توجد طلبيات جديدة حالياً")
 
     if 'orders' in st.session_state:
         for name in st.session_state.orders:
-            if st.button(f"📦 طلبية جديدة من: {name}", key=f"btn_{name}", use_container_width=True):
+            if st.button(f"📦 طلبية جديدة من: {name}", key=f"btn_{name}"):
                 st.session_state.active_rep = name
                 st.rerun()
     st.markdown('</div>', unsafe_allow_html=True)
@@ -182,28 +159,35 @@ if client:
 
             if st.button("🚀 تصديق وإرسال النهائي", type="primary", use_container_width=True):
                 for _, r in edited.iterrows(): ws.update_cell(int(r['row_no']), 4, "تم التصديق")
-                st.success("تم!"); st.rerun()
+                st.success("تم التصديق بنجاح!"); st.rerun()
             
-            rows_html = "".join([f"<tr><td class='col-qty'>{r['الكميه المطلوبه']}</td><td style='text-align:right;'>{r['اسم الصنف']}</td><td style='width:10%'></td></tr>" for _, r in edited.iterrows()])
+            rows_html = "".join([f"<tr><td class='col-qty'>{r['الكميه المطلوبه']}</td><td>{r['اسم الصنف']}</td><td style='width:10%'></td></tr>" for _, r in edited.iterrows()])
             
-            half_view = f"""
+            order_content = f"""
             <div class="header-box">
                 <p class="name-txt">{selected_rep}</p>
-                <p class="date-txt">وقت الطلب: {order_time}</p>
+                <p style="font-size:16px; margin:0;">وقت الطلب: {order_time}</p>
             </div>
             <table class="table-style">
-                <thead><tr><th class="th-bg">العدد</th><th class="th-bg">الصنف</th><th class="th-bg">✓</th></tr></thead>
+                <thead><tr><th style="background:#eee;">العدد</th><th style="background:#eee;">الصنف</th><th style="background:#eee;">✓</th></tr></thead>
                 <tbody>{rows_html}</tbody>
             </table>
             """
 
             st.markdown(f"""
-                <div class="print-main-wrapper clearfix">
-                    <div class="print-half">{half_view}</div>
-                    <div class="print-half">{half_view}</div>
+                <div class="print-main-wrapper">
+                    <div class="order-copy">
+                        <div class="copy-label">النسخة الأولى (للمستودع)</div>
+                        {order_content}
+                    </div>
+                    <div style="border-top: 3px dashed #000; margin: 40px 0;"></div>
+                    <div class="order-copy">
+                        <div class="copy-label">النسخة الثانية (للإدارة)</div>
+                        {order_content}
+                    </div>
                 </div>
                 <button onclick="window.print()" class="print-button-real no-print">
-                   🖨️ طباعة الطلب (تم إصلاح نقص الأسطر)
+                   🖨️ طباعة الطلب كاملاً (الحل النهائي للنقص)
                 </button>
             """, unsafe_allow_html=True)
 
