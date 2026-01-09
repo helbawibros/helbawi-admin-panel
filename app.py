@@ -5,7 +5,7 @@ import gspread
 from google.oauth2.service_account import Credentials
 import os
 
-# --- 1. إعدادات الصفحة والتنسيق المزدوج مع "خط غامق جداً" ---
+# --- 1. إعدادات الصفحة والتنسيق المزدوج فائق الوضوح ---
 st.set_page_config(page_title="إدارة حلباوي", layout="wide")
 
 st.markdown("""
@@ -19,14 +19,13 @@ st.markdown("""
         cursor: pointer; font-weight: bold; font-size: 22px; margin-top: 20px;
     }
 
-    /* --- كود الطباعة المحسن للوضوح العالي --- */
+    /* --- كود الطباعة فائق الوضوح للأرقام والحدود --- */
     @media print {
         body * { visibility: hidden !important; }
         
-        /* ضمان اللون الأسود الخالص للأرقام والنصوص */
         .print-main-wrapper, .print-main-wrapper * { 
             visibility: visible !important; 
-            color: #000000 !important; 
+            color: #000000 !important; /* أسود فاحم */
             -webkit-print-color-adjust: exact;
         }
 
@@ -46,9 +45,9 @@ st.markdown("""
 
         .print-half {
             width: 49% !important;
-            padding: 10px !important;
+            padding: 15px !important;
             box-sizing: border-box !important;
-            border-left: 1px dashed #000 !important;
+            border-left: 2px dashed #000 !important; /* خط القص أوضح */
         }
 
         header, footer, .no-print, [data-testid="stSidebar"], [data-testid="stHeader"] { 
@@ -58,82 +57,58 @@ st.markdown("""
         @page { size: A4 portrait; margin: 0; }
 
         .header-box {
-            border-bottom: 3px solid #000 !important; /* خط تحت الاسم سميك */
+            border-bottom: 4px solid #000 !important; /* خط عريض جداً تحت الاسم */
             padding-bottom: 5px;
-            margin-bottom: 10px;
+            margin-bottom: 15px;
             text-align: right;
         }
 
-        /* اسم المندوب: عريض وواضح */
         .name-txt { 
-            font-size: 22px !important; 
+            font-size: 24px !important; 
             font-weight: 900 !important; 
             margin: 0; 
         }
         
         .date-txt { 
-            font-size: 13px !important; 
-            font-weight: bold !important; 
+            font-size: 14px !important; 
+            font-weight: 900 !important; 
             margin: 0; 
         }
 
         .table-style { 
             width: 100%; 
             border-collapse: collapse; 
-            border: 2px solid #000 !important; 
+            border: 3px solid #000 !important; /* حدود الجدول عريضة */
         }
         
-        /* نصوص الجدول والأرقام: Bold وأسود قاتم */
+        /* تنسيق الأرقام والكلمات ليكون عريض جداً */
         .table-style th, .table-style td {
             border: 2px solid #000 !important; 
-            padding: 6px !important;
+            padding: 8px !important;
             text-align: center;
-            font-size: 16px !important;
-            font-weight: 900 !important; /* زيادة سماكة الخط للكل */
+            font-size: 17px !important;
+            font-weight: 900 !important; /* أقصى سمك للخط */
+            /* تقنية لتقوية ظهور الرقم الباهت */
+            text-shadow: 0.5px 0px 0px #000; 
         }
         
         .th-bg { 
-            background-color: #e0e0e0 !important; 
+            background-color: #cccccc !important; 
             font-weight: 900 !important; 
         }
         
-        /* خانة العدد: تم تكبير الخط والسمك للوضوح */
+        /* عمود العدد: تكبير إضافي للأرقام لضمان وضوحها */
         .col-qty { 
-            width: 18%; 
-            font-size: 22px !important; 
+            width: 20%; 
+            font-size: 24px !important; 
             font-weight: 900 !important; 
+            color: #000000 !important;
         }
     }
     </style>
 """, unsafe_allow_html=True)
 
-def show_full_logo():
-    st.markdown('<div class="no-print">', unsafe_allow_html=True)
-    possible_names = ["Logo.JPG", "Logo .JPG", "logo.jpg"]
-    found = False
-    for name in possible_names:
-        if os.path.exists(name):
-            st.image(name, use_container_width=True)
-            found = True
-            break
-    if not found:
-        st.info("⚠️ يرجى التأكد من رفع صورة Logo.JPG")
-    st.markdown('</div>', unsafe_allow_html=True)
-
-# --- نظام الدخول والاتصال ---
-if 'admin_logged_in' not in st.session_state: st.session_state.admin_logged_in = False
-if not st.session_state.admin_logged_in:
-    show_full_logo()
-    col1, col2, col3 = st.columns([1, 2, 1])
-    with col2:
-        st.markdown("<h1 style='text-align: center;'>دخول الإدارة</h1>", unsafe_allow_html=True)
-        pwd = st.text_input("كلمة السر", type="password")
-        if st.button("دخول", use_container_width=True):
-            if pwd == "Hlb_Admin_2024":
-                st.session_state.admin_logged_in = True
-                st.rerun()
-    st.stop()
-
+# --- نظام الدخول والاتصال وقاعدة البيانات ---
 def get_client():
     try:
         info = json.loads(st.secrets["gcp_service_account"]["json_data"].strip(), strict=False)
@@ -146,19 +121,28 @@ client = get_client()
 if client:
     spreadsheet = client.open_by_key("1-Abj-Kvbe02az8KYZfQL0eal2arKw_wgjVQdJX06IA0")
     delegates = [sh.title for sh in spreadsheet.worksheets() if sh.title not in ["طلبات", "الأسعار", "البيانات", "الزبائن", "Sheet1"]]
-    show_full_logo()
     
-    if st.button("🔔 فحص الإشعارات الجديدة", use_container_width=True):
-        st.session_state.orders = []
-        for rep in delegates:
-            ws = spreadsheet.worksheet(rep)
-            if "بانتظار التصديق" in ws.col_values(4): st.session_state.orders.append(rep)
+    # واجهة الشاشة
+    st.markdown('<div class="no-print">', unsafe_allow_html=True)
+    possible_names = ["Logo.JPG", "Logo .JPG", "logo.jpg"]
+    for name in possible_names:
+        if os.path.exists(name):
+            st.image(name, use_container_width=True)
+            break
+    st.markdown('</div>', unsafe_allow_html=True)
 
-    if 'orders' in st.session_state:
-        for name in st.session_state.orders:
-            if st.button(f"📦 طلبية جديدة من: {name}", key=f"btn_{name}", use_container_width=True):
-                st.session_state.active_rep = name
-                st.rerun()
+    # بقية كود Streamlit
+    if 'admin_logged_in' not in st.session_state: st.session_state.admin_logged_in = False
+    if not st.session_state.admin_logged_in:
+        col1, col2, col3 = st.columns([1, 2, 1])
+        with col2:
+            st.markdown("<h1 style='text-align: center;'>دخول الإدارة</h1>", unsafe_allow_html=True)
+            pwd = st.text_input("كلمة السر", type="password")
+            if st.button("دخول", use_container_width=True):
+                if pwd == "Hlb_Admin_2024":
+                    st.session_state.admin_logged_in = True
+                    st.rerun()
+        st.stop()
 
     active = st.session_state.get('active_rep', "-- اختر مندوب --")
     selected_rep = st.selectbox("المندوب المختار:", ["-- اختر مندوب --"] + delegates, 
@@ -179,7 +163,8 @@ if client:
                 for _, r in edited.iterrows(): ws.update_cell(int(r['row_no']), 4, "تم التصديق")
                 st.success("تم!"); st.rerun()
             
-            rows_html = "".join([f"<tr><td class='col-qty'>{r['الكميه المطلوبه']}</td><td>{r['اسم الصنف']}</td><td style='width:12%'></td></tr>" for _, r in edited.iterrows()])
+            # محتوى النصف الواحد للطباعة مع Bold فائق
+            rows_html = "".join([f"<tr><td class='col-qty'>{r['الكميه المطلوبه']}</td><td style='text-align:right;'>{r['اسم الصنف']}</td><td style='width:12%'></td></tr>" for _, r in edited.iterrows()])
             
             half_view = f"""
             <div class="header-box">
@@ -198,9 +183,6 @@ if client:
                     <div class="print-half">{half_view}</div>
                 </div>
                 <button onclick="window.print()" class="print-button-real no-print">
-                   🖨️ طباعة (خط أسود غامق)
+                   🖨️ طباعة الطلب (أرقام واضحة جداً)
                 </button>
             """, unsafe_allow_html=True)
-
-if st.sidebar.button("خروج"):
-    st.session_state.clear(); st.rerun()
