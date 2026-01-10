@@ -5,7 +5,7 @@ import gspread
 from google.oauth2.service_account import Credentials
 import os
 
-# --- 1. إعدادات الصفحة والتنسيق المزدوج ---
+# --- 1. إعدادات الصفحة والتنسيق المزدوج (تركيز سماكة الخط للجدول كاملاً) ---
 st.set_page_config(page_title="إدارة حلباوي", layout="wide")
 
 st.markdown("""
@@ -19,7 +19,7 @@ st.markdown("""
         cursor: pointer; font-weight: bold; font-size: 22px; margin-top: 20px;
     }
 
-    /* --- كود الطباعة المحسن لدعم الصفحات المتعددة --- */
+    /* --- كود الطباعة المحسن للوضوح العالي جداً --- */
     @media print {
         body * { visibility: hidden !important; }
         
@@ -30,8 +30,7 @@ st.markdown("""
         }
 
         .print-main-wrapper {
-            /* تم تغيير fixed إلى absolute للسماح بالتمدد لعدة صفحات */
-            position: absolute !important;
+            position: fixed !important;
             top: 0 !important;
             left: 0 !important;
             width: 100% !important;
@@ -55,10 +54,7 @@ st.markdown("""
             display: none !important; 
         }
 
-        @page { 
-            size: A4 portrait; 
-            margin: 1cm 0cm; /* هوامش علوية بسيطة لمنع قص الكلام */
-        }
+        @page { size: A4 portrait; margin: 0; }
 
         .header-box {
             border-bottom: 4px solid #000 !important; 
@@ -83,22 +79,17 @@ st.markdown("""
             width: 100%; 
             border-collapse: collapse; 
             border: 3px solid #000 !important; 
-            /* لضمان عدم انقسام السطر الواحد بين صفحتين */
-            page-break-inside: auto;
         }
         
-        .table-style tr {
-            page-break-inside: avoid;
-            page-break-after: auto;
-        }
-
+        /* تعديل شامل: كل خلية في الجدول ستكون بولد فاحم وعريض */
         .table-style th, .table-style td {
             border: 2px solid #000 !important; 
             padding: 8px !important;
             text-align: center;
-            font-size: 18px !important; 
-            font-weight: 950 !important; 
+            font-size: 18px !important; /* حجم خط موحد وواضح */
+            font-weight: 950 !important; /* أقصى سماكة للخط */
             color: #000000 !important;
+            /* تأثير القلم العريض على كل نصوص الجدول (أصناف وأرقام) */
             -webkit-text-stroke: 0.8px black;
             text-shadow: 0.5px 0px 0px #000;
         }
@@ -108,10 +99,11 @@ st.markdown("""
             font-weight: 950 !important; 
         }
         
+        /* تمييز إضافي لعمود العدد ليبقى الأكبر حجماً */
         .col-qty { 
             width: 18%; 
             font-size: 26px !important; 
-            -webkit-text-stroke: 1.2px black; 
+            -webkit-text-stroke: 1.2px black; /* سماكة أكبر للأرقام الأساسية */
         }
     }
     </style>
@@ -158,6 +150,7 @@ if client:
     delegates = [sh.title for sh in spreadsheet.worksheets() if sh.title not in ["طلبات", "الأسعار", "البيانات", "الزبائن", "Sheet1"]]
     show_full_logo()
     
+    # --- نظام الإشعارات (الجرس) ---
     st.markdown('<div class="no-print">', unsafe_allow_html=True)
     if st.button("🔔 فحص الإشعارات الجديدة", use_container_width=True):
         st.session_state.orders = []
