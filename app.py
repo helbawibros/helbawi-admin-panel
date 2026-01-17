@@ -5,111 +5,107 @@ import gspread
 from google.oauth2.service_account import Credentials
 import os
 
-# --- 1. إعدادات الصفحة وتنسيق الطباعة الحرارية المتقدم ---
+# --- 1. إعدادات الصفحة والتنسيق الحراري المباشر ---
 st.set_page_config(page_title="إدارة حلباوي - فواتير", layout="wide")
 
 st.markdown("""
     <style>
-    /* تنسيق زر الطباعة على الشاشة */
+    /* تنسيق زر الشاشة */
     .print-button-real {
         display: block; width: 100%; height: 60px; 
         background-color: #28a745; color: white !important; 
-        border: 2px solid #ffffff; border-radius: 10px; 
-        cursor: pointer; font-weight: bold; font-size: 22px; margin-top: 20px;
+        border-radius: 10px; font-weight: bold; font-size: 22px; margin-top: 20px;
     }
 
-    /* --- كود الطباعة المحسن جداً --- */
     @media print {
+        /* إخفاء كل شيء ما عدا منطقة الطباعة */
         body * { visibility: hidden !important; }
         
         html, body {
             margin: 0 !important;
             padding: 0 !important;
             height: auto !important;
-            background-color: white !important;
+            width: 80mm !important;
         }
 
-        /* حاوية الطباعة الرئيسية */
         .print-main-wrapper, .print-main-wrapper * { 
             visibility: visible !important; 
-            color: #000000 !important; 
-            /* تسميك إجباري لكل النصوص ليظهر كأنه Bold فاحم */
-            font-weight: 950 !important;
-            -webkit-text-stroke: 0.7px black;
+            color: #000 !important;
+            font-family: "Arial Black", Gadget, sans-serif !important; /* لضمان أقصى عرض للخط */
         }
 
         .print-main-wrapper {
+            display: block !important;
             position: absolute !important;
-            top: -20px !important; /* سحب للأعلى لتعويض فراغ المتصفح */
-            left: 50% !important;
-            transform: translateX(-50%) !important; /* توسيط دقيق */
-            width: 76mm !important; 
+            top: 0 !important;
+            left: 0 !important;
+            width: 100% !important;
             margin: 0 !important;
             padding: 0 !important;
             direction: rtl !important;
         }
 
-        /* إخفاء واجهة الموقع */
+        /* إلغاء الهوامش تماماً من تعريف الصفحة */
+        @page { 
+            size: auto; 
+            margin: 0 !important; 
+        }
+
         header, footer, .no-print, [data-testid="stSidebar"], [data-testid="stHeader"] { 
             display: none !important; 
         }
 
-        @page { 
-            size: 80mm auto; 
-            margin: 0 !important; 
-        }
-
+        /* تنسيق المحتوى ليكون عريضاً وواضحاً */
         .header-box {
-            border-bottom: 3px solid #000 !important; 
-            padding-bottom: 5px;
-            margin-bottom: 5px;
             text-align: center;
+            border-bottom: 4px solid #000 !important;
+            margin-bottom: 10px;
+            padding: 10px 0;
         }
 
         .name-txt { 
-            font-size: 32px !important; 
-            -webkit-text-stroke: 1.2px black; /* تسميك إضافي للاسم */
-            margin: 0; 
+            font-size: 34px !important; 
+            font-weight: 900 !important;
+            margin: 0;
         }
         
-        .date-txt { 
-            font-size: 16px !important; 
-            margin-top: 2px;
-        }
+        .date-txt { font-size: 18px !important; margin: 5px 0; }
 
-        /* تنسيق الجدول */
         .table-style { 
-            width: 100%; 
+            width: 98%; 
+            margin: 0 auto;
             border-collapse: collapse; 
-            border: 3px solid #000 !important;
+            border: 4px solid #000 !important;
         }
         
         .table-style th, .table-style td {
-            border: 2px solid #000 !important; 
-            padding: 5px 2px !important;
+            border: 3px solid #000 !important; 
+            padding: 8px 2px !important;
             text-align: center;
-            font-size: 22px !important; 
+            font-size: 24px !important; 
+            font-weight: 900 !important;
         }
         
-        /* الأرقام عريضة جداً وبدون أي تظليل */
+        /* عمود العدد: عريض جداً وبدون أي خلفية رمادية أو خطوط زائدة */
         .col-qty { 
             width: 25% !important; 
-            font-size: 36px !important; 
-            -webkit-text-stroke: 1.5px black; 
-            background-color: transparent !important;
+            font-size: 40px !important; 
+            background: none !important;
         }
 
         .end-text {
             text-align: center;
-            font-size: 18px;
-            margin-top: 10px;
-            padding-bottom: 5px;
+            font-size: 20px;
+            font-weight: bold;
+            margin-top: 15px;
+            border-top: 2px dashed #000;
+            padding-top: 5px;
         }
     }
     </style>
 """, unsafe_allow_html=True)
 
-# --- 2. الدوال والنظام الأمني والاتصال ---
+# --- 2. الدوال الأساسية ونظام الدخول (كما هي في كودك) ---
 def show_full_logo():
     st.markdown('<div class="no-print">', unsafe_allow_html=True)
     possible_names = ["Logo.JPG", "Logo .JPG", "logo.jpg"]
@@ -150,7 +146,6 @@ if client:
     delegates = [sh.title for sh in spreadsheet.worksheets() if sh.title not in ["طلبات", "الأسعار", "البيانات", "الزبائن", "Sheet1"]]
     show_full_logo()
     
-    # --- نظام الطلبات ---
     st.markdown('<div class="no-print">', unsafe_allow_html=True)
     if st.button("🔔 فحص الإشعارات الجديدة", use_container_width=True):
         st.session_state.orders = []
@@ -187,7 +182,7 @@ if client:
             # بناء صفوف الجدول
             rows_html = "".join([f"<tr><td class='col-qty'>{r['الكميه المطلوبه']}</td><td style='text-align:right;'>{r['اسم الصنف']}</td></tr>" for _, r in edited.iterrows()])
             
-            # --- حاوية الطباعة الحرارية ---
+            # محتوى الطباعة الحرارية المباشر
             thermal_view = f"""
             <div class="print-main-wrapper">
                 <div class="header-box">
@@ -197,7 +192,7 @@ if client:
                 <table class="table-style">
                     <thead>
                         <tr>
-                            <th style="width:25%">العدد</th>
+                            <th>العدد</th>
                             <th>الصنف</th>
                         </tr>
                     </thead>
@@ -213,7 +208,7 @@ if client:
             
             st.markdown("""
                 <button onclick="window.print()" class="print-button-real no-print">
-                   🖨️ طباعة الفاتورة (Bold - 80mm)
+                   🖨️ طباعة الفاتورة (80mm)
                 </button>
             """, unsafe_allow_html=True)
 
