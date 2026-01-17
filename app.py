@@ -10,6 +10,9 @@ st.set_page_config(page_title="إدارة حلباوي - حراري", layout="wi
 
 st.markdown("""
     <style>
+    /* تنسيق الزر والشاشة العادية */
+    .screen-info { color: white; font-size: 18px; text-align: right; }
+    
     .print-button-real {
         display: block; width: 100%; height: 60px; 
         background-color: #28a745; color: white !important; 
@@ -17,68 +20,91 @@ st.markdown("""
         cursor: pointer; font-weight: bold; font-size: 22px; margin-top: 20px;
     }
 
+    /* --- كود الطباعة المحسن لإلغاء الفراغ العلوي (80mm) --- */
     @media print {
+        /* إخفاء كل عناصر الموقع الأصلية */
         body * { visibility: hidden !important; }
         
+        /* إزالة أي هوامش تلقائية من المتصفح */
         html, body {
             margin: 0 !important;
             padding: 0 !important;
             height: auto !important;
-            overflow: visible !important;
         }
 
+        /* إظهار حاوية الطباعة فقط */
         .print-main-wrapper, .print-main-wrapper * { 
             visibility: visible !important; 
             color: #000000 !important; 
-            font-weight: 950 !important;
         }
 
         .print-main-wrapper {
-            position: absolute !important;
-            /* تم زيادة الرفع للأعلى لضمان البداية من رأس الورقة */
-            top: -80px !important; 
-            left: 0 !important;
-            width: 100% !important;
+            position: fixed !important; /* تثبيت في أعلى الصفحة تماماً */
+            top: 0 !important;
+            right: 0 !important;
+            width: 72mm !important; /* العرض الفعلي للطباعة */
             direction: rtl !important;
             margin: 0 !important;
             padding: 0 !important;
+            background-color: white !important;
         }
 
+        /* إخفاء إضافات ستريمليت الإجبارية */
         header, footer, .no-print, [data-testid="stSidebar"], [data-testid="stHeader"] { 
             display: none !important; 
         }
 
+        /* ضبط إعدادات الصفحة الحرارية */
         @page { 
-            size: auto; 
-            margin: 0 !important; 
+            size: 80mm auto; 
+            margin: 0mm !important; 
         }
 
         .header-box {
-            border-bottom: 3px solid #000 !important; 
+            border-bottom: 2px dashed #000 !important; 
             padding-bottom: 5px;
             margin-bottom: 10px;
             text-align: center;
         }
 
-        .name-txt { font-size: 32px !important; margin: 0; }
-        .date-txt { font-size: 16px !important; }
+        .name-txt { 
+            font-size: 26px !important; 
+            font-weight: 900 !important; 
+            margin: 0; 
+        }
+        
+        .date-txt { 
+            font-size: 14px !important; 
+            font-weight: bold !important; 
+            margin: 5px 0; 
+        }
 
         .table-style { 
             width: 100%; 
             border-collapse: collapse; 
-            border: 3px solid #000 !important;
+            border: 1px solid #000 !important;
         }
         
         .table-style th, .table-style td {
-            border: 2px solid #000 !important; 
-            padding: 8px 2px !important;
+            border: 1px solid #000 !important; 
+            padding: 6px !important;
             text-align: center;
-            font-size: 24px !important; 
+            font-size: 19px !important; 
+            font-weight: 900 !important; 
+            color: #000000 !important;
         }
         
         .col-qty { 
-            width: 25% !important; 
-            font-size: 40px !important; 
+            width: 25%; 
+            font-size: 26px !important; 
+            background-color: #f0f0f0 !important;
+            -webkit-print-color-adjust: exact;
+        }
+
+        .footer-space {
+            height: 40px;
+            border-top: 1px dashed #000;
+            margin-top: 10px;
         }
     }
     </style>
@@ -87,14 +113,21 @@ st.markdown("""
 # --- 2. الدوال الأساسية ونظام الدخول ---
 def show_full_logo():
     st.markdown('<div class="no-print">', unsafe_allow_html=True)
-    if os.path.exists("Logo.JPG"):
-        st.image("Logo.JPG", use_container_width=True)
+    possible_names = ["Logo.JPG", "Logo .JPG", "logo.jpg"]
+    found = False
+    for name in possible_names:
+        if os.path.exists(name):
+            st.image(name, use_container_width=True)
+            found = True
+            break
+    if not found:
+        st.info("⚠️ يرجى التأكد من رفع صورة Logo.JPG")
     st.markdown('</div>', unsafe_allow_html=True)
 
 if 'admin_logged_in' not in st.session_state: st.session_state.admin_logged_in = False
 if not st.session_state.admin_logged_in:
     show_full_logo()
-    col2 = st.columns([1, 2, 1])[1]
+    col1, col2, col3 = st.columns([1, 2, 1])
     with col2:
         st.markdown("<h1 style='text-align: center;'>دخول الإدارة</h1>", unsafe_allow_html=True)
         pwd = st.text_input("كلمة السر", type="password")
@@ -106,7 +139,6 @@ if not st.session_state.admin_logged_in:
 
 def get_client():
     try:
-        # إصلاح قراءة البيانات من st.secrets
         info = json.loads(st.secrets["gcp_service_account"]["json_data"].strip(), strict=False)
         creds = Credentials.from_service_account_info(info, scopes=["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"])
         return gspread.authorize(creds)
@@ -116,7 +148,6 @@ client = get_client()
 
 # --- 3. معالجة البيانات والطلبات ---
 if client:
-    # استخدام المفتاح الكامل والمصلح
     spreadsheet = client.open_by_key("1-Abj-Kvbe02az8KYZfQL0eal2arKw_wgjVQdJX06IA0")
     delegates = [sh.title for sh in spreadsheet.worksheets() if sh.title not in ["طلبات", "الأسعار", "البيانات", "الزبائن", "Sheet1"]]
     show_full_logo()
@@ -127,10 +158,12 @@ if client:
         for rep in delegates:
             ws = spreadsheet.worksheet(rep)
             if "بانتظار التصديق" in ws.col_values(4): st.session_state.orders.append(rep)
-    
+        if not st.session_state.orders:
+            st.toast("لا توجد طلبيات جديدة حالياً")
+
     if 'orders' in st.session_state:
         for name in st.session_state.orders:
-            if st.button(f"📦 طلبية من: {name}", key=f"btn_{name}", use_container_width=True):
+            if st.button(f"📦 طلبية جديدة من: {name}", key=f"btn_{name}", use_container_width=True):
                 st.session_state.active_rep = name
                 st.rerun()
     st.markdown('</div>', unsafe_allow_html=True)
@@ -154,8 +187,10 @@ if client:
                 for _, r in edited.iterrows(): ws.update_cell(int(r['row_no']), 4, "تم التصديق")
                 st.success("تم!"); st.rerun()
             
+            # بناء صفوف الجدول للطباعة
             rows_html = "".join([f"<tr><td class='col-qty'>{r['الكميه المطلوبه']}</td><td style='text-align:right;'>{r['اسم الصنف']}</td></tr>" for _, r in edited.iterrows()])
             
+            # --- حاوية الطباعة الحرارية ---
             thermal_view = f"""
             <div class="print-main-wrapper">
                 <div class="header-box">
@@ -163,17 +198,27 @@ if client:
                     <p class="date-txt">{order_time}</p>
                 </div>
                 <table class="table-style">
-                    <thead><tr><th style="width:25%">العدد</th><th>الصنف</th></tr></thead>
-                    <tbody>{rows_html}</tbody>
+                    <thead>
+                        <tr style="background-color: #eee;">
+                            <th style="width:30%">العدد</th>
+                            <th>الصنف</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {rows_html}
+                    </tbody>
                 </table>
-                <p style="text-align:center; margin-top:10px;">*** نهاية الطلب ***</p>
+                <div class="footer-space"></div>
+                <p style="text-align:center; font-size:14px; font-weight:bold;">*** نهاية الطلب ***</p>
             </div>
             """
+
             st.markdown(thermal_view, unsafe_allow_html=True)
             
+            # زر الطباعة يظهر على الشاشة فقط
             st.markdown("""
                 <button onclick="window.print()" class="print-button-real no-print">
-                   🖨️ طباعة الفاتورة (EPSON Receipt6)
+                   🖨️ طباعة الفاتورة (Epson 80mm)
                 </button>
             """, unsafe_allow_html=True)
 
