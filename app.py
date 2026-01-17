@@ -5,11 +5,12 @@ import gspread
 from google.oauth2.service_account import Credentials
 import os
 
-# --- 1. إعدادات الصفحة والتنسيق النهائي الموجه للطابعة الحرارية ---
-st.set_page_config(page_title="إدارة حلباوي - فاتورة", layout="wide")
+# --- 1. إعدادات الصفحة والتنسيق الحراري الفائق ---
+st.set_page_config(page_title="إدارة حلباوي - طباعة حرارية", layout="wide")
 
 st.markdown("""
     <style>
+    /* تنسيق زر الطباعة على الشاشة */
     .print-button-real {
         display: block; width: 100%; height: 60px; 
         background-color: #28a745; color: white !important; 
@@ -17,99 +18,104 @@ st.markdown("""
         cursor: pointer; font-weight: bold; font-size: 22px; margin-top: 20px;
     }
 
+    /* --- تنسيق الطباعة الحرارية الصارم --- */
     @media print {
+        /* إخفاء واجهة الموقع تماماً */
         body * { visibility: hidden !important; }
         
+        /* إجبار الصفحة على البدء من الصفر الحقيقي */
         html, body {
             margin: 0 !important;
             padding: 0 !important;
             height: auto !important;
-            background-color: white !important;
+            width: 80mm !important;
+            overflow: visible !important;
         }
 
+        /* حاوية الطباعة الرئيسية */
         .print-main-wrapper, .print-main-wrapper * { 
             visibility: visible !important; 
             color: #000000 !important; 
-            /* جعل كل الخطوط عريضة جداً للوضوح */
-            font-weight: 900 !important;
-            -webkit-text-stroke: 0.6px black;
         }
 
         .print-main-wrapper {
-            position: absolute !important;
-            top: 0 !important; /* الالتصاق التام بالأعلى لإلغاء الهدر */
-            left: 50% !important;
-            transform: translateX(-50%) !important; /* التوسيط الدقيق في نص الورقة */
-            width: 76mm !important; 
-            margin: 0 !important;
+            display: block !important;
+            position: relative !important;
+            top: 0 !important;
+            margin: 0 auto !important;
             padding: 0 !important;
+            width: 74mm !important; /* لترك هامش بسيط للأجناب */
             direction: rtl !important;
+            text-align: center;
         }
 
+        /* ضبط إعدادات صفحة المتصفح */
+        @page { 
+            size: 80mm auto; 
+            margin: 0 !important; 
+        }
+
+        /* إخفاء إضافات ستريمليت */
         header, footer, .no-print, [data-testid="stSidebar"], [data-testid="stHeader"] { 
             display: none !important; 
         }
 
-        @page { 
-            size: 80mm auto; /* جعل الطول يتبع المحتوى فقط */
-            margin: 0 !important; 
-        }
-
+        /* --- تكبير وعرض الخطوط (Bold) --- */
         .header-box {
-            border-bottom: 3px dashed #000 !important; 
+            border-bottom: 3px solid #000 !important; 
             padding-bottom: 5px;
             margin-bottom: 5px;
-            text-align: center;
         }
 
         .name-txt { 
-            font-size: 30px !important; 
+            font-size: 32px !important; 
+            font-weight: 950 !important; /* أقصى سماكة */
+            -webkit-text-stroke: 1.2px black; /* تسميك الخط */
             margin: 0; 
         }
         
         .date-txt { 
             font-size: 16px !important; 
-            margin-top: 2px;
+            font-weight: 900 !important;
         }
 
         .table-style { 
             width: 100%; 
             border-collapse: collapse; 
             border: 3px solid #000 !important;
+            margin-top: 5px;
         }
         
         .table-style th, .table-style td {
             border: 2px solid #000 !important; 
-            padding: 5px 2px !important;
+            padding: 6px 2px !important;
             text-align: center;
-            font-size: 22px !important; /* تكبير الخط للأصناف */
+            font-size: 22px !important; 
+            font-weight: 950 !important;
+            -webkit-text-stroke: 0.8px black;
         }
         
-        /* تنسيق خاص لعمود العدد ليكون الأبرز */
+        /* --- الأرقام (Bold) واضحة جداً وبدون خلفية --- */
         .col-qty { 
-            width: 25% !important; 
-            font-size: 32px !important; /* أرقام كبيرة جداً */
-            background-color: transparent !important; /* إزالة أي تظليل أو شبك */
-            -webkit-text-stroke: 1px black; /* زيادة سماكة الأرقام تحديداً */
-        }
-
-        /* تقليل الهدر النهائي */
-        .footer-space {
-            height: 5px;
-            margin: 0;
+            width: 28% !important; 
+            font-size: 36px !important; /* تكبير الأرقام */
+            font-weight: 950 !important;
+            -webkit-text-stroke: 1.5px black; /* تسميك الأرقام خصيصاً */
+            background-color: transparent !important;
         }
 
         .end-text {
             text-align: center;
-            font-size: 16px;
-            margin: 0;
-            padding-bottom: 2px;
+            font-size: 18px;
+            font-weight: 950 !important;
+            margin-top: 10px;
+            padding-bottom: 10px;
         }
     }
     </style>
 """, unsafe_allow_html=True)
 
-# (الدوال والنظام الأمني - تبقى كما هي)
+# (الدوال والنظام الأمني تبقى كما هي)
 def show_full_logo():
     st.markdown('<div class="no-print">', unsafe_allow_html=True)
     possible_names = ["Logo.JPG", "Logo .JPG", "logo.jpg"]
@@ -202,7 +208,6 @@ if client:
                         {rows_html}
                     </tbody>
                 </table>
-                <div class="footer-space"></div>
                 <p class="end-text">*** نهاية الطلب ***</p>
             </div>
             """
