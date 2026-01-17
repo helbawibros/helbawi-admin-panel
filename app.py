@@ -5,7 +5,7 @@ import gspread
 from google.oauth2.service_account import Credentials
 import os
 
-# --- 1. إعدادات الصفحة وتنسيق الطباعة الحرارية ---
+# --- 1. إعدادات الصفحة وتنسيق الطباعة الحرارية المحسن ---
 st.set_page_config(page_title="إدارة حلباوي - حراري", layout="wide")
 
 st.markdown("""
@@ -20,97 +20,84 @@ st.markdown("""
         cursor: pointer; font-weight: bold; font-size: 22px; margin-top: 20px;
     }
 
-    /* --- كود الطباعة المحسن لإلغاء الفراغ العلوي (80mm) --- */
+    /* --- كود الطباعة المحسن (يدعم الطلبيات الطويلة + بدون فراغ علوي) --- */
     @media print {
-        /* إخفاء كل عناصر الموقع الأصلية */
         body * { visibility: hidden !important; }
         
-        /* إزالة أي هوامش تلقائية من المتصفح */
         html, body {
             margin: 0 !important;
             padding: 0 !important;
-            height: auto !important;
-        }
-
-        /* إظهار حاوية الطباعة فقط */
-        .print-main-wrapper, .print-main-wrapper * { 
-            visibility: visible !important; 
-            color: #000000 !important; 
-        }
-
-        .print-main-wrapper {
-            position: fixed !important; /* تثبيت في أعلى الصفحة تماماً */
-            top: 0 !important;
-            right: 0 !important;
-            width: 72mm !important; /* العرض الفعلي للطباعة */
-            direction: rtl !important;
-            margin: 0 !important;
-            padding: 0 !important;
+            height: auto !important; /* ضروري جداً للطلبيات الطويلة */
             background-color: white !important;
         }
 
-        /* إخفاء إضافات ستريمليت الإجبارية */
+        .print-main-wrapper, .print-main-wrapper * { 
+            visibility: visible !important; 
+            color: #000000 !important; 
+            font-weight: 950 !important; /* خط عريض جداً */
+            -webkit-text-stroke: 0.8px black; /* تسميك إضافي */
+        }
+
+        .print-main-wrapper {
+            position: absolute !important; /* تم التغيير من fixed إلى absolute لدعم التمرير والطول */
+            top: -50px !important; /* سحب للأعلى لإلغاء فراغ المتصفح */
+            right: 0 !important;
+            width: 76mm !important; 
+            direction: rtl !important;
+            margin: 0 !important;
+            padding: 0 !important;
+        }
+
+        /* إخفاء إضافات ستريمليت */
         header, footer, .no-print, [data-testid="stSidebar"], [data-testid="stHeader"] { 
             display: none !important; 
         }
 
-        /* ضبط إعدادات الصفحة الحرارية */
         @page { 
-            size: 80mm auto; 
+            size: 80mm auto; /* يحدد العرض 80 والطول تلقائي */
             margin: 0mm !important; 
         }
 
         .header-box {
-            border-bottom: 2px dashed #000 !important; 
+            border-bottom: 3px solid #000 !important; 
             padding-bottom: 5px;
             margin-bottom: 10px;
             text-align: center;
         }
 
-        .name-txt { 
-            font-size: 26px !important; 
-            font-weight: 900 !important; 
-            margin: 0; 
-        }
-        
-        .date-txt { 
-            font-size: 14px !important; 
-            font-weight: bold !important; 
-            margin: 5px 0; 
-        }
+        .name-txt { font-size: 28px !important; margin: 0; }
+        .date-txt { font-size: 15px !important; margin: 5px 0; }
 
         .table-style { 
             width: 100%; 
             border-collapse: collapse; 
-            border: 1px solid #000 !important;
+            border: 3px solid #000 !important;
         }
         
         .table-style th, .table-style td {
-            border: 1px solid #000 !important; 
-            padding: 6px !important;
+            border: 2px solid #000 !important; 
+            padding: 6px 2px !important;
             text-align: center;
-            font-size: 19px !important; 
-            font-weight: 900 !important; 
-            color: #000000 !important;
+            font-size: 21px !important; 
         }
         
         .col-qty { 
             width: 25%; 
-            font-size: 26px !important; 
-            background-color: #f0f0f0 !important;
-            -webkit-print-color-adjust: exact;
+            font-size: 35px !important; /* تكبير الرقم */
+            -webkit-text-stroke: 1.2px black;
+            background-color: transparent !important; /* إلغاء الرمادي لزيادة الوضوح */
         }
 
         .footer-space {
-            height: 40px;
-            border-top: 1px dashed #000;
+            height: 20px;
+            border-top: 2px dashed #000;
             margin-top: 10px;
         }
     }
     </style>
 """, unsafe_allow_html=True)
 
-# --- 2. الدوال الأساسية ونظام الدخول ---
+# --- 2. الدوال الأساسية ---
 def show_full_logo():
     st.markdown('<div class="no-print">', unsafe_allow_html=True)
     possible_names = ["Logo.JPG", "Logo .JPG", "logo.jpg"]
@@ -120,8 +107,6 @@ def show_full_logo():
             st.image(name, use_container_width=True)
             found = True
             break
-    if not found:
-        st.info("⚠️ يرجى التأكد من رفع صورة Logo.JPG")
     st.markdown('</div>', unsafe_allow_html=True)
 
 if 'admin_logged_in' not in st.session_state: st.session_state.admin_logged_in = False
@@ -146,7 +131,7 @@ def get_client():
 
 client = get_client()
 
-# --- 3. معالجة البيانات والطلبات ---
+# --- 3. المعالجة والطباعة ---
 if client:
     spreadsheet = client.open_by_key("1-Abj-Kvbe02az8KYZfQL0eal2arKw_wgjVQdJX06IA0")
     delegates = [sh.title for sh in spreadsheet.worksheets() if sh.title not in ["طلبات", "الأسعار", "البيانات", "الزبائن", "Sheet1"]]
@@ -158,9 +143,7 @@ if client:
         for rep in delegates:
             ws = spreadsheet.worksheet(rep)
             if "بانتظار التصديق" in ws.col_values(4): st.session_state.orders.append(rep)
-        if not st.session_state.orders:
-            st.toast("لا توجد طلبيات جديدة حالياً")
-
+    
     if 'orders' in st.session_state:
         for name in st.session_state.orders:
             if st.button(f"📦 طلبية جديدة من: {name}", key=f"btn_{name}", use_container_width=True):
@@ -187,10 +170,8 @@ if client:
                 for _, r in edited.iterrows(): ws.update_cell(int(r['row_no']), 4, "تم التصديق")
                 st.success("تم!"); st.rerun()
             
-            # بناء صفوف الجدول للطباعة
             rows_html = "".join([f"<tr><td class='col-qty'>{r['الكميه المطلوبه']}</td><td style='text-align:right;'>{r['اسم الصنف']}</td></tr>" for _, r in edited.iterrows()])
             
-            # --- حاوية الطباعة الحرارية ---
             thermal_view = f"""
             <div class="print-main-wrapper">
                 <div class="header-box">
@@ -199,26 +180,21 @@ if client:
                 </div>
                 <table class="table-style">
                     <thead>
-                        <tr style="background-color: #eee;">
-                            <th style="width:30%">العدد</th>
-                            <th>الصنف</th>
-                        </tr>
+                        <tr><th style="width:25%">العدد</th><th>الصنف</th></tr>
                     </thead>
                     <tbody>
                         {rows_html}
                     </tbody>
                 </table>
                 <div class="footer-space"></div>
-                <p style="text-align:center; font-size:14px; font-weight:bold;">*** نهاية الطلب ***</p>
+                <p style="text-align:center; font-size:16px; font-weight:bold;">*** نهاية الطلب ***</p>
             </div>
             """
-
             st.markdown(thermal_view, unsafe_allow_html=True)
             
-            # زر الطباعة يظهر على الشاشة فقط
             st.markdown("""
                 <button onclick="window.print()" class="print-button-real no-print">
-                   🖨️ طباعة الفاتورة (Epson 80mm)
+                   🖨️ طباعة الفاتورة كاملة (Epson 80mm)
                 </button>
             """, unsafe_allow_html=True)
 
