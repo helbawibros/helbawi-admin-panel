@@ -5,14 +5,12 @@ import gspread
 from google.oauth2.service_account import Credentials
 import os
 
-# --- 1. إعدادات الصفحة وتنسيق الطباعة الحرارية ---
-st.set_page_config(page_title="إدارة حلباوي - حراري", layout="wide")
+# --- 1. إعدادات الصفحة والتنسيق النهائي ---
+st.set_page_config(page_title="إدارة حلباوي - فواتير", layout="wide")
 
 st.markdown("""
     <style>
-    /* تنسيق الزر والشاشة العادية */
-    .screen-info { color: white; font-size: 18px; text-align: right; }
-    
+    /* تنسيق زر الطباعة على الشاشة */
     .print-button-real {
         display: block; width: 100%; height: 60px; 
         background-color: #28a745; color: white !important; 
@@ -20,55 +18,50 @@ st.markdown("""
         cursor: pointer; font-weight: bold; font-size: 22px; margin-top: 20px;
     }
 
-    /* --- كود الطباعة المحسن لإلغاء الفراغ العلوي (80mm) --- */
+    /* --- التنسيق المخصص للطباعة الحرارية 80mm --- */
     @media print {
-        /* إخفاء كل عناصر الموقع الأصلية */
         body * { visibility: hidden !important; }
         
-        /* إزالة أي هوامش تلقائية من المتصفح */
         html, body {
             margin: 0 !important;
             padding: 0 !important;
             height: auto !important;
         }
 
-        /* إظهار حاوية الطباعة فقط */
         .print-main-wrapper, .print-main-wrapper * { 
             visibility: visible !important; 
             color: #000000 !important; 
         }
 
         .print-main-wrapper {
-            position: fixed !important; /* تثبيت في أعلى الصفحة تماماً */
+            position: absolute !important;
             top: 0 !important;
+            left: 0 !important;
             right: 0 !important;
-            width: 72mm !important; /* العرض الفعلي للطباعة */
-            direction: rtl !important;
-            margin: 0 !important;
+            width: 76mm !important; /* تقريباً كامل عرض الورق */
+            margin: 0 auto !important; /* لتوسيط المحتوى في المنتصف */
             padding: 0 !important;
-            background-color: white !important;
+            direction: rtl !important;
         }
 
-        /* إخفاء إضافات ستريمليت الإجبارية */
         header, footer, .no-print, [data-testid="stSidebar"], [data-testid="stHeader"] { 
             display: none !important; 
         }
 
-        /* ضبط إعدادات الصفحة الحرارية */
         @page { 
             size: 80mm auto; 
-            margin: 0mm !important; 
+            margin: 0 !important; 
         }
 
         .header-box {
             border-bottom: 2px dashed #000 !important; 
             padding-bottom: 5px;
-            margin-bottom: 10px;
+            margin-bottom: 8px;
             text-align: center;
         }
 
         .name-txt { 
-            font-size: 26px !important; 
+            font-size: 28px !important; 
             font-weight: 900 !important; 
             margin: 0; 
         }
@@ -76,41 +69,51 @@ st.markdown("""
         .date-txt { 
             font-size: 14px !important; 
             font-weight: bold !important; 
-            margin: 5px 0; 
         }
 
+        /* --- تعديل الجدول لإلغاء الهدر والتوسيط --- */
         .table-style { 
             width: 100%; 
             border-collapse: collapse; 
-            border: 1px solid #000 !important;
+            border: 2px solid #000 !important;
         }
         
         .table-style th, .table-style td {
             border: 1px solid #000 !important; 
-            padding: 6px !important;
+            padding: 4px 2px !important; /* تقليل الحشو لتقليل الطول */
             text-align: center;
-            font-size: 19px !important; 
-            font-weight: 900 !important; 
+            font-size: 18px !important; 
+            font-weight: 800 !important; 
             color: #000000 !important;
         }
         
+        /* جعل عمود العدد Bold فاحم وبدون خلفية رمادية */
         .col-qty { 
-            width: 25%; 
+            width: 22% !important; 
             font-size: 26px !important; 
-            background-color: #f0f0f0 !important;
-            -webkit-print-color-adjust: exact;
+            font-weight: 950 !important; /* أقصى سماكة للأرقام */
+            background-color: transparent !important; /* إزالة الشبك الرمادي */
+            -webkit-text-stroke: 0.5px black; /* زيادة عرض الحرف برمجياً */
         }
 
+        /* تقليل الفراغ النهائي لمنع هدر الورق */
         .footer-space {
-            height: 40px;
-            border-top: 1px dashed #000;
-            margin-top: 10px;
+            height: 10px; /* تقليل المسافة السفلية جداً */
+            margin-top: 5px;
+        }
+
+        .end-text {
+            text-align: center;
+            font-size: 14px;
+            font-weight: bold;
+            margin: 0;
+            padding-bottom: 5px; /* يقلل الهدر بعد هذه الكلمة */
         }
     }
     </style>
 """, unsafe_allow_html=True)
 
-# --- 2. الدوال الأساسية ونظام الدخول ---
+# (الدوال والنظام الأمني بدون تغيير)
 def show_full_logo():
     st.markdown('<div class="no-print">', unsafe_allow_html=True)
     possible_names = ["Logo.JPG", "Logo .JPG", "logo.jpg"]
@@ -127,7 +130,7 @@ def show_full_logo():
 if 'admin_logged_in' not in st.session_state: st.session_state.admin_logged_in = False
 if not st.session_state.admin_logged_in:
     show_full_logo()
-    col1, col2, col3 = st.columns([1, 2, 1])
+    col2 = st.columns([1, 2, 1])[1]
     with col2:
         st.markdown("<h1 style='text-align: center;'>دخول الإدارة</h1>", unsafe_allow_html=True)
         pwd = st.text_input("كلمة السر", type="password")
@@ -146,24 +149,22 @@ def get_client():
 
 client = get_client()
 
-# --- 3. معالجة البيانات والطلبات ---
 if client:
     spreadsheet = client.open_by_key("1-Abj-Kvbe02az8KYZfQL0eal2arKw_wgjVQdJX06IA0")
     delegates = [sh.title for sh in spreadsheet.worksheets() if sh.title not in ["طلبات", "الأسعار", "البيانات", "الزبائن", "Sheet1"]]
     show_full_logo()
     
+    # --- نظام الإشعارات واختيار المندوب ---
     st.markdown('<div class="no-print">', unsafe_allow_html=True)
     if st.button("🔔 فحص الإشعارات الجديدة", use_container_width=True):
         st.session_state.orders = []
         for rep in delegates:
             ws = spreadsheet.worksheet(rep)
             if "بانتظار التصديق" in ws.col_values(4): st.session_state.orders.append(rep)
-        if not st.session_state.orders:
-            st.toast("لا توجد طلبيات جديدة حالياً")
-
+    
     if 'orders' in st.session_state:
         for name in st.session_state.orders:
-            if st.button(f"📦 طلبية جديدة من: {name}", key=f"btn_{name}", use_container_width=True):
+            if st.button(f"📦 طلبية من: {name}", key=f"btn_{name}", use_container_width=True):
                 st.session_state.active_rep = name
                 st.rerun()
     st.markdown('</div>', unsafe_allow_html=True)
@@ -187,10 +188,10 @@ if client:
                 for _, r in edited.iterrows(): ws.update_cell(int(r['row_no']), 4, "تم التصديق")
                 st.success("تم!"); st.rerun()
             
-            # بناء صفوف الجدول للطباعة
+            # بناء صفوف الجدول
             rows_html = "".join([f"<tr><td class='col-qty'>{r['الكميه المطلوبه']}</td><td style='text-align:right;'>{r['اسم الصنف']}</td></tr>" for _, r in edited.iterrows()])
             
-            # --- حاوية الطباعة الحرارية ---
+            # التنسيق الحراري المحسن
             thermal_view = f"""
             <div class="print-main-wrapper">
                 <div class="header-box">
@@ -199,8 +200,8 @@ if client:
                 </div>
                 <table class="table-style">
                     <thead>
-                        <tr style="background-color: #eee;">
-                            <th style="width:30%">العدد</th>
+                        <tr>
+                            <th style="width:25%">العدد</th>
                             <th>الصنف</th>
                         </tr>
                     </thead>
@@ -209,13 +210,12 @@ if client:
                     </tbody>
                 </table>
                 <div class="footer-space"></div>
-                <p style="text-align:center; font-size:14px; font-weight:bold;">*** نهاية الطلب ***</p>
+                <p class="end-text">*** نهاية الطلب ***</p>
             </div>
             """
 
             st.markdown(thermal_view, unsafe_allow_html=True)
             
-            # زر الطباعة يظهر على الشاشة فقط
             st.markdown("""
                 <button onclick="window.print()" class="print-button-real no-print">
                    🖨️ طباعة الفاتورة (Epson 80mm)
