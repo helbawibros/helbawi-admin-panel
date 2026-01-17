@@ -5,8 +5,8 @@ import gspread
 from google.oauth2.service_account import Credentials
 import os
 
-# --- 1. إعدادات الصفحة والتنسيق الحراري الفائق ---
-st.set_page_config(page_title="إدارة حلباوي - طباعة حرارية", layout="wide")
+# --- 1. إعدادات الصفحة وتنسيق الطباعة الحرارية المتقدم ---
+st.set_page_config(page_title="إدارة حلباوي - فواتير", layout="wide")
 
 st.markdown("""
     <style>
@@ -18,104 +18,98 @@ st.markdown("""
         cursor: pointer; font-weight: bold; font-size: 22px; margin-top: 20px;
     }
 
-    /* --- تنسيق الطباعة الحرارية الصارم --- */
+    /* --- كود الطباعة المحسن جداً --- */
     @media print {
-        /* إخفاء واجهة الموقع تماماً */
         body * { visibility: hidden !important; }
         
-        /* إجبار الصفحة على البدء من الصفر الحقيقي */
         html, body {
             margin: 0 !important;
             padding: 0 !important;
             height: auto !important;
-            width: 80mm !important;
-            overflow: visible !important;
+            background-color: white !important;
         }
 
         /* حاوية الطباعة الرئيسية */
         .print-main-wrapper, .print-main-wrapper * { 
             visibility: visible !important; 
             color: #000000 !important; 
+            /* تسميك إجباري لكل النصوص ليظهر كأنه Bold فاحم */
+            font-weight: 950 !important;
+            -webkit-text-stroke: 0.7px black;
         }
 
         .print-main-wrapper {
-            display: block !important;
-            position: relative !important;
-            top: 0 !important;
-            margin: 0 auto !important;
+            position: absolute !important;
+            top: -20px !important; /* سحب للأعلى لتعويض فراغ المتصفح */
+            left: 50% !important;
+            transform: translateX(-50%) !important; /* توسيط دقيق */
+            width: 76mm !important; 
+            margin: 0 !important;
             padding: 0 !important;
-            width: 74mm !important; /* لترك هامش بسيط للأجناب */
             direction: rtl !important;
-            text-align: center;
         }
 
-        /* ضبط إعدادات صفحة المتصفح */
+        /* إخفاء واجهة الموقع */
+        header, footer, .no-print, [data-testid="stSidebar"], [data-testid="stHeader"] { 
+            display: none !important; 
+        }
+
         @page { 
             size: 80mm auto; 
             margin: 0 !important; 
         }
 
-        /* إخفاء إضافات ستريمليت */
-        header, footer, .no-print, [data-testid="stSidebar"], [data-testid="stHeader"] { 
-            display: none !important; 
-        }
-
-        /* --- تكبير وعرض الخطوط (Bold) --- */
         .header-box {
             border-bottom: 3px solid #000 !important; 
             padding-bottom: 5px;
             margin-bottom: 5px;
+            text-align: center;
         }
 
         .name-txt { 
             font-size: 32px !important; 
-            font-weight: 950 !important; /* أقصى سماكة */
-            -webkit-text-stroke: 1.2px black; /* تسميك الخط */
+            -webkit-text-stroke: 1.2px black; /* تسميك إضافي للاسم */
             margin: 0; 
         }
         
         .date-txt { 
             font-size: 16px !important; 
-            font-weight: 900 !important;
+            margin-top: 2px;
         }
 
+        /* تنسيق الجدول */
         .table-style { 
             width: 100%; 
             border-collapse: collapse; 
             border: 3px solid #000 !important;
-            margin-top: 5px;
         }
         
         .table-style th, .table-style td {
             border: 2px solid #000 !important; 
-            padding: 6px 2px !important;
+            padding: 5px 2px !important;
             text-align: center;
             font-size: 22px !important; 
-            font-weight: 950 !important;
-            -webkit-text-stroke: 0.8px black;
         }
         
-        /* --- الأرقام (Bold) واضحة جداً وبدون خلفية --- */
+        /* الأرقام عريضة جداً وبدون أي تظليل */
         .col-qty { 
-            width: 28% !important; 
-            font-size: 36px !important; /* تكبير الأرقام */
-            font-weight: 950 !important;
-            -webkit-text-stroke: 1.5px black; /* تسميك الأرقام خصيصاً */
+            width: 25% !important; 
+            font-size: 36px !important; 
+            -webkit-text-stroke: 1.5px black; 
             background-color: transparent !important;
         }
 
         .end-text {
             text-align: center;
             font-size: 18px;
-            font-weight: 950 !important;
             margin-top: 10px;
-            padding-bottom: 10px;
+            padding-bottom: 5px;
         }
     }
     </style>
 """, unsafe_allow_html=True)
 
-# (الدوال والنظام الأمني تبقى كما هي)
+# --- 2. الدوال والنظام الأمني والاتصال ---
 def show_full_logo():
     st.markdown('<div class="no-print">', unsafe_allow_html=True)
     possible_names = ["Logo.JPG", "Logo .JPG", "logo.jpg"]
@@ -156,6 +150,7 @@ if client:
     delegates = [sh.title for sh in spreadsheet.worksheets() if sh.title not in ["طلبات", "الأسعار", "البيانات", "الزبائن", "Sheet1"]]
     show_full_logo()
     
+    # --- نظام الطلبات ---
     st.markdown('<div class="no-print">', unsafe_allow_html=True)
     if st.button("🔔 فحص الإشعارات الجديدة", use_container_width=True):
         st.session_state.orders = []
@@ -189,8 +184,10 @@ if client:
                 for _, r in edited.iterrows(): ws.update_cell(int(r['row_no']), 4, "تم التصديق")
                 st.success("تم!"); st.rerun()
             
+            # بناء صفوف الجدول
             rows_html = "".join([f"<tr><td class='col-qty'>{r['الكميه المطلوبه']}</td><td style='text-align:right;'>{r['اسم الصنف']}</td></tr>" for _, r in edited.iterrows()])
             
+            # --- حاوية الطباعة الحرارية ---
             thermal_view = f"""
             <div class="print-main-wrapper">
                 <div class="header-box">
@@ -216,7 +213,7 @@ if client:
             
             st.markdown("""
                 <button onclick="window.print()" class="print-button-real no-print">
-                   🖨️ طباعة الفاتورة (Epson 80mm)
+                   🖨️ طباعة الفاتورة (Bold - 80mm)
                 </button>
             """, unsafe_allow_html=True)
 
