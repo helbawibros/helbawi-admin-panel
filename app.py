@@ -5,14 +5,11 @@ import gspread
 from google.oauth2.service_account import Credentials
 import os
 
-# --- 1. إعدادات الصفحة وتنسيق الطباعة الحرارية المحسن ---
+# --- 1. إعدادات الصفحة وتنسيق الطباعة الحرارية المطور ---
 st.set_page_config(page_title="إدارة حلباوي - حراري", layout="wide")
 
 st.markdown("""
     <style>
-    /* تنسيق الزر والشاشة العادية */
-    .screen-info { color: white; font-size: 18px; text-align: right; }
-    
     .print-button-real {
         display: block; width: 100%; height: 60px; 
         background-color: #28a745; color: white !important; 
@@ -20,53 +17,52 @@ st.markdown("""
         cursor: pointer; font-weight: bold; font-size: 22px; margin-top: 20px;
     }
 
-    /* --- كود الطباعة المحسن (يدعم الطلبيات الطويلة + بدون فراغ علوي) --- */
     @media print {
         body * { visibility: hidden !important; }
         
         html, body {
             margin: 0 !important;
             padding: 0 !important;
-            height: auto !important; /* ضروري جداً للطلبيات الطويلة */
+            height: auto !important;
             background-color: white !important;
         }
 
         .print-main-wrapper, .print-main-wrapper * { 
             visibility: visible !important; 
             color: #000000 !important; 
-            font-weight: 950 !important; /* خط عريض جداً */
-            -webkit-text-stroke: 0.8px black; /* تسميك إضافي */
+            font-weight: 950 !important;
+            -webkit-text-stroke: 0.8px black;
         }
 
         .print-main-wrapper {
-            position: absolute !important; /* تم التغيير من fixed إلى absolute لدعم التمرير والطول */
-            top: -50px !important; /* سحب للأعلى لإلغاء فراغ المتصفح */
-            right: 0 !important;
-            width: 76mm !important; 
+            position: absolute !important;
+            top: -45px !important; /* لسحب المحتوى للأعلى وتجنب فراغ البداية */
+            left: 50% !important;
+            transform: translateX(-50%) !important;
+            width: 78mm !important; 
             direction: rtl !important;
             margin: 0 !important;
             padding: 0 !important;
         }
 
-        /* إخفاء إضافات ستريمليت */
         header, footer, .no-print, [data-testid="stSidebar"], [data-testid="stHeader"] { 
             display: none !important; 
         }
 
         @page { 
-            size: 80mm auto; /* يحدد العرض 80 والطول تلقائي */
-            margin: 0mm !important; 
+            size: 80mm auto; 
+            margin: 0 !important; 
         }
 
         .header-box {
             border-bottom: 3px solid #000 !important; 
             padding-bottom: 5px;
-            margin-bottom: 10px;
+            margin-bottom: 8px;
             text-align: center;
         }
 
-        .name-txt { font-size: 28px !important; margin: 0; }
-        .date-txt { font-size: 15px !important; margin: 5px 0; }
+        .name-txt { font-size: 30px !important; margin: 0; }
+        .date-txt { font-size: 16px !important; margin: 5px 0; }
 
         .table-style { 
             width: 100%; 
@@ -76,37 +72,31 @@ st.markdown("""
         
         .table-style th, .table-style td {
             border: 2px solid #000 !important; 
-            padding: 6px 2px !important;
+            padding: 5px 2px !important;
             text-align: center;
-            font-size: 21px !important; 
+            font-size: 22px !important; 
         }
         
         .col-qty { 
             width: 25%; 
-            font-size: 35px !important; /* تكبير الرقم */
-            -webkit-text-stroke: 1.2px black;
-            background-color: transparent !important; /* إلغاء الرمادي لزيادة الوضوح */
+            font-size: 38px !important; 
+            -webkit-text-stroke: 1.5px black;
+            background-color: transparent !important;
         }
 
         .footer-space {
             height: 20px;
-            border-top: 2px dashed #000;
             margin-top: 10px;
         }
     }
     </style>
 """, unsafe_allow_html=True)
 
-# --- 2. الدوال الأساسية ---
+# --- 2. الدوال الأساسية ونظام الدخول ---
 def show_full_logo():
     st.markdown('<div class="no-print">', unsafe_allow_html=True)
-    possible_names = ["Logo.JPG", "Logo .JPG", "logo.jpg"]
-    found = False
-    for name in possible_names:
-        if os.path.exists(name):
-            st.image(name, use_container_width=True)
-            found = True
-            break
+    if os.path.exists("Logo.JPG"):
+        st.image("Logo.JPG", use_container_width=True)
     st.markdown('</div>', unsafe_allow_html=True)
 
 if 'admin_logged_in' not in st.session_state: st.session_state.admin_logged_in = False
@@ -124,14 +114,16 @@ if not st.session_state.admin_logged_in:
 
 def get_client():
     try:
+        # إصلاح النواقص في قراءة البيانات من السيكرتس
         info = json.loads(st.secrets["gcp_service_account"]["json_data"].strip(), strict=False)
         creds = Credentials.from_service_account_info(info, scopes=["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"])
         return gspread.authorize(creds)
-    except: return None
+    except Exception as e:
+        return None
 
 client = get_client()
 
-# --- 3. المعالجة والطباعة ---
+# --- 3. معالجة البيانات والطلبات ---
 if client:
     spreadsheet = client.open_by_key("1-Abj-Kvbe02az8KYZfQL0eal2arKw_wgjVQdJX06IA0")
     delegates = [sh.title for sh in spreadsheet.worksheets() if sh.title not in ["طلبات", "الأسعار", "البيانات", "الزبائن", "Sheet1"]]
@@ -167,8 +159,9 @@ if client:
             edited = st.data_editor(pending[['row_no', 'اسم الصنف', 'الكميه المطلوبه']], hide_index=True, use_container_width=True)
 
             if st.button("🚀 تصديق وإرسال النهائي", type="primary", use_container_width=True):
-                for _, r in edited.iterrows(): ws.update_cell(int(r['row_no']), 4, "تم التصديق")
-                st.success("تم!"); st.rerun()
+                for _, r in edited.iterrows(): 
+                    ws.update_cell(int(r['row_no']), 4, "تم التصديق")
+                st.success("تم التصديق بنجاح!"); st.rerun()
             
             rows_html = "".join([f"<tr><td class='col-qty'>{r['الكميه المطلوبه']}</td><td style='text-align:right;'>{r['اسم الصنف']}</td></tr>" for _, r in edited.iterrows()])
             
@@ -180,7 +173,10 @@ if client:
                 </div>
                 <table class="table-style">
                     <thead>
-                        <tr><th style="width:25%">العدد</th><th>الصنف</th></tr>
+                        <tr>
+                            <th style="width:25%">العدد</th>
+                            <th>الصنف</th>
+                        </tr>
                     </thead>
                     <tbody>
                         {rows_html}
@@ -194,7 +190,7 @@ if client:
             
             st.markdown("""
                 <button onclick="window.print()" class="print-button-real no-print">
-                   🖨️ طباعة الفاتورة كاملة (Epson 80mm)
+                   🖨️ طباعة الفاتورة (Epson 80mm)
                 </button>
             """, unsafe_allow_html=True)
 
