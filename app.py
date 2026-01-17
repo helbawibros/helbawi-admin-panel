@@ -24,22 +24,21 @@ st.markdown("""
             margin: 0 !important;
             padding: 0 !important;
             height: auto !important;
+            overflow: visible !important;
         }
 
         .print-main-wrapper, .print-main-wrapper * { 
             visibility: visible !important; 
             color: #000000 !important; 
             font-weight: 950 !important;
-            -webkit-text-stroke: 0.5px black;
         }
 
         .print-main-wrapper {
             position: absolute !important;
-            /* ارفع هذه القيمة إذا وجدت فراغاً علوياً */
-            top: -50px !important; 
-            left: 50% !important;
-            transform: translateX(-50%) !important;
-            width: 78mm !important; 
+            /* تم زيادة الرفع للأعلى لضمان البداية من رأس الورقة */
+            top: -80px !important; 
+            left: 0 !important;
+            width: 100% !important;
             direction: rtl !important;
             margin: 0 !important;
             padding: 0 !important;
@@ -51,7 +50,7 @@ st.markdown("""
 
         @page { 
             size: auto; 
-            margin: 0mm !important; 
+            margin: 0 !important; 
         }
 
         .header-box {
@@ -80,7 +79,6 @@ st.markdown("""
         .col-qty { 
             width: 25% !important; 
             font-size: 40px !important; 
-            -webkit-text-stroke: 1.5px black;
         }
     }
     </style>
@@ -108,6 +106,7 @@ if not st.session_state.admin_logged_in:
 
 def get_client():
     try:
+        # إصلاح قراءة البيانات من st.secrets
         info = json.loads(st.secrets["gcp_service_account"]["json_data"].strip(), strict=False)
         creds = Credentials.from_service_account_info(info, scopes=["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"])
         return gspread.authorize(creds)
@@ -117,7 +116,7 @@ client = get_client()
 
 # --- 3. معالجة البيانات والطلبات ---
 if client:
-    # تم وضع الرابط الكامل المصلح هنا
+    # استخدام المفتاح الكامل والمصلح
     spreadsheet = client.open_by_key("1-Abj-Kvbe02az8KYZfQL0eal2arKw_wgjVQdJX06IA0")
     delegates = [sh.title for sh in spreadsheet.worksheets() if sh.title not in ["طلبات", "الأسعار", "البيانات", "الزبائن", "Sheet1"]]
     show_full_logo()
@@ -174,7 +173,7 @@ if client:
             
             st.markdown("""
                 <button onclick="window.print()" class="print-button-real no-print">
-                   🖨️ طباعة الفاتورة (Fix)
+                   🖨️ طباعة الفاتورة (EPSON Receipt6)
                 </button>
             """, unsafe_allow_html=True)
 
