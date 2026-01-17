@@ -5,12 +5,13 @@ import gspread
 from google.oauth2.service_account import Credentials
 import os
 
-# --- 1. إعدادات الصفحة والتنسيق الحراري الفائق ---
-st.set_page_config(page_title="إدارة حلباوي - فواتير", layout="wide")
+# --- 1. إعدادات الصفحة وتنسيق الطباعة الحرارية النهائي ---
+st.set_page_config(page_title="إدارة حلباوي - حراري", layout="wide")
 
 st.markdown("""
     <style>
-    /* زر الطباعة على الشاشة */
+    .screen-info { color: white; font-size: 18px; text-align: right; }
+    
     .print-button-real {
         display: block; width: 100%; height: 60px; 
         background-color: #28a745; color: white !important; 
@@ -18,7 +19,7 @@ st.markdown("""
         cursor: pointer; font-weight: bold; font-size: 22px; margin-top: 20px;
     }
 
-    /* --- التنسيق المخصص للطباعة الحرارية --- */
+    /* --- كود الطباعة المخصص للطابعة الحرارية 80mm --- */
     @media print {
         body * { visibility: hidden !important; }
         
@@ -29,86 +30,100 @@ st.markdown("""
             background-color: white !important;
         }
 
-        /* حاوية الطباعة: حل مشكلة الهدر والزيح */
         .print-main-wrapper, .print-main-wrapper * { 
             visibility: visible !important; 
             color: #000000 !important; 
-            font-weight: 950 !important; /* عريض جداً */
-            -webkit-text-stroke: 0.8px black; /* تسميك إضافي لكل الخطوط */
+            /* تسميك الخط ليكون Bold فاحم */
+            font-weight: 950 !important;
+            -webkit-text-stroke: 0.8px black;
         }
 
         .print-main-wrapper {
             position: absolute !important;
-            top: -45px !important; /* سحب للاعلى بقوة لإلغاء فراغ البداية */
-            left: 0 !important;
-            width: 78mm !important; 
+            top: -45px !important; /* سحب للأعلى لإلغاء الفراغ العلوي */
+            left: 50% !important;
+            transform: translateX(-50%) !important; /* التوسيط في نص الورقة */
+            width: 76mm !important; 
+            direction: rtl !important;
             margin: 0 !important;
             padding: 0 !important;
-            direction: rtl !important;
         }
 
-        /* تصفير الهوامش الإجبارية للمتصفح */
-        @page { 
-            size: auto; 
-            margin: 0 !important; 
-        }
-
+        /* إخفاء عناصر ستريمليت الزائدة */
         header, footer, .no-print, [data-testid="stSidebar"], [data-testid="stHeader"] { 
             display: none !important; 
         }
 
-        .header-box {
-            text-align: center;
-            border-bottom: 4px solid #000 !important; 
-            padding-bottom: 5px;
-            margin-bottom: 8px;
+        @page { 
+            size: 80mm auto; 
+            margin: 0 !important; 
         }
 
-        .name-txt { font-size: 32px !important; margin: 0; }
-        .date-txt { font-size: 16px !important; margin: 0; }
+        .header-box {
+            border-bottom: 3px solid #000 !important; 
+            padding-bottom: 5px;
+            margin-bottom: 8px;
+            text-align: center;
+        }
+
+        .name-txt { 
+            font-size: 30px !important; 
+            margin: 0; 
+        }
+        
+        .date-txt { 
+            font-size: 16px !important; 
+            margin: 5px 0; 
+        }
 
         .table-style { 
             width: 100%; 
             border-collapse: collapse; 
-            border: 4px solid #000 !important;
+            border: 3px solid #000 !important;
         }
         
         .table-style th, .table-style td {
             border: 2px solid #000 !important; 
-            padding: 6px 2px !important;
+            padding: 5px 2px !important;
             text-align: center;
             font-size: 22px !important; 
-            background-color: white !important; /* إلغاء الشبك الرمادي */
         }
         
-        /* الأرقام Bold فاحم جداً وبدون خلفية */
+        /* عمود العدد: Bold فاحم وبدون خلفية رمادية */
         .col-qty { 
-            width: 25% !important; 
+            width: 25%; 
             font-size: 38px !important; 
-            -webkit-text-stroke: 1.5px black; /* تسميك الرقم حصراً */
+            background-color: transparent !important;
+            -webkit-text-stroke: 1.5px black;
         }
 
-        .end-text {
-            text-align: center;
-            font-size: 18px;
+        .footer-space {
+            height: 10px;
             margin-top: 10px;
-            padding-bottom: 5px;
         }
     }
     </style>
 """, unsafe_allow_html=True)
 
-# --- 2. الدوال الأمنية واللوغو ---
+# --- 2. الدوال الأساسية ---
+
 def show_full_logo():
     st.markdown('<div class="no-print">', unsafe_allow_html=True)
-    if os.path.exists("Logo.JPG"):
-        st.image("Logo.JPG", use_container_width=True)
+    possible_names = ["Logo.JPG", "Logo .JPG", "logo.jpg"]
+    found = False
+    for name in possible_names:
+        if os.path.exists(name):
+            st.image(name, use_container_width=True)
+            found = True
+            break
+    if not found:
+        st.info("⚠️ يرجى التأكد من رفع صورة Logo.JPG")
     st.markdown('</div>', unsafe_allow_html=True)
 
 if 'admin_logged_in' not in st.session_state: st.session_state.admin_logged_in = False
 if not st.session_state.admin_logged_in:
     show_full_logo()
-    col2 = st.columns([1, 2, 1])[1]
+    col1, col2, col3 = st.columns([1, 2, 1])
     with col2:
         st.markdown("<h1 style='text-align: center;'>دخول الإدارة</h1>", unsafe_allow_html=True)
         pwd = st.text_input("كلمة السر", type="password")
@@ -118,7 +133,6 @@ if not st.session_state.admin_logged_in:
                 st.rerun()
     st.stop()
 
-# --- 3. الاتصال بجوجل شيت ---
 def get_client():
     try:
         info = json.loads(st.secrets["gcp_service_account"]["json_data"].strip(), strict=False)
@@ -127,6 +141,8 @@ def get_client():
     except: return None
 
 client = get_client()
+
+# --- 3. معالجة البيانات والطباعة ---
 
 if client:
     spreadsheet = client.open_by_key("1-Abj-Kvbe02az8KYZfQL0eal2arKw_wgjVQdJX06IA0")
@@ -139,10 +155,12 @@ if client:
         for rep in delegates:
             ws = spreadsheet.worksheet(rep)
             if "بانتظار التصديق" in ws.col_values(4): st.session_state.orders.append(rep)
-    
+        if not st.session_state.orders:
+            st.toast("لا توجد طلبيات جديدة حالياً")
+
     if 'orders' in st.session_state:
         for name in st.session_state.orders:
-            if st.button(f"📦 طلبية من: {name}", key=f"btn_{name}", use_container_width=True):
+            if st.button(f"📦 طلبية جديدة من: {name}", key=f"btn_{name}", use_container_width=True):
                 st.session_state.active_rep = name
                 st.rerun()
     st.markdown('</div>', unsafe_allow_html=True)
@@ -166,8 +184,10 @@ if client:
                 for _, r in edited.iterrows(): ws.update_cell(int(r['row_no']), 4, "تم التصديق")
                 st.success("تم!"); st.rerun()
             
+            # بناء صفوف الجدول للطباعة
             rows_html = "".join([f"<tr><td class='col-qty'>{r['الكميه المطلوبه']}</td><td style='text-align:right;'>{r['اسم الصنف']}</td></tr>" for _, r in edited.iterrows()])
             
+            # الحاوية النهائية المخصصة للـ 80mm
             thermal_view = f"""
             <div class="print-main-wrapper">
                 <div class="header-box">
@@ -176,13 +196,20 @@ if client:
                 </div>
                 <table class="table-style">
                     <thead>
-                        <tr><th style="width:25%">العدد</th><th>الصنف</th></tr>
+                        <tr>
+                            <th style="width:25%">العدد</th>
+                            <th>الصنف</th>
+                        </tr>
                     </thead>
-                    <tbody>{rows_html}</tbody>
+                    <tbody>
+                        {rows_html}
+                    </tbody>
                 </table>
-                <p class="end-text">*** نهاية الطلب ***</p>
+                <div class="footer-space"></div>
+                <p style="text-align:center; font-size:16px; font-weight:bold;">*** نهاية الطلب ***</p>
             </div>
             """
+
             st.markdown(thermal_view, unsafe_allow_html=True)
             
             st.markdown("""
