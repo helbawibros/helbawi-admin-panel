@@ -5,12 +5,11 @@ import gspread
 from google.oauth2.service_account import Credentials
 import os
 
-# --- 1. إعدادات الصفحة والتنسيق النهائي ---
-st.set_page_config(page_title="إدارة حلباوي - فواتير", layout="wide")
+# --- 1. إعدادات الصفحة والتنسيق النهائي الموجه للطابعة الحرارية ---
+st.set_page_config(page_title="إدارة حلباوي - فاتورة", layout="wide")
 
 st.markdown("""
     <style>
-    /* تنسيق زر الطباعة على الشاشة */
     .print-button-real {
         display: block; width: 100%; height: 60px; 
         background-color: #28a745; color: white !important; 
@@ -18,7 +17,6 @@ st.markdown("""
         cursor: pointer; font-weight: bold; font-size: 22px; margin-top: 20px;
     }
 
-    /* --- التنسيق المخصص للطباعة الحرارية 80mm --- */
     @media print {
         body * { visibility: hidden !important; }
         
@@ -26,20 +24,24 @@ st.markdown("""
             margin: 0 !important;
             padding: 0 !important;
             height: auto !important;
+            background-color: white !important;
         }
 
         .print-main-wrapper, .print-main-wrapper * { 
             visibility: visible !important; 
             color: #000000 !important; 
+            /* جعل كل الخطوط عريضة جداً للوضوح */
+            font-weight: 900 !important;
+            -webkit-text-stroke: 0.6px black;
         }
 
         .print-main-wrapper {
             position: absolute !important;
-            top: 0 !important;
-            left: 0 !important;
-            right: 0 !important;
-            width: 76mm !important; /* تقريباً كامل عرض الورق */
-            margin: 0 auto !important; /* لتوسيط المحتوى في المنتصف */
+            top: 0 !important; /* الالتصاق التام بالأعلى لإلغاء الهدر */
+            left: 50% !important;
+            transform: translateX(-50%) !important; /* التوسيط الدقيق في نص الورقة */
+            width: 76mm !important; 
+            margin: 0 !important;
             padding: 0 !important;
             direction: rtl !important;
         }
@@ -49,71 +51,65 @@ st.markdown("""
         }
 
         @page { 
-            size: 80mm auto; 
+            size: 80mm auto; /* جعل الطول يتبع المحتوى فقط */
             margin: 0 !important; 
         }
 
         .header-box {
-            border-bottom: 2px dashed #000 !important; 
+            border-bottom: 3px dashed #000 !important; 
             padding-bottom: 5px;
-            margin-bottom: 8px;
+            margin-bottom: 5px;
             text-align: center;
         }
 
         .name-txt { 
-            font-size: 28px !important; 
-            font-weight: 900 !important; 
+            font-size: 30px !important; 
             margin: 0; 
         }
         
         .date-txt { 
-            font-size: 14px !important; 
-            font-weight: bold !important; 
+            font-size: 16px !important; 
+            margin-top: 2px;
         }
 
-        /* --- تعديل الجدول لإلغاء الهدر والتوسيط --- */
         .table-style { 
             width: 100%; 
             border-collapse: collapse; 
-            border: 2px solid #000 !important;
+            border: 3px solid #000 !important;
         }
         
         .table-style th, .table-style td {
-            border: 1px solid #000 !important; 
-            padding: 4px 2px !important; /* تقليل الحشو لتقليل الطول */
+            border: 2px solid #000 !important; 
+            padding: 5px 2px !important;
             text-align: center;
-            font-size: 18px !important; 
-            font-weight: 800 !important; 
-            color: #000000 !important;
+            font-size: 22px !important; /* تكبير الخط للأصناف */
         }
         
-        /* جعل عمود العدد Bold فاحم وبدون خلفية رمادية */
+        /* تنسيق خاص لعمود العدد ليكون الأبرز */
         .col-qty { 
-            width: 22% !important; 
-            font-size: 26px !important; 
-            font-weight: 950 !important; /* أقصى سماكة للأرقام */
-            background-color: transparent !important; /* إزالة الشبك الرمادي */
-            -webkit-text-stroke: 0.5px black; /* زيادة عرض الحرف برمجياً */
+            width: 25% !important; 
+            font-size: 32px !important; /* أرقام كبيرة جداً */
+            background-color: transparent !important; /* إزالة أي تظليل أو شبك */
+            -webkit-text-stroke: 1px black; /* زيادة سماكة الأرقام تحديداً */
         }
 
-        /* تقليل الفراغ النهائي لمنع هدر الورق */
+        /* تقليل الهدر النهائي */
         .footer-space {
-            height: 10px; /* تقليل المسافة السفلية جداً */
-            margin-top: 5px;
+            height: 5px;
+            margin: 0;
         }
 
         .end-text {
             text-align: center;
-            font-size: 14px;
-            font-weight: bold;
+            font-size: 16px;
             margin: 0;
-            padding-bottom: 5px; /* يقلل الهدر بعد هذه الكلمة */
+            padding-bottom: 2px;
         }
     }
     </style>
 """, unsafe_allow_html=True)
 
-# (الدوال والنظام الأمني بدون تغيير)
+# (الدوال والنظام الأمني - تبقى كما هي)
 def show_full_logo():
     st.markdown('<div class="no-print">', unsafe_allow_html=True)
     possible_names = ["Logo.JPG", "Logo .JPG", "logo.jpg"]
@@ -154,7 +150,6 @@ if client:
     delegates = [sh.title for sh in spreadsheet.worksheets() if sh.title not in ["طلبات", "الأسعار", "البيانات", "الزبائن", "Sheet1"]]
     show_full_logo()
     
-    # --- نظام الإشعارات واختيار المندوب ---
     st.markdown('<div class="no-print">', unsafe_allow_html=True)
     if st.button("🔔 فحص الإشعارات الجديدة", use_container_width=True):
         st.session_state.orders = []
@@ -188,10 +183,8 @@ if client:
                 for _, r in edited.iterrows(): ws.update_cell(int(r['row_no']), 4, "تم التصديق")
                 st.success("تم!"); st.rerun()
             
-            # بناء صفوف الجدول
             rows_html = "".join([f"<tr><td class='col-qty'>{r['الكميه المطلوبه']}</td><td style='text-align:right;'>{r['اسم الصنف']}</td></tr>" for _, r in edited.iterrows()])
             
-            # التنسيق الحراري المحسن
             thermal_view = f"""
             <div class="print-main-wrapper">
                 <div class="header-box">
