@@ -20,9 +20,16 @@ st.markdown("""
     }
 
     /* --- كود الطباعة المخصص للطابعة الحرارية 80mm --- */
-    @media print {
+        @media print {
         body * { visibility: hidden !important; }
         
+        /* إزالة أي هوامش تفرضها المتصفحات تلقائياً */
+        html, body {
+            margin: 0 !important;
+            padding: 0 !important;
+            height: auto !important;
+        }
+
         .print-main-wrapper, .print-main-wrapper * { 
             visibility: visible !important; 
             color: #000000 !important; 
@@ -30,23 +37,25 @@ st.markdown("""
 
         .print-main-wrapper {
             position: absolute !important;
-            top: 0 !important;
-            left: 0 !important;
-            width: 72mm !important; /* عرض الطباعة الفعلي داخل ورق الـ 80mm */
+            top: 0 !important;   /* لضمان البدء من أعلى الورقة تماماً */
+            right: 0 !important; /* بما أن اللغة عربية نلتزم بالجهة اليمنى */
+            width: 72mm !important; 
             direction: rtl !important;
             margin: 0 !important;
             padding: 0 !important;
         }
 
-        /* إخفاء عناصر ستريمليت الزائدة */
-        header, footer, .no-print, [data-testid="stSidebar"], [data-testid="stHeader"] { 
-            display: none !important; 
+        /* إخفاء أي مساحات فارغة لـ Streamlit */
+        [data-testid="stAppViewContainer"] {
+            padding: 0 !important;
         }
 
         @page { 
-            size: 80mm auto; /* جعل الطول تلقائي بناءً على محتوى الطلب */
-            margin: 0; 
+            size: 80mm auto; 
+            margin: 0 !important; /* إلغاء هوامش الصفحة تماماً */
         }
+    }
+
 
         .header-box {
             border-bottom: 2px dashed #000 !important; 
