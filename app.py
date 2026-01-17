@@ -5,7 +5,7 @@ import gspread
 from google.oauth2.service_account import Credentials
 import os
 
-# --- 1. إعدادات الصفحة وتنسيق الطباعة الحرارية المطور ---
+# --- 1. إعدادات الصفحة وتنسيق الطباعة الحرارية ---
 st.set_page_config(page_title="إدارة حلباوي - حراري", layout="wide")
 
 st.markdown("""
@@ -24,19 +24,19 @@ st.markdown("""
             margin: 0 !important;
             padding: 0 !important;
             height: auto !important;
-            background-color: white !important;
         }
 
         .print-main-wrapper, .print-main-wrapper * { 
             visibility: visible !important; 
             color: #000000 !important; 
             font-weight: 950 !important;
-            -webkit-text-stroke: 0.8px black;
+            -webkit-text-stroke: 0.5px black;
         }
 
         .print-main-wrapper {
             position: absolute !important;
-            top: -45px !important; /* لسحب المحتوى للأعلى وتجنب فراغ البداية */
+            /* ارفع هذه القيمة إذا وجدت فراغاً علوياً */
+            top: -50px !important; 
             left: 50% !important;
             transform: translateX(-50%) !important;
             width: 78mm !important; 
@@ -50,19 +50,19 @@ st.markdown("""
         }
 
         @page { 
-            size: 80mm auto; 
-            margin: 0 !important; 
+            size: auto; 
+            margin: 0mm !important; 
         }
 
         .header-box {
             border-bottom: 3px solid #000 !important; 
             padding-bottom: 5px;
-            margin-bottom: 8px;
+            margin-bottom: 10px;
             text-align: center;
         }
 
-        .name-txt { font-size: 30px !important; margin: 0; }
-        .date-txt { font-size: 16px !important; margin: 5px 0; }
+        .name-txt { font-size: 32px !important; margin: 0; }
+        .date-txt { font-size: 16px !important; }
 
         .table-style { 
             width: 100%; 
@@ -72,21 +72,15 @@ st.markdown("""
         
         .table-style th, .table-style td {
             border: 2px solid #000 !important; 
-            padding: 5px 2px !important;
+            padding: 8px 2px !important;
             text-align: center;
-            font-size: 22px !important; 
+            font-size: 24px !important; 
         }
         
         .col-qty { 
-            width: 25%; 
-            font-size: 38px !important; 
+            width: 25% !important; 
+            font-size: 40px !important; 
             -webkit-text-stroke: 1.5px black;
-            background-color: transparent !important;
-        }
-
-        .footer-space {
-            height: 20px;
-            margin-top: 10px;
         }
     }
     </style>
@@ -102,7 +96,7 @@ def show_full_logo():
 if 'admin_logged_in' not in st.session_state: st.session_state.admin_logged_in = False
 if not st.session_state.admin_logged_in:
     show_full_logo()
-    col1, col2, col3 = st.columns([1, 2, 1])
+    col2 = st.columns([1, 2, 1])[1]
     with col2:
         st.markdown("<h1 style='text-align: center;'>دخول الإدارة</h1>", unsafe_allow_html=True)
         pwd = st.text_input("كلمة السر", type="password")
@@ -114,17 +108,16 @@ if not st.session_state.admin_logged_in:
 
 def get_client():
     try:
-        # إصلاح النواقص في قراءة البيانات من السيكرتس
         info = json.loads(st.secrets["gcp_service_account"]["json_data"].strip(), strict=False)
         creds = Credentials.from_service_account_info(info, scopes=["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"])
         return gspread.authorize(creds)
-    except Exception as e:
-        return None
+    except: return None
 
 client = get_client()
 
 # --- 3. معالجة البيانات والطلبات ---
 if client:
+    # تم وضع الرابط الكامل المصلح هنا
     spreadsheet = client.open_by_key("1-Abj-Kvbe02az8KYZfQL0eal2arKw_wgjVQdJX06IA0")
     delegates = [sh.title for sh in spreadsheet.worksheets() if sh.title not in ["طلبات", "الأسعار", "البيانات", "الزبائن", "Sheet1"]]
     show_full_logo()
@@ -138,7 +131,7 @@ if client:
     
     if 'orders' in st.session_state:
         for name in st.session_state.orders:
-            if st.button(f"📦 طلبية جديدة من: {name}", key=f"btn_{name}", use_container_width=True):
+            if st.button(f"📦 طلبية من: {name}", key=f"btn_{name}", use_container_width=True):
                 st.session_state.active_rep = name
                 st.rerun()
     st.markdown('</div>', unsafe_allow_html=True)
@@ -159,9 +152,8 @@ if client:
             edited = st.data_editor(pending[['row_no', 'اسم الصنف', 'الكميه المطلوبه']], hide_index=True, use_container_width=True)
 
             if st.button("🚀 تصديق وإرسال النهائي", type="primary", use_container_width=True):
-                for _, r in edited.iterrows(): 
-                    ws.update_cell(int(r['row_no']), 4, "تم التصديق")
-                st.success("تم التصديق بنجاح!"); st.rerun()
+                for _, r in edited.iterrows(): ws.update_cell(int(r['row_no']), 4, "تم التصديق")
+                st.success("تم!"); st.rerun()
             
             rows_html = "".join([f"<tr><td class='col-qty'>{r['الكميه المطلوبه']}</td><td style='text-align:right;'>{r['اسم الصنف']}</td></tr>" for _, r in edited.iterrows()])
             
@@ -172,25 +164,17 @@ if client:
                     <p class="date-txt">{order_time}</p>
                 </div>
                 <table class="table-style">
-                    <thead>
-                        <tr>
-                            <th style="width:25%">العدد</th>
-                            <th>الصنف</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {rows_html}
-                    </tbody>
+                    <thead><tr><th style="width:25%">العدد</th><th>الصنف</th></tr></thead>
+                    <tbody>{rows_html}</tbody>
                 </table>
-                <div class="footer-space"></div>
-                <p style="text-align:center; font-size:16px; font-weight:bold;">*** نهاية الطلب ***</p>
+                <p style="text-align:center; margin-top:10px;">*** نهاية الطلب ***</p>
             </div>
             """
             st.markdown(thermal_view, unsafe_allow_html=True)
             
             st.markdown("""
                 <button onclick="window.print()" class="print-button-real no-print">
-                   🖨️ طباعة الفاتورة (Epson 80mm)
+                   🖨️ طباعة الفاتورة (Fix)
                 </button>
             """, unsafe_allow_html=True)
 
