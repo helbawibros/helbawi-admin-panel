@@ -158,7 +158,7 @@ if client:
         for rep in delegates:
             ws = spreadsheet.worksheet(rep)
             all_vals = ws.get_all_values()
-            if len(all_vals) > 1:
+        if len(all_vals) > 1:
                 df_check = pd.DataFrame(all_vals[1:], columns=all_vals[0])
                 # التأكد من اسم العمود لتجنب KeyError
                 col_status = 'الحالة' if 'الحالة' in df_check.columns else df_check.columns[3]
