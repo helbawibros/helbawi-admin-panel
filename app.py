@@ -157,16 +157,25 @@ if client:
         st.session_state.orders = []
         for rep in delegates:
             ws = spreadsheet.worksheet(rep)
-            if "بانتظار التصديق" in ws.col_values(4): st.session_state.orders.append(rep)
+            status_values = ws.col_values(4) # عمود الحالة
+            if "بانتظار التصديق" in status_values:
+                # جلب الوقت من العمود رقم 5 (التاريخ والوقت) لأول صف بانتظار التصديق
+                row_idx = status_values.index("بانتظار التصديق") + 1
+                order_time = ws.cell(row_idx, 5).value 
+                st.session_state.orders.append({"name": rep, "time": order_time})
+        
         if not st.session_state.orders:
             st.toast("لا توجد طلبيات جديدة حالياً")
 
     if 'orders' in st.session_state:
-        for name in st.session_state.orders:
-            if st.button(f"📦 طلبية جديدة من: {name}", key=f"btn_{name}", use_container_width=True):
-                st.session_state.active_rep = name
+        for order in st.session_state.orders:
+            # المفتاح key ظل كما هو btn_ لضمان الوميض
+            btn_label = f"📦 طلبية من: {order['name']} | 🕒 {order['time']}"
+            if st.button(btn_label, key=f"btn_{order['name']}", use_container_width=True):
+                st.session_state.active_rep = order['name']
                 st.rerun()
     st.markdown('</div>', unsafe_allow_html=True)
+
 
     active = st.session_state.get('active_rep', "-- اختر مندوب --")
     selected_rep = st.selectbox("المندوب المختار:", ["-- اختر مندوب --"] + delegates, 
