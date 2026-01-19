@@ -137,23 +137,50 @@ if client:
                 for _, r in edited.iterrows(): ws.update_cell(int(r['row_no']), 4, "تم التصديق")
                 st.success("تم!"); st.rerun()
             
-            rows_html = "".join([f"<tr><td class='col-qty'>{r['الكميه المطلوبه']}</td><td style='text-align:right;'>{r['اسم الصنف']}</td></tr>" for _, r in edited.iterrows()])
+                        # 1. بناء صفوف الجدول مع إضافة عمود الترقيم تلقائياً
+            rows_html = "".join([
+                f"<tr>"
+                f"<td style='width:10%; text-align:center;'>{i+1}</td>" # عمود الترقيم
+                f"<td class='col-qty' style='font-size:45px !important;'>{r['الكميه المطلوبه']}</td>" # العدد بخط كبير
+                f"<td style='text-align:right; font-size:40px !important;'>{r['اسم الصنف']}</td>" # الصنف بخط 40
+                f"</tr>" 
+                for i, (_, r) in enumerate(edited.iterrows())
+            ])
             
+            # 2. حاوية الطباعة الحرارية المعدلة
             thermal_view = f"""
             <div class="print-main-wrapper">
                 <div class="header-box">
-                    <p class="name-txt">طلب: {selected_rep}</p>
-                    <p class="date-txt">{order_time_val}</p>
+                    <p class="name-txt" style="font-size: 45px !important; margin:0;">طلب: {selected_rep}</p>
+                    <p class="date-txt" style="font-size: 25px !important; margin:5px 0;">{order_time_val}</p>
                 </div>
-                <table class="table-style">
-                    <thead><tr><th style="width:30%">العدد</th><th>الصنف</th></tr></thead>
-                    <tbody>{rows_html}</tbody>
+                <table class="table-style" style="width:100%; border-collapse: collapse;">
+                    <thead>
+                        <tr style="background-color: #eee; font-size: 30px !important;">
+                            <th style="width:10%; border:1px solid black;">ت</th>
+                            <th style="width:25%; border:1px solid black;">العدد</th>
+                            <th style="border:1px solid black;">الصنف</th>
+                        </tr>
+                    </thead>
+                    <tbody style="font-weight: bold;">
+                        {rows_html}
+                    </tbody>
                 </table>
-                <p style="text-align:center; font-size:14px; font-weight:bold; margin-top:10px;">*** نهاية الطلب ***</p>
+                <div class="footer-space" style="height:20px; border-bottom:1px dashed black; margin-bottom:10px;"></div>
+                <p style="text-align:center; font-size:20px; font-weight:bold;">*** نهاية الطلب ***</p>
             </div>
             """
-            st.markdown(thermal_view, unsafe_allow_html=True)
-            st.markdown("""<button onclick="window.print()" class="print-button-real no-print">🖨️ طباعة الفاتورة</button>""", unsafe_allow_html=True)
 
+            st.markdown(thermal_view, unsafe_allow_html=True)
+            
+            # زر الطباعة (يظهر على الشاشة فقط)
+            st.markdown("""
+                <button onclick="window.print()" class="print-button-real no-print">
+                   🖨️ طباعة الفاتورة (Epson 80mm)
+                </button>
+            """, unsafe_allow_html=True)
+
+# --- إغلاق نظام تسجيل الخروج ---
 if st.sidebar.button("خروج"):
-    st.session_state.clear(); st.rerun()
+    st.session_state.clear()
+    st.rerun()
