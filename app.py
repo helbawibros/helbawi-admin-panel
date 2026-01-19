@@ -143,7 +143,7 @@ if client:
             thermal_view = f"""
             <div class="print-main-wrapper" style="width:100%; direction:rtl;">
                 <div class="header-box" style="text-align:center;">
-                    <p style="font-size:80px !important; font-weight:900; margin:0;">طلب: {selected_rep}</p>
+                    <p style="font-size:120px !important; font-weight:900; margin:0;">طلب: {selected_rep}</p>
                     <p style="font-size:35px !important; font-weight:bold; margin-top:5px;">{order_time_val}</p>
                 </div>
                 <table class="table-style" style="width:100%; border-collapse:collapse;">
