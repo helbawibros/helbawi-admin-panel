@@ -10,9 +10,6 @@ st.set_page_config(page_title="إدارة حلباوي - حراري", layout="wi
 
 st.markdown("""
     <style>
-    /* تنسيق الزر والشاشة العادية */
-    .screen-info { color: white; font-size: 18px; text-align: right; }
-    
     .print-button-real {
         display: block; width: 100%; height: 60px; 
         background-color: #28a745; color: white !important; 
@@ -20,95 +17,58 @@ st.markdown("""
         cursor: pointer; font-weight: bold; font-size: 22px; margin-top: 20px;
     }
 
-    /* --- كود الطباعة المحسن لإلغاء الفراغ العلوي (80mm) --- */
     @media print {
-        /* إخفاء كل عناصر الموقع الأصلية */
+        /* إخفاء كل شيء غير ضروري */
         body * { visibility: hidden !important; }
         
-        /* إزالة أي هوامش تلقائية من المتصفح */
         html, body {
             margin: 0 !important;
             padding: 0 !important;
-            height: auto !important;
+            /* السر هنا: نجعل الارتفاع يتحدد بالمحتوى فقط */
+            height: auto !important; 
+            min-height: 0 !important;
+            overflow: visible !important;
         }
 
-        /* إظهار حاوية الطباعة فقط */
         .print-main-wrapper, .print-main-wrapper * { 
             visibility: visible !important; 
             color: #000000 !important; 
+            font-weight: 950 !important;
         }
 
         .print-main-wrapper {
-            position: fixed !important; /* تثبيت في أعلى الصفحة تماماً */
+            position: relative !important; /* نستخدم relative للسماح للورق بالتقلص */
             top: 0 !important;
-            right: 0 !important;
-            width: 72mm !important; /* العرض الفعلي للطباعة */
-            direction: rtl !important;
+            width: 78mm !important; 
             margin: 0 !important;
             padding: 0 !important;
-            background-color: white !important;
+            display: inline-block !important; /* يمنع امتداد الحاوية لنهاية الصفحة */
         }
 
-        /* إخفاء إضافات ستريمليت الإجبارية */
-        header, footer, .no-print, [data-testid="stSidebar"], [data-testid="stHeader"] { 
-            display: none !important; 
-        }
-
-        /* ضبط إعدادات الصفحة الحرارية */
         @page { 
-            size: 80mm auto; 
-            margin: 0mm !important; 
+            /* نترك المقاس auto ليأخذ عرض الطابعة وطول المحتوى */
+            size: auto; 
+            margin: 0 !important; 
         }
 
         .header-box {
-            border-bottom: 2px dashed #000 !important; 
+            border-bottom: 3px solid #000 !important; 
             padding-bottom: 5px;
             margin-bottom: 10px;
             text-align: center;
         }
 
-        .name-txt { 
-            font-size: 26px !important; 
-            font-weight: 900 !important; 
-            margin: 0; 
-        }
+        /* تكبير الخط ليملأ العرض ويقلل الطول */
+        .table-style { width: 100%; border-collapse: collapse; border: 2px solid #000 !important; }
+        .table-style td { font-size: 24px !important; border: 2px solid #000 !important; padding: 5px; }
         
-        .date-txt { 
-            font-size: 14px !important; 
-            font-weight: bold !important; 
-            margin: 5px 0; 
-        }
-
-        .table-style { 
-            width: 100%; 
-            border-collapse: collapse; 
-            border: 1px solid #000 !important;
-        }
-        
-        .table-style th, .table-style td {
-            border: 1px solid #000 !important; 
-            padding: 6px !important;
-            text-align: center;
-            font-size: 19px !important; 
-            font-weight: 900 !important; 
-            color: #000000 !important;
-        }
-        
-        .col-qty { 
-            width: 25%; 
-            font-size: 26px !important; 
-            background-color: #f0f0f0 !important;
-            -webkit-print-color-adjust: exact;
-        }
-
-        .footer-space {
-            height: 40px;
-            border-top: 1px dashed #000;
-            margin-top: 10px;
+        header, footer, .no-print, [data-testid="stSidebar"], [data-testid="stHeader"] { 
+            display: none !important; 
         }
     }
     </style>
 """, unsafe_allow_html=True)
+
 
 # --- 2. الدوال الأساسية ونظام الدخول ---
 def show_full_logo():
