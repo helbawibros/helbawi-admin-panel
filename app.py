@@ -139,19 +139,28 @@ if client:
             
                 
                         # 1. بناء صفوف الجدول - طريقة بسيطة جداً لمنع تداخل الأكواد
-            rows_html = "".join([f"<tr><td class='col-qty'>{r['الكميه المطلوبه']}</td><td style='text-align:right;'>{r['اسم الصنف']}</td></tr>" for _, r in edited.iterrows()])
+                        # تعديل السطر الذي ينجح معك دائماً ليحتوي على الترقيم والخط الكبير
+            rows_html = "".join([f"<tr><td style='border:1px solid black; text-align:center; width:10%; font-size:25px;'>{i+1}</td><td class='col-qty' style='font-size:45px !important;'>{r['الكميه المطلوبه']}</td><td style='text-align:right; font-size:36px !important; white-space:nowrap;'>{r['اسم الصنف']}</td></tr>" for i, (_, r) in enumerate(edited.iterrows())])
             
             thermal_view = f"""
-            <div class="print-main-wrapper">
-                <div class="header-box">
-                    <p class="name-txt">طلب: {selected_rep}</p>
-                    <p class="date-txt">{order_time_val}</p>
+            <div class="print-main-wrapper" style="width:100%; direction:rtl;">
+                <div class="header-box" style="text-align:center;">
+                    <p style="font-size:75px !important; font-weight:900; margin:0;">طلب: {selected_rep}</p>
+                    <p style="font-size:35px !important; font-weight:bold; margin-top:5px;">{order_time_val}</p>
                 </div>
-                <table class="table-style">
-                    <thead><tr><th style="width:30%">العدد</th><th>الصنف</th></tr></thead>
-                    <tbody>{rows_html}</tbody>
+                <table class="table-style" style="width:100%; border-collapse:collapse;">
+                    <thead>
+                        <tr style="background-color:#eee; font-size:25px;">
+                            <th style="width:12%; border:1px solid black;">ت</th>
+                            <th style="width:23%; border:1px solid black;">العدد</th>
+                            <th style="border:1px solid black;">الصنف</th>
+                        </tr>
+                    </thead>
+                    <tbody style="font-weight:900;">
+                        {rows_html}
+                    </tbody>
                 </table>
-                <p style="text-align:center; font-size:14px; font-weight:bold; margin-top:10px;">*** نهاية الطلب ***</p>
+                <p style="text-align:center; font-size:25px; font-weight:bold; margin-top:20px; border-top:2px dashed black; padding-top:10px;">*** نهاية الطلب ***</p>
             </div>
             """
             st.markdown(thermal_view, unsafe_allow_html=True)
