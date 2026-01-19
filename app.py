@@ -139,36 +139,39 @@ if client:
             
                         # 1. بناء صفوف الجدول مع إضافة عمود الترقيم تلقائياً
                         # 1. بناء صفوف الجدول (تنسيق أنحف وخط 30)
+                        # 1. بناء صفوف الجدول (تنسيق 36px مع توسيط)
             rows_html = "".join([
                 f"<tr>"
-                f"<td style='width:10%; text-align:center; border:1px solid black;'>{i+1}</td>" 
-                f"<td style='width:20%; text-align:center; border:1px solid black; font-size:35px !important;'>{r['الكميه المطلوبه']}</td>" 
-                f"<td style='text-align:right; border:1px solid black; padding-right:5px; font-size:30px !important;'>{r['اسم الصنف']}</td>" 
+                f"<td style='border:1px solid black; text-align:center; width:15%;'>{i+1}</td>" 
+                f"<td style='border:1px solid black; text-align:center; width:20%; font-size:40px !important;'>{r['الكميه المطلوبه']}</td>" 
+                f"<td style='border:1px solid black; text-align:right; padding-right:10px; font-size:36px !important;'>{r['اسم الصنف']}</td>" 
                 f"</tr>" 
                 for i, (_, r) in enumerate(edited.iterrows())
             ])
             
-            # 2. حاوية الطباعة الحرارية المعدلة (خط 30)
+            # 2. حاوية الطباعة الحرارية (توسيط كامل وخطوط كبيرة)
             thermal_view = f"""
-            <div class="print-main-wrapper" style="font-family: Arial, sans-serif;">
-                <div class="header-box" style="text-align:center; border-bottom:2px solid black; margin-bottom:5px;">
-                    <p style="font-size: 35px !important; font-weight: bold; margin:0;">طلب: {selected_rep}</p>
-                    <p style="font-size: 20px !important; margin:2px 0;">{order_time_val}</p>
+            <div class="print-main-wrapper" style="width: 100%; direction: rtl;">
+                <div style="text-align:center; border-bottom:3px solid black; padding-bottom:10px; margin-bottom:15px;">
+                    <p style="font-size: 65px !important; font-weight: 900; margin:0;">طلب: {selected_rep}</p>
+                    <p style="font-size: 35px !important; font-weight: bold; margin:5px 0;">{order_time_val}</p>
                 </div>
-                <table style="width:100%; border-collapse: collapse; table-layout: fixed;">
+                
+                <table style="width:98%; margin: auto; border-collapse: collapse; border: 2px solid black;">
                     <thead>
-                        <tr style="background-color: #eee; font-size: 25px !important;">
-                            <th style="width:12%; border:1px solid black;">ت</th>
-                            <th style="width:23%; border:1px solid black;">العدد</th>
-                            <th style="border:1px solid black;">الصنف</th>
+                        <tr style="background-color: #eee; font-size: 30px !important;">
+                            <th style="border:2px solid black; width:15%;">ت</th>
+                            <th style="border:2px solid black; width:25%;">العدد</th>
+                            <th style="border:2px solid black;">الصنف</th>
                         </tr>
                     </thead>
-                    <tbody style="font-weight: bold;">
+                    <tbody style="font-weight: 900;">
                         {rows_html}
                     </tbody>
                 </table>
-                <div style="border-top:1px dashed black; margin-top:10px; padding-top:5px; text-align:center;">
-                    <p style="font-size:18px; font-weight:bold;">*** نهاية الطلب ***</p>
+                
+                <div style="margin-top:20px; text-align:center; border-top:2px dashed black; padding-top:10px;">
+                    <p style="font-size:25px; font-weight:bold;">*** نهاية الطلب ***</p>
                 </div>
             </div>
             """
@@ -180,9 +183,3 @@ if client:
                    🖨️ طباعة الفاتورة (Epson 80mm)
                 </button>
             """, unsafe_allow_html=True)
-
-
-# --- إغلاق نظام تسجيل الخروج ---
-if st.sidebar.button("خروج"):
-    st.session_state.clear()
-    st.rerun()
