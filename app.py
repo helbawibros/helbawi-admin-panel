@@ -151,20 +151,34 @@ if client:
     spreadsheet = client.open_by_key("1-Abj-Kvbe02az8KYZfQL0eal2arKw_wgjVQdJX06IA0")
     delegates = [sh.title for sh in spreadsheet.worksheets() if sh.title not in ["طلبات", "الأسعار", "البيانات", "الزبائن", "Sheet1"]]
     show_full_logo()
-    
+
     st.markdown('<div class="no-print">', unsafe_allow_html=True)
     if st.button("🔔 فحص الإشعارات الجديدة", use_container_width=True):
         st.session_state.orders = []
         for rep in delegates:
             ws = spreadsheet.worksheet(rep)
-            if "بانتظار التصديق" in ws.col_values(4): st.session_state.orders.append(rep)
+            all_vals = ws.get_all_values()
+            if len(all_vals) > 1:
+                df_check = pd.DataFrame(all_vals[1:], columns=all_vals[0])
+                # التأكد من اسم العمود لتجنب KeyError
+                col_status = 'الحالة' if 'الحالة' in df_check.columns else df_check.columns[3]
+                pending_check = df_check[df_check[col_status] == "بانتظار التصديق"]
+                
+                if not pending_check.empty:
+                    # جلب وقت أول طلبية بانتظار التصديق
+                    order_time = pending_check.iloc[0]['التاريخ و الوقت'] if 'التاريخ و الوقت' in df_check.columns else "وقت غير محدد"
+                    st.session_state.orders.append({"name": rep, "time": order_time})
+        
         if not st.session_state.orders:
             st.toast("لا توجد طلبيات جديدة حالياً")
 
+    # عرض الأزرار مع الوميض والوقت
     if 'orders' in st.session_state:
-        for name in st.session_state.orders:
-            if st.button(f"📦 طلبية جديدة من: {name}", key=f"btn_{name}", use_container_width=True):
-                st.session_state.active_rep = name
+        for order in st.session_state.orders:
+            # الزر سيومض باللون الأحمر بفضل كود الـ CSS في بداية الصفحة
+            btn_label = f"📦 طلبية: {order['name']} | 🕒 {order['time']}"
+            if st.button(btn_label, key=f"btn_{order['name']}", use_container_width=True):
+                st.session_state.active_rep = order['name']
                 st.rerun()
     st.markdown('</div>', unsafe_allow_html=True)
 
@@ -176,8 +190,11 @@ if client:
         ws = spreadsheet.worksheet(selected_rep)
         data = ws.get_all_values()
         df = pd.DataFrame(data[1:], columns=data[0])
+        # تحديد عمود الحالة ديناميكياً لتجنب الأخطاء
+        col_status = 'الحالة' if 'الحالة' in df.columns else df.columns[3]
         df['row_no'] = range(2, len(df) + 2)
-        pending = df[df['الحالة'] == "بانتظار التصديق"].copy()
+        pending = df[df[col_status] == "بانتظار التصديق"].copy()
+
 
         if not pending.empty:
             order_time = pending.iloc[0]['التاريخ و الوقت']
