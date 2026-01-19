@@ -140,29 +140,36 @@ if client:
                 
                         # 1. بناء صفوف الجدول - طريقة بسيطة جداً لمنع تداخل الأكواد
                         # تعديل السطر الذي ينجح معك دائماً ليحتوي على الترقيم والخط الكبير
-            rows_html = "".join([f"<tr><td style='border:1px solid black; text-align:center; width:10%; font-size:25px;'>{i+1}</td><td class='col-qty' style='font-size:45px !important;'>{r['الكميه المطلوبه']}</td><td style='text-align:right; font-size:36px !important; white-space:nowrap;'>{r['اسم الصنف']}</td></tr>" for i, (_, r) in enumerate(edited.iterrows())])
+                        # 1. بناء الصفوف (بقي كما هو لضمان عدم ظهور أكواد)
+            rows_html = "".join([f"<tr><td style='border:1px solid black; text-align:center; width:10%; font-size:25px;'>{i+1}</td><td class='col-qty' style='font-size:45px !important;'>{r['الكميه المطلوبه']}</td><td style='text-align:right; font-size:36px !important; white-space:nowrap; padding-right:10px;'>{r['اسم الصنف']}</td></tr>" for i, (_, r) in enumerate(edited.iterrows())])
             
+            # 2. تصميم الفاتورة (تمت إضافة التوسيط وتكبير الاسم)
             thermal_view = f"""
-            <div class="print-main-wrapper" style="width:100%; direction:rtl;">
-                <div class="header-box" style="text-align:center;">
-                    <p style="font-size:75px !important; font-weight:900; margin:0;">طلب: {selected_rep}</p>
-                    <p style="font-size:35px !important; font-weight:bold; margin-top:5px;">{order_time_val}</p>
+            <div class="print-main-wrapper" style="width:100%; direction:rtl; margin:0; padding:0;">
+                <div style="text-align:center; border-bottom:5px solid black; padding-bottom:15px; margin-bottom:15px;">
+                    <h1 style="font-size:85px !important; font-weight:900; margin:0; line-height:1.2;">طلب: {selected_rep}</h1>
+                    <p style="font-size:40px !important; font-weight:bold; margin:10px 0;">{order_time_val}</p>
                 </div>
-                <table class="table-style" style="width:100%; border-collapse:collapse;">
+                
+                <table style="width:98% !important; margin: 0 auto !important; border-collapse:collapse; border:3px solid black; table-layout:fixed;">
                     <thead>
-                        <tr style="background-color:#eee; font-size:25px;">
-                            <th style="width:12%; border:1px solid black;">ت</th>
-                            <th style="width:23%; border:1px solid black;">العدد</th>
-                            <th style="border:1px solid black;">الصنف</th>
+                        <tr style="background-color:#eee; font-size:28px;">
+                            <th style="width:12%; border:2px solid black;">ت</th>
+                            <th style="width:23%; border:2px solid black;">العدد</th>
+                            <th style="border:2px solid black;">الصنف</th>
                         </tr>
                     </thead>
                     <tbody style="font-weight:900;">
                         {rows_html}
                     </tbody>
                 </table>
-                <p style="text-align:center; font-size:25px; font-weight:bold; margin-top:20px; border-top:2px dashed black; padding-top:10px;">*** نهاية الطلب ***</p>
+                
+                <div style="margin-top:30px; text-align:center; border-top:3px dashed black; padding-top:10px;">
+                    <p style="font-size:30px; font-weight:bold;">*** نهاية الطلب ***</p>
+                </div>
             </div>
             """
+            
             st.markdown(thermal_view, unsafe_allow_html=True)
             st.markdown("""<button onclick="window.print()" class="print-button-real no-print">🖨️ طباعة الفاتورة</button>""", unsafe_allow_html=True)
 
