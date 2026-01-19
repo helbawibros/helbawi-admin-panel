@@ -158,8 +158,9 @@ if client:
                         {rows_html}
                     </tbody>
                 </table>
-                <p style="text-align:center; font-size:25px; font-weight:bold; margin-top:20px; border-top:2px dashed black; padding-top:10px;">*** نهاية الطلب ***</p>
-            </div>
+                <p style="text-align:center; font-size:25px; font-weight:bold; margin-top:20px; border-top:2px dashed black; padding-top:10px; padding-bottom: 20px;">*** نهاية الطلب ***</p>
+             </div>
+             <div style="page-break-after: always;"></div>
             """
             st.markdown(thermal_view, unsafe_allow_html=True)
             st.markdown("""<button onclick="window.print()" class="print-button-real no-print">🖨️ طباعة الفاتورة</button>""", unsafe_allow_html=True)
