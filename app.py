@@ -141,16 +141,25 @@ if client:
                         # 1. بناء الصفوف - ركزت هون على لغاء أي تداخل بالأكواد
                         # 1. التعديل على rows_html لإضافة التعداد (ت) واستخدام خط 36
             # استخدمنا enumerate(..., 1) لتبدأ الحلقة من رقم 1
-            rows_html = "".join([f"<tr><td style='text-align:center; border:1px solid black;'>{i}</td><td class='col-qty' style='font-size:45px !important;'>{r['الكميه المطلوبه']}</td><td style='text-align:right; font-size:36px !important;'>{r['اسم الصنف']}</td></tr>" for i, (_, r) in enumerate(edited.iterrows(), 1)])
+                        # 1. بناء صفوف الجدول - طريقة بسيطة جداً لمنع تداخل الأكواد
+            rows_html = ""
+            for i, (_, r) in enumerate(edited.iterrows(), 1):
+                rows_html += f"<tr>"
+                rows_html += f"<td style='border:1px solid black; text-align:center; font-size:25px;'>{i}</td>"
+                rows_html += f"<td style='border:1px solid black; text-align:center; font-size:45px; font-weight:900;'>{r['الكميه المطلوبه']}</td>"
+                # هنا أضفنا white-space: nowrap لمنع الكتابة من النزول لسطر ثاني
+                rows_html += f"<td style='border:1px solid black; text-align:right; font-size:36px; font-weight:900; padding-right:5px; white-space:nowrap;'>{r['اسم الصنف']}</td>"
+                rows_html += f"</tr>"
             
-            # 2. التعديل على thermal_view لزيادة الأحجام وتوسيع الجدول
+            # 2. تصميم الفاتورة - استغلال كامل العرض 100% ومنع الفراغات
             thermal_view = f"""
-            <div class="print-main-wrapper" style="width:100%; direction:rtl;">
-                <div class="header-box" style="text-align:center; border-bottom:4px solid black; padding-bottom:10px;">
-                    <p class="name-txt" style="font-size:75px !important; font-weight:900; margin:0;">طلب: {selected_rep}</p>
-                    <p class="date-txt" style="font-size:35px !important; font-weight:bold;">{order_time_val}</p>
+            <div class="print-main-wrapper" style="width:100% !important; direction:rtl; margin:0; padding:0;">
+                <div style="text-align:center; border-bottom:5px solid black; padding-bottom:10px; margin-bottom:10px;">
+                    <div style="font-size:75px !important; font-weight:900; line-height:1; margin:0;">طلب: {selected_rep}</div>
+                    <div style="font-size:40px !important; font-weight:bold; margin-top:10px;">{order_time_val}</div>
                 </div>
-                <table class="table-style" style="width:100%; border-collapse:collapse; border:2px solid black;">
+                
+                <table style="width:100% !important; border-collapse:collapse; border:2px solid black; table-layout:fixed;">
                     <thead>
                         <tr style="background-color:#eee; font-size:25px;">
                             <th style="width:12%; border:1px solid black;">ت</th>
@@ -158,15 +167,23 @@ if client:
                             <th style="border:1px solid black;">الصنف</th>
                         </tr>
                     </thead>
-                    <tbody style="font-weight:bold;">
+                    <tbody>
                         {rows_html}
                     </tbody>
                 </table>
-                <p style="text-align:center; font-size:25px; font-weight:bold; margin-top:20px; border-top:2px dashed black; padding-top:10px;">*** نهاية الطلب ***</p>
+                
+                <div style="margin-top:20px; text-align:center; border-top:2px dashed black; padding-top:10px;">
+                    <p style="font-size:25px; font-weight:bold;">*** نهاية الطلب ***</p>
+                </div>
             </div>
             """
+            
             st.markdown(thermal_view, unsafe_allow_html=True)
-            st.markdown("""<button onclick="window.print()" class="print-button-real no-print">🖨️ طباعة الفاتورة</button>""", unsafe_allow_html=True)
+            
+            # زر الطباعة (يظهر على الشاشة فقط)
+            st.markdown('<button onclick="window.print()" class="print-button-real no-print">🖨️ طباعة الفاتورة</button>', unsafe_allow_html=True)
 
+# --- زر الخروج ---
 if st.sidebar.button("خروج"):
-    st.session_state.clear(); st.rerun()
+    st.session_state.clear()
+    st.rerun()
