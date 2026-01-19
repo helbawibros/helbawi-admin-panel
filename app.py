@@ -164,7 +164,7 @@ if client:
                 col_status = 'الحالة' if 'الحالة' in df_check.columns else df_check.columns[3]
                 pending_check = df_check[df_check[col_status] == "بانتظار التصديق"]
                 
-                if not pending_check.empty:
+        if not pending_check.empty:
                     # جلب وقت أول طلبية بانتظار التصديق
                     order_time = pending_check.iloc[0]['التاريخ و الوقت'] if 'التاريخ و الوقت' in df_check.columns else "وقت غير محدد"
                     st.session_state.orders.append({"name": rep, "time": order_time})
