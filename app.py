@@ -45,7 +45,7 @@ st.markdown("""
         header, footer, .no-print, [data-testid="stSidebar"], [data-testid="stHeader"] { display: none !important; }
         @page { size: 80mm auto; margin: 0mm !important; }
         .header-box { border-bottom: 2px dashed #000 !important; text-align: center; }
-        .name-txt { font-size: 26px !important; font-weight: 900 !important; margin: 0; }
+        .name-txt { font-size: 60px !important; font-weight: 900 !important; margin: 0; }
         .table-style { width: 100%; border-collapse: collapse; border: 1px solid #000 !important; }
         .table-style th, .table-style td { border: 1px solid #000 !important; padding: 6px !important; text-align: center; font-size: 19px !important; font-weight: 900 !important; }
         .col-qty { width: 25%; font-size: 26px !important; background-color: #f0f0f0 !important; }
