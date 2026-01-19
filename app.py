@@ -20,75 +20,71 @@ st.markdown("""
         cursor: pointer; font-weight: bold; font-size: 22px; margin-top: 20px;
     }
 
-    /* تأثير الوميض للأزرار الجديدة */
-    @keyframes blinking {
-        0% { background-color: #ff4b4b; box-shadow: 0 0 5px #ff4b4b; }
-        50% { background-color: #b00000; box-shadow: 0 0 20px #ff4b4b; }
-        100% { background-color: #ff4b4b; box-shadow: 0 0 5px #ff4b4b; }
-    }
-    
-    .stButton>button[kind="secondary"] {
-        /* هذا سيطبق التأثير على أزرار الطلبيات في حال كانت في قائمة orders */
-    }
-    
-    div[data-testid="stVerticalBlock"] > div:has(button[key^="btn_"]) button {
-        animation: blinking 1.5s infinite;
-        color: white !important;
-        border: 2px solid white !important;
-        height: 70px !important;
-        font-size: 20px !important;
-    }
-
     /* --- كود الطباعة المحسن لإلغاء الفراغ العلوي (80mm) --- */
     @media print {
+        /* إخفاء كل عناصر الموقع الأصلية */
         body * { visibility: hidden !important; }
+        
+        /* إزالة أي هوامش تلقائية من المتصفح */
         html, body {
             margin: 0 !important;
             padding: 0 !important;
             height: auto !important;
         }
+
+        /* إظهار حاوية الطباعة فقط */
         .print-main-wrapper, .print-main-wrapper * { 
             visibility: visible !important; 
             color: #000000 !important; 
         }
+
         .print-main-wrapper {
-            position: fixed !important;
+            position: fixed !important; /* تثبيت في أعلى الصفحة تماماً */
             top: 0 !important;
             right: 0 !important;
-            width: 72mm !important;
+            width: 72mm !important; /* العرض الفعلي للطباعة */
             direction: rtl !important;
             margin: 0 !important;
             padding: 0 !important;
             background-color: white !important;
         }
+
+        /* إخفاء إضافات ستريمليت الإجبارية */
         header, footer, .no-print, [data-testid="stSidebar"], [data-testid="stHeader"] { 
             display: none !important; 
         }
+
+        /* ضبط إعدادات الصفحة الحرارية */
         @page { 
             size: 80mm auto; 
             margin: 0mm !important; 
         }
+
         .header-box {
             border-bottom: 2px dashed #000 !important; 
             padding-bottom: 5px;
             margin-bottom: 10px;
             text-align: center;
         }
+
         .name-txt { 
             font-size: 26px !important; 
             font-weight: 900 !important; 
             margin: 0; 
         }
+        
         .date-txt { 
             font-size: 14px !important; 
             font-weight: bold !important; 
             margin: 5px 0; 
         }
+
         .table-style { 
             width: 100%; 
             border-collapse: collapse; 
             border: 1px solid #000 !important;
         }
+        
         .table-style th, .table-style td {
             border: 1px solid #000 !important; 
             padding: 6px !important;
@@ -97,12 +93,14 @@ st.markdown("""
             font-weight: 900 !important; 
             color: #000000 !important;
         }
+        
         .col-qty { 
             width: 25%; 
             font-size: 26px !important; 
             background-color: #f0f0f0 !important;
             -webkit-print-color-adjust: exact;
         }
+
         .footer-space {
             height: 40px;
             border-top: 1px dashed #000;
@@ -159,24 +157,14 @@ if client:
         st.session_state.orders = []
         for rep in delegates:
             ws = spreadsheet.worksheet(rep)
-            all_data = ws.get_all_values()
-            if len(all_data) > 1:
-                df_check = pd.DataFrame(all_data[1:], columns=all_data[0])
-                pending_check = df_check[df_check['الحالة'] == "بانتظار التصديق"]
-                if not pending_check.empty:
-                    # تخزين الاسم والوقت معاً
-                    last_time = pending_check.iloc[0]['التاريخ و الوقت']
-                    st.session_state.orders.append({"name": rep, "time": last_time})
-        
+            if "بانتظار التصديق" in ws.col_values(4): st.session_state.orders.append(rep)
         if not st.session_state.orders:
             st.toast("لا توجد طلبيات جديدة حالياً")
 
     if 'orders' in st.session_state:
-        for order in st.session_state.orders:
-            # الزر سيظهر باللون الأحمر الومّاض بسبب CSS المضاف أعلاه
-            btn_label = f"📦 طلبية من: {order['name']} | 🕒 {order['time']}"
-            if st.button(btn_label, key=f"btn_{order['name']}", use_container_width=True):
-                st.session_state.active_rep = order['name']
+        for name in st.session_state.orders:
+            if st.button(f"📦 طلبية جديدة من: {name}", key=f"btn_{name}", use_container_width=True):
+                st.session_state.active_rep = name
                 st.rerun()
     st.markdown('</div>', unsafe_allow_html=True)
 
@@ -199,8 +187,10 @@ if client:
                 for _, r in edited.iterrows(): ws.update_cell(int(r['row_no']), 4, "تم التصديق")
                 st.success("تم!"); st.rerun()
             
+            # بناء صفوف الجدول للطباعة
             rows_html = "".join([f"<tr><td class='col-qty'>{r['الكميه المطلوبه']}</td><td style='text-align:right;'>{r['اسم الصنف']}</td></tr>" for _, r in edited.iterrows()])
             
+            # --- حاوية الطباعة الحرارية ---
             thermal_view = f"""
             <div class="print-main-wrapper">
                 <div class="header-box">
@@ -222,8 +212,10 @@ if client:
                 <p style="text-align:center; font-size:14px; font-weight:bold;">*** نهاية الطلب ***</p>
             </div>
             """
+
             st.markdown(thermal_view, unsafe_allow_html=True)
             
+            # زر الطباعة يظهر على الشاشة فقط
             st.markdown("""
                 <button onclick="window.print()" class="print-button-real no-print">
                    🖨️ طباعة الفاتورة (Epson 80mm)
