@@ -136,25 +136,21 @@ if client:
             if st.button("🚀 تصديق وإرسال النهائي", type="primary", use_container_width=True):
                 for _, r in edited.iterrows(): ws.update_cell(int(r['row_no']), 4, "تم التصديق")
                 st.success("تم!"); st.rerun()
-            
-                
-                        # 1. بناء صفوف الجدول - طريقة بسيطة جداً لمنع تداخل الأكواد
-                        # تعديل السطر الذي ينجح معك دائماً ليحتوي على الترقيم والخط الكبير
-                        # 1. بناء الصفوف (بقي كما هو لضمان عدم ظهور أكواد)
+    
                         # تعديل السطر الذي ينجح معك دائماً ليحتوي على الترقيم والخط الكبير
             rows_html = "".join([f"<tr><td style='border:1px solid black; text-align:center; width:10%; font-size:25px;'>{i+1}</td><td class='col-qty' style='font-size:45px !important;'>{r['الكميه المطلوبه']}</td><td style='text-align:right; font-size:36px !important; white-space:nowrap;'>{r['اسم الصنف']}</td></tr>" for i, (_, r) in enumerate(edited.iterrows())])
             
             thermal_view = f"""
             <div class="print-main-wrapper" style="width:100%; direction:rtl;">
                 <div class="header-box" style="text-align:center;">
-                    <p style="font-size:75px !important; font-weight:900; margin:0;">طلب: {selected_rep}</p>
+                    <p style="font-size:80px !important; font-weight:900; margin:0;">طلب: {selected_rep}</p>
                     <p style="font-size:35px !important; font-weight:bold; margin-top:5px;">{order_time_val}</p>
                 </div>
                 <table class="table-style" style="width:100%; border-collapse:collapse;">
                     <thead>
-                        <tr style="background-color:#eee; font-size:25px;">
-                            <th style="width:12%; border:1px solid black;">ت</th>
-                            <th style="width:23%; border:1px solid black;">العدد</th>
+                        <tr style="background-color:#eee; font-size:36px;">
+                            <th style="width:10%; border:1px solid black;">ت</th>
+                            <th style="width:30%; border:1px solid black;">العدد</th>
                             <th style="border:1px solid black;">الصنف</th>
                         </tr>
                     </thead>
