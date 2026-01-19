@@ -154,32 +154,19 @@ if client:
     
     st.markdown('<div class="no-print">', unsafe_allow_html=True)
     if st.button("🔔 فحص الإشعارات الجديدة", use_container_width=True):
-    st.session_state.orders = []
-    for rep in delegates:
-        ws = spreadsheet.worksheet(rep)
-        status_values = ws.col_values(4)  # جلب عمود الحالة
-            
-        if "بانتظار التصديق" in status_values:
-            # الحصول على رقم السطر لأول طلب "بانتظار التصديق"
-            row_idx = status_values.index("بانتظار التصديق") + 1
-            # جلب الوقت من العمود رقم 5 (التاريخ والوقت)
-            order_time = ws.cell(row_idx, 5).value 
-            st.session_state.orders.append({"name": rep, "time": order_time})
-        
-    if not st.session_state.orders:
-        st.toast("لا توجد طلبيات جديدة حالياً")
+        st.session_state.orders = []
+        for rep in delegates:
+            ws = spreadsheet.worksheet(rep)
+            if "بانتظار التصديق" in ws.col_values(4): st.session_state.orders.append(rep)
+        if not st.session_state.orders:
+            st.toast("لا توجد طلبيات جديدة حالياً")
 
-if 'orders' in st.session_state:
-    for order in st.session_state.orders:
-        # دمج الاسم والوقت في عنوان الزر
-        btn_label = f"📦 طلبية من: {order['name']} | 🕒 {order['time']}"
-        # استخدام key يبدأ بـ btn_ ليتعرف عليه كود الوميض في الـ CSS
-        if st.button(btn_label, key=f"btn_{order['name']}", use_container_width=True):
-            st.session_state.active_rep = order['name']
-            st.rerun()
-
+    if 'orders' in st.session_state:
+        for name in st.session_state.orders:
+            if st.button(f"📦 طلبية جديدة من: {name}", key=f"btn_{name}", use_container_width=True):
+                st.session_state.active_rep = name
+                st.rerun()
     st.markdown('</div>', unsafe_allow_html=True)
-
 
     active = st.session_state.get('active_rep', "-- اختر مندوب --")
     selected_rep = st.selectbox("المندوب المختار:", ["-- اختر مندوب --"] + delegates, 
