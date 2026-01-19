@@ -142,38 +142,29 @@ if client:
                         # تعديل السطر الذي ينجح معك دائماً ليحتوي على الترقيم والخط الكبير
                         # 1. بناء الصفوف (بقي كما هو لضمان عدم ظهور أكواد)
                         # تعديل السطر الذي ينجح معك دائماً ليحتوي على الترقيم والخط الكبير
-                        # 1. بناء صفوف الجدول (نفس طريقتك الأصلية والناجحة)
-            rows_html = "".join([f"<tr><td style='border:1px solid black; text-align:center; width:12%; font-size:25px;'>{i+1}</td><td style='border:1px solid black; text-align:center; width:23%; font-size:45px; font-weight:bold;'>{r['الكميه المطلوبه']}</td><td style='border:1px solid black; text-align:right; font-size:36px; font-weight:bold; padding-right:10px; white-space:nowrap;'>{r['اسم الصنف']}</td></tr>" for i, (_, r) in enumerate(edited.iterrows())])
+            rows_html = "".join([f"<tr><td style='border:1px solid black; text-align:center; width:10%; font-size:25px;'>{i+1}</td><td class='col-qty' style='font-size:45px !important;'>{r['الكميه المطلوبه']}</td><td style='text-align:right; font-size:36px !important; white-space:nowrap;'>{r['اسم الصنف']}</td></tr>" for i, (_, r) in enumerate(edited.iterrows())])
             
-            # 2. تصميم الفاتورة (قالب بسيط، واسع، وموسط)
             thermal_view = f"""
-            <div class="print-main-wrapper" style="width:100%; direction:rtl; text-align:center; margin:0; padding:0;">
-                
-                <div style="border-bottom:5px solid black; padding-bottom:10px; margin-bottom:15px;">
-                    <div style="font-size:85px; font-weight:900; line-height:1.2; margin:0;">طلب: {selected_rep}</div>
-                    <div style="font-size:40px; font-weight:bold; margin-top:5px;">{order_time_val}</div>
+            <div class="print-main-wrapper" style="width:100%; direction:rtl;">
+                <div class="header-box" style="text-align:center;">
+                    <p style="font-size:75px !important; font-weight:900; margin:0;">طلب: {selected_rep}</p>
+                    <p style="font-size:35px !important; font-weight:bold; margin-top:5px;">{order_time_val}</p>
                 </div>
-                
-                <table style="width:99%; margin: 0 auto; border-collapse:collapse; border:3px solid black; table-layout:fixed;">
+                <table class="table-style" style="width:100%; border-collapse:collapse;">
                     <thead>
-                        <tr style="background-color:#eee; font-size:28px;">
-                            <th style="border:2px solid black; width:12%;">ت</th>
-                            <th style="border:2px solid black; width:23%;">العدد</th>
-                            <th style="border:2px solid black;">الصنف</th>
+                        <tr style="background-color:#eee; font-size:25px;">
+                            <th style="width:12%; border:1px solid black;">ت</th>
+                            <th style="width:23%; border:1px solid black;">العدد</th>
+                            <th style="border:1px solid black;">الصنف</th>
                         </tr>
                     </thead>
-                    <tbody>
+                    <tbody style="font-weight:900;">
                         {rows_html}
                     </tbody>
                 </table>
-                
-                <div style="margin-top:25px; border-top:3px dashed black; padding-top:10px;">
-                    <div style="font-size:30px; font-weight:bold;">*** نهاية الطلب ***</div>
-                </div>
-                
+                <p style="text-align:center; font-size:25px; font-weight:bold; margin-top:20px; border-top:2px dashed black; padding-top:10px;">*** نهاية الطلب ***</p>
             </div>
             """
-            
             st.markdown(thermal_view, unsafe_allow_html=True)
             st.markdown("""<button onclick="window.print()" class="print-button-real no-print">🖨️ طباعة الفاتورة</button>""", unsafe_allow_html=True)
 
