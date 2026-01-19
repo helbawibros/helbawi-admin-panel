@@ -4,6 +4,8 @@ import json
 import gspread
 from google.oauth2.service_account import Credentials
 import os
+from datetime import datetime
+import pytz # مكتبة التوقيت العالمي
 
 # --- 1. إعدادات الصفحة وتنسيق الطباعة الحرارية ---
 st.set_page_config(page_title="إدارة حلباوي - حراري", layout="wide")
@@ -155,6 +157,9 @@ if client:
     st.markdown('<div class="no-print">', unsafe_allow_html=True)
     if st.button("🔔 فحص الإشعارات الجديدة", use_container_width=True):
         st.session_state.orders = []
+        # توليد توقيت بيروت (نظام 24 ساعة)
+order_time = datetime.now(pytz.timezone('Asia/Beirut')).strftime('%H:%M')
+
         for rep in delegates:
             ws = spreadsheet.worksheet(rep)
             if "بانتظار التصديق" in ws.col_values(4): st.session_state.orders.append(rep)
