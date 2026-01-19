@@ -153,35 +153,43 @@ if client:
     show_full_logo()
 
     st.markdown('<div class="no-print">', unsafe_allow_html=True)
+    
     if st.button("🔔 فحص الإشعارات الجديدة", use_container_width=True):
-        st.session_state.orders = []
+        new_orders = []
         for rep in delegates:
             ws = spreadsheet.worksheet(rep)
             all_vals = ws.get_all_values()
-        if len(all_vals) > 1:
+            
+            if len(all_vals) > 1:
                 df_check = pd.DataFrame(all_vals[1:], columns=all_vals[0])
-                # التأكد من اسم العمود لتجنب KeyError
+                # تحديد عمود الحالة وعمود الوقت
                 col_status = 'الحالة' if 'الحالة' in df_check.columns else df_check.columns[3]
+                col_time = 'التاريخ و الوقت' if 'التاريخ و الوقت' in df_check.columns else None
+                
                 pending_check = df_check[df_check[col_status] == "بانتظار التصديق"]
                 
-        if not pending_check.empty:
-                    # جلب وقت أول طلبية بانتظار التصديق
-                    order_time = pending_check.iloc[0]['التاريخ و الوقت'] if 'التاريخ و الوقت' in df_check.columns else "وقت غير محدد"
-                    st.session_state.orders.append({"name": rep, "time": order_time})
+                if not pending_check.empty:
+                    order_time = pending_check.iloc[0][col_time] if col_time else "وقت غير محدد"
+                    new_orders.append({"name": rep, "time": order_time})
         
-        if not st.session_state.orders:
+        st.session_state.orders = new_orders
+        if not new_orders:
             st.toast("لا توجد طلبيات جديدة حالياً")
 
-    # عرض الأزرار مع الوميض والوقت
-    if 'orders' in st.session_state:
+    # عرض الأزرار الومّاضة
+    if 'orders' in st.session_state and st.session_state.orders:
+        st.write("---") # خط فاصل للتنظيم
         for order in st.session_state.orders:
-            # الزر سيومض باللون الأحمر بفضل كود الـ CSS في بداية الصفحة
             btn_label = f"📦 طلبية: {order['name']} | 🕒 {order['time']}"
+            # الـ key هنا هو السر في تفعيل الوميض الأحمر
             if st.button(btn_label, key=f"btn_{order['name']}", use_container_width=True):
                 st.session_state.active_rep = order['name']
                 st.rerun()
+        st.write("---")
+
     st.markdown('</div>', unsafe_allow_html=True)
 
+    # اختيار المندوب يدوياً أو من خلال الزر
     active = st.session_state.get('active_rep', "-- اختر مندوب --")
     selected_rep = st.selectbox("المندوب المختار:", ["-- اختر مندوب --"] + delegates, 
                                 index=(delegates.index(active)+1 if active in delegates else 0))
@@ -190,19 +198,24 @@ if client:
         ws = spreadsheet.worksheet(selected_rep)
         data = ws.get_all_values()
         df = pd.DataFrame(data[1:], columns=data[0])
-        # تحديد عمود الحالة ديناميكياً لتجنب الأخطاء
+        
         col_status = 'الحالة' if 'الحالة' in df.columns else df.columns[3]
         df['row_no'] = range(2, len(df) + 2)
         pending = df[df[col_status] == "بانتظار التصديق"].copy()
 
-
         if not pending.empty:
-            order_time = pending.iloc[0]['التاريخ و الوقت']
+            order_time = pending.iloc[0]['التاريخ و الوقت'] if 'التاريخ و الوقت' in df.columns else ""
             edited = st.data_editor(pending[['row_no', 'اسم الصنف', 'الكميه المطلوبه']], hide_index=True, use_container_width=True)
 
             if st.button("🚀 تصديق وإرسال النهائي", type="primary", use_container_width=True):
-                for _, r in edited.iterrows(): ws.update_cell(int(r['row_no']), 4, "تم التصديق")
-                st.success("تم!"); st.rerun()
+                # تحديد رقم عمود الحالة لتحديثه
+                status_col_idx = data[0].index(col_status) + 1
+                for _, r in edited.iterrows():
+                    ws.update_cell(int(r['row_no']), status_col_idx, "تم التصديق")
+                st.success("تم التصديق بنجاح!")
+                st.session_state.orders = [o for o in st.session_state.get('orders', []) if o['name'] != selected_rep]
+                st.rerun()
+
             
             # بناء صفوف الجدول للطباعة
             rows_html = "".join([f"<tr><td class='col-qty'>{r['الكميه المطلوبه']}</td><td style='text-align:right;'>{r['اسم الصنف']}</td></tr>" for _, r in edited.iterrows()])
