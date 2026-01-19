@@ -139,52 +139,23 @@ if client:
             
                         # 1. بناء صفوف الجدول (تعداد - عدد - صنف) مع خط 36
                         # 1. بناء الصفوف - ركزت هون على لغاء أي تداخل بالأكواد
-            rows_html = ""
-            for i, (_, r) in enumerate(edited.iterrows()):
-                item_name = r['اسم الصنف']
-                item_qty = r['الكميه المطلوبه']
-                rows_html += f"""
-                <tr>
-                    <td style="border: 1px solid black; text-align: center; font-size: 25px; width: 15%;">{i+1}</td>
-                    <td style="border: 1px solid black; text-align: center; font-size: 45px; width: 25%; font-weight: bold;">{item_qty}</td>
-                    <td style="border: 1px solid black; text-align: right; font-size: 36px; padding-right: 10px; font-weight: bold;">{item_name}</td>
-                </tr>
-                """
+            rows_html = "".join([f"<tr><td class='col-qty'>{r['الكميه المطلوبه']}</td><td style='text-align:right;'>{r['اسم الصنف']}</td></tr>" for _, r in edited.iterrows()])
             
-            # 2. تصميم الفاتورة - استغلال كامل العرض ومنع ظهور الكود البرمجي
             thermal_view = f"""
-            <div class="print-main-wrapper" style="width: 100%; direction: rtl;">
-                <div style="text-align: center; border-bottom: 5px solid black; padding-bottom: 10px; margin-bottom: 15px;">
-                    <div style="font-size: 70px !important; font-weight: 900; line-height: 1.1;">طلب: {selected_rep}</div>
-                    <div style="font-size: 35px !important; font-weight: bold; margin-top: 10px;">{order_time_val}</div>
+            <div class="print-main-wrapper">
+                <div class="header-box">
+                    <p class="name-txt">طلب: {selected_rep}</p>
+                    <p class="date-txt">{order_time_val}</p>
                 </div>
-                
-                <table style="width: 100%; border-collapse: collapse; border: 2px solid black;">
-                    <thead>
-                        <tr style="background-color: #eeeeee;">
-                            <th style="border: 2px solid black; width: 15%; font-size: 25px;">ت</th>
-                            <th style="border: 2px solid black; width: 25%; font-size: 25px;">العدد</th>
-                            <th style="border: 2px solid black; font-size: 25px;">الصنف</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {rows_html}
-                    </tbody>
+                <table class="table-style">
+                    <thead><tr><th style="width:30%">العدد</th><th>الصنف</th></tr></thead>
+                    <tbody>{rows_html}</tbody>
                 </table>
-                
-                <div style="margin-top: 30px; text-align: center; border-top: 3px dashed black; padding-top: 10px;">
-                    <div style="font-size: 30px; font-weight: bold;">*** نهاية الطلب ***</div>
-                </div>
+                <p style="text-align:center; font-size:14px; font-weight:bold; margin-top:10px;">*** نهاية الطلب ***</p>
             </div>
             """
-
-            # عرض المعاينة
             st.markdown(thermal_view, unsafe_allow_html=True)
-            
-            # زر الطباعة المباشر
-            st.markdown('<button onclick="window.print()" class="print-button-real no-print">🖨️ طباعة الفاتورة</button>', unsafe_allow_html=True)
+            st.markdown("""<button onclick="window.print()" class="print-button-real no-print">🖨️ طباعة الفاتورة</button>""", unsafe_allow_html=True)
 
-# --- نهاية الكود وتسكيرة الـ if ---
 if st.sidebar.button("خروج"):
-    st.session_state.clear()
-    st.rerun()
+    st.session_state.clear(); st.rerun()
