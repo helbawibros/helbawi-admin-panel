@@ -82,10 +82,29 @@ if not st.session_state.admin_logged_in:
 
 def get_client():
     try:
-        info = json.loads(st.secrets["gcp_service_account"]["json_data"].strip(), strict=False)
-        creds = Credentials.from_service_account_info(info, scopes=["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"])
+        # 1. جلب النص من Secrets
+        raw_json = st.secrets["gcp_service_account"]["json_data"]
+        
+        # 2. تنظيف النص من أي فراغات أو علامات زائدة في البداية والنهاية
+        clean_json = raw_json.strip()
+        
+        # 3. تحويل النص إلى قاموس (Dictionary)
+        info = json.loads(clean_json, strict=False)
+        
+        # 4. بناء الصلاحيات
+        creds = Credentials.from_service_account_info(
+            info, 
+            scopes=[
+                "https://spreadsheets.google.com/feeds",
+                "https://www.googleapis.com/auth/drive"
+            ]
+        )
         return gspread.authorize(creds)
-    except: return None
+    except Exception as e:
+        # سيظهر لك هذا التنبيه في التطبيق إذا فشلت القراءة
+        st.error(f"⚠️ مشكلة فنية في قراءة المفتاح: {e}")
+        return None
+
 
 client = get_client()
 
