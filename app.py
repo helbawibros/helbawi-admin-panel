@@ -82,28 +82,36 @@ if not st.session_state.admin_logged_in:
 
 def get_client():
     try:
-        # 1. جلب النص من Secrets
-        raw_json = st.secrets["gcp_service_account"]["json_data"]
+        # 1. فحص وجود السر في الإعدادات
+        if "gcp_service_account" not in st.secrets:
+            st.error("❌ لم يتم العثور على gcp_service_account في Secrets")
+            return None
         
-        # 2. تنظيف النص من أي فراغات أو علامات زائدة في البداية والنهاية
-        clean_json = raw_json.strip()
+        # 2. محاولة قراءة النص وتفكيكه
+        json_data = st.secrets["gcp_service_account"]["json_data"].strip()
+        info = json.loads(json_data, strict=False)
         
-        # 3. تحويل النص إلى قاموس (Dictionary)
-        info = json.loads(clean_json, strict=False)
+        # 3. فحص العناصر الأساسية (للتأكد من اكتمال النسخ)
+        required_keys = ["project_id", "private_key", "client_email"]
+        for key in required_keys:
+            if key not in info:
+                st.error(f"❌ العنصر {key} مفقود من المفتاح! تأكد من نسخ ملف الـ JSON كاملاً.")
+                return None
         
-        # 4. بناء الصلاحيات
+        # 4. محاولة الاتصال الرسمية
         creds = Credentials.from_service_account_info(
             info, 
-            scopes=[
-                "https://spreadsheets.google.com/feeds",
-                "https://www.googleapis.com/auth/drive"
-            ]
+            scopes=["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
         )
         return gspread.authorize(creds)
-    except Exception as e:
-        # سيظهر لك هذا التنبيه في التطبيق إذا فشلت القراءة
-        st.error(f"⚠️ مشكلة فنية في قراءة المفتاح: {e}")
+        
+    except json.JSONDecodeError:
+        st.error("❌ خطأ في تنسيق JSON: تأكد من أن النص يبدأ بـ { وينتهي بـ } ولا يوجد حروف زائدة.")
         return None
+    except Exception as e:
+        st.error(f"⚠️ خطأ غير متوقع: {e}")
+        return None
+
 
 
 client = get_client()
