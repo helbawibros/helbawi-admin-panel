@@ -91,30 +91,42 @@ def get_client():
         json_data = st.secrets["gcp_service_account"]["json_data"].strip()
         info = json.loads(json_data, strict=False)
         
-        # 3. فحص العناصر الأساسية (للتأكد من اكتمال النسخ)
+        # 3. فحص العناصر الأساسية لضمان سلامة المفتاح
         required_keys = ["project_id", "private_key", "client_email"]
         for key in required_keys:
             if key not in info:
                 st.error(f"❌ العنصر {key} مفقود من المفتاح! تأكد من نسخ ملف الـ JSON كاملاً.")
                 return None
         
-        # 4. محاولة الاتصال الرسمية
+        # 4. محاولة الاتصال الرسمية بسيرفرات جوجل
         creds = Credentials.from_service_account_info(
             info, 
-            scopes=["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
+            scopes=[
+                "https://spreadsheets.google.com/feeds",
+                "https://www.googleapis.com/auth/drive"
+            ]
         )
         return gspread.authorize(creds)
         
     except json.JSONDecodeError:
-        st.error("❌ خطأ في تنسيق JSON: تأكد من أن النص يبدأ بـ { وينتهي بـ } ولا يوجد حروف زائدة.")
+        st.error("❌ خطأ في تنسيق JSON: تأكد من أن النص يبدأ بـ { وينتهي بـ }.")
         return None
     except Exception as e:
-        st.error(f"⚠️ خطأ غير متوقع: {e}")
+        st.error(f"⚠️ خطأ أثناء الاتصال: {e}")
         return None
 
-
-
+# --- تنفيذ الاتصال وفتح الملف ---
 client = get_client()
+
+if client:
+    try:
+        # فتح الشيت باستخدام المعرف الخاص بك
+        spreadsheet = client.open_by_key("1-Abj-Kvbe02az8KYZfQL0eal2arKw_wgjVQdJX06IA0")
+        # إذا وصل الكود هنا، فهذا يعني أن البرنامج نجح في الاتصال!
+    except Exception as e:
+        st.error(f"❌ نجح الاتصال بالمفتاح ولكن فشل فتح الملف: {e}")
+        st.info("تأكد من إضافة الإيميل البرمجي (client_email) كـ Editor في ملف الشيت.")
+
 
 # --- 3. معالجة البيانات والطلبات ---
 if client:
