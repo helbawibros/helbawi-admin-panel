@@ -45,7 +45,7 @@ st.markdown("""
         header, footer, .no-print, [data-testid="stSidebar"], [data-testid="stHeader"] { display: none !important; }
         @page { size: 80mm auto; margin: 0mm !important; }
         .header-box { border-bottom: 2px dashed #000 !important; text-align: center; }
-        .name-txt { font-size: 85px !important; font-weight: 900 !important; margin: 0; }
+        .name-txt { font-size: 26px !important; font-weight: 900 !important; margin: 0; }
         .table-style { width: 100%; border-collapse: collapse; border: 1px solid #000 !important; }
         .table-style th, .table-style td { border: 1px solid #000 !important; padding: 6px !important; text-align: center; font-size: 19px !important; font-weight: 900 !important; }
         .col-qty { width: 25%; font-size: 26px !important; background-color: #f0f0f0 !important; }
@@ -82,55 +82,16 @@ if not st.session_state.admin_logged_in:
 
 def get_client():
     try:
-        # 1. فحص وجود السر في الإعدادات
-        if "gcp_service_account" not in st.secrets:
-            st.error("❌ لم يتم العثور على gcp_service_account في Secrets")
-            return None
-        
-        # 2. محاولة قراءة النص وتفكيكه
-        json_data = st.secrets["gcp_service_account"]["json_data"].strip()
-        info = json.loads(json_data, strict=False)
-        
-        # 3. فحص العناصر الأساسية لضمان سلامة المفتاح
-        required_keys = ["project_id", "private_key", "client_email"]
-        for key in required_keys:
-            if key not in info:
-                st.error(f"❌ العنصر {key} مفقود من المفتاح! تأكد من نسخ ملف الـ JSON كاملاً.")
-                return None
-        
-        # 4. محاولة الاتصال الرسمية بسيرفرات جوجل
-        creds = Credentials.from_service_account_info(
-            info, 
-            scopes=[
-                "https://spreadsheets.google.com/feeds",
-                "https://www.googleapis.com/auth/drive"
-            ]
-        )
+        info = json.loads(st.secrets["gcp_service_account"]["json_data"].strip(), strict=False)
+        creds = Credentials.from_service_account_info(info, scopes=["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"])
         return gspread.authorize(creds)
-        
-    except json.JSONDecodeError:
-        st.error("❌ خطأ في تنسيق JSON: تأكد من أن النص يبدأ بـ { وينتهي بـ }.")
-        return None
-    except Exception as e:
-        st.error(f"⚠️ خطأ أثناء الاتصال: {e}")
-        return None
+    except: return None
 
-# --- تنفيذ الاتصال وفتح الملف ---
 client = get_client()
-
-if client:
-    try:
-        # فتح الشيت باستخدام المعرف الخاص بك
-        spreadsheet = client.open_by_key("1-Abj-Kvbe02az8KYZfQL0eal2arKw_wgjVQd-JX06IA0")
-        # إذا وصل الكود هنا، فهذا يعني أن البرنامج نجح في الاتصال!
-    except Exception as e:
-        st.error(f"❌ نجح الاتصال بالمفتاح ولكن فشل فتح الملف: {e}")
-        st.info("تأكد من إضافة الإيميل البرمجي (client_email) كـ Editor في ملف الشيت.")
-
 
 # --- 3. معالجة البيانات والطلبات ---
 if client:
-    spreadsheet = client.open_by_key("1-Abj-Kvbe02az8KYZfQL0eal2arKw_wgjVQd-JX06IA0")
+    spreadsheet = client.open_by_key("1-Abj-Kvbe02az8KYZfQL0eal2arKw_wgjVQdJX06IA0")
     delegates = [sh.title for sh in spreadsheet.worksheets() if sh.title not in ["طلبات", "الأسعار", "البيانات", "الزبائن", "Sheet1"]]
     show_full_logo()
     
@@ -175,21 +136,25 @@ if client:
             if st.button("🚀 تصديق وإرسال النهائي", type="primary", use_container_width=True):
                 for _, r in edited.iterrows(): ws.update_cell(int(r['row_no']), 4, "تم التصديق")
                 st.success("تم!"); st.rerun()
-    
+            
+                
+                        # 1. بناء صفوف الجدول - طريقة بسيطة جداً لمنع تداخل الأكواد
+                        # تعديل السطر الذي ينجح معك دائماً ليحتوي على الترقيم والخط الكبير
+                        # 1. بناء الصفوف (بقي كما هو لضمان عدم ظهور أكواد)
                         # تعديل السطر الذي ينجح معك دائماً ليحتوي على الترقيم والخط الكبير
             rows_html = "".join([f"<tr><td style='border:1px solid black; text-align:center; width:10%; font-size:25px;'>{i+1}</td><td class='col-qty' style='font-size:45px !important;'>{r['الكميه المطلوبه']}</td><td style='text-align:right; font-size:36px !important; white-space:nowrap;'>{r['اسم الصنف']}</td></tr>" for i, (_, r) in enumerate(edited.iterrows())])
             
             thermal_view = f"""
             <div class="print-main-wrapper" style="width:100%; direction:rtl;">
                 <div class="header-box" style="text-align:center;">
-                    <p style="font-size:120px !important; font-weight:900; margin:0;">طلب: {selected_rep}</p>
+                    <p style="font-size:75px !important; font-weight:900; margin:0;">طلب: {selected_rep}</p>
                     <p style="font-size:35px !important; font-weight:bold; margin-top:5px;">{order_time_val}</p>
                 </div>
                 <table class="table-style" style="width:100%; border-collapse:collapse;">
                     <thead>
-                        <tr style="background-color:#eee; font-size:36px;">
-                            <th style="width:10%; border:1px solid black;">ت</th>
-                            <th style="width:30%; border:1px solid black;">العدد</th>
+                        <tr style="background-color:#eee; font-size:25px;">
+                            <th style="width:12%; border:1px solid black;">ت</th>
+                            <th style="width:23%; border:1px solid black;">العدد</th>
                             <th style="border:1px solid black;">الصنف</th>
                         </tr>
                     </thead>
@@ -198,12 +163,11 @@ if client:
                     </tbody>
                 </table>
                 <p style="text-align:center; font-size:25px; font-weight:bold; margin-top:20px; border-top:2px dashed black; padding-top:10px;">*** نهاية الطلب ***</p>
-                </div>
-                <div style="page-break-after: always; visibility: hidden;">.</div>
-
+            </div>
             """
             st.markdown(thermal_view, unsafe_allow_html=True)
             st.markdown("""<button onclick="window.print()" class="print-button-real no-print">🖨️ طباعة الفاتورة</button>""", unsafe_allow_html=True)
 
 if st.sidebar.button("خروج"):
     st.session_state.clear(); st.rerun()
+
