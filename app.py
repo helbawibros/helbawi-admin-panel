@@ -121,7 +121,7 @@ client = get_client()
 if client:
     try:
         # فتح الشيت باستخدام المعرف الخاص بك
-        spreadsheet = client.open_by_key("1-Abj-Kvbe02az8KYZfQL0eal2arKw_wgjVQdJX06IA0")
+        spreadsheet = client.open_by_key("1-Abj-Kvbe02az8KYZfQL0eal2arKw_wgjVQd-JX06IA0")
         # إذا وصل الكود هنا، فهذا يعني أن البرنامج نجح في الاتصال!
     except Exception as e:
         st.error(f"❌ نجح الاتصال بالمفتاح ولكن فشل فتح الملف: {e}")
@@ -130,7 +130,7 @@ if client:
 
 # --- 3. معالجة البيانات والطلبات ---
 if client:
-    spreadsheet = client.open_by_key("1-Abj-Kvbe02az8KYZfQL0eal2arKw_wgjVQdJX06IA0")
+    spreadsheet = client.open_by_key("1-Abj-Kvbe02az8KYZfQL0eal2arKw_wgjVQd-JX06IA0")
     delegates = [sh.title for sh in spreadsheet.worksheets() if sh.title not in ["طلبات", "الأسعار", "البيانات", "الزبائن", "Sheet1"]]
     show_full_logo()
     
@@ -143,7 +143,7 @@ if client:
             status_vals = ws.col_values(4)
             if "بانتظار التصديق" in status_vals:
                 # توليد توقيت بيروت الحالي لحظة الفحص
-                order_time_val = pending.iloc[0]['التاريخ و الوقت'] if 'التاريخ و الوقت' in df.columns else datetime.now(pytz.timezone('Asia/Beirut')).strftime('%Y-%m-%d %H:%M')
+                beirut_time = datetime.now(pytz.timezone('Asia/Beirut')).strftime('%H:%M')
                 st.session_state.orders.append({"name": rep, "time": beirut_time})
         if not st.session_state.orders:
             st.toast("لا توجد طلبيات جديدة حالياً")
