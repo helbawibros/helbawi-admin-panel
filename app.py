@@ -143,7 +143,7 @@ if client:
             status_vals = ws.col_values(4)
             if "بانتظار التصديق" in status_vals:
                 # توليد توقيت بيروت الحالي لحظة الفحص
-                beirut_time = datetime.now(pytz.timezone('Asia/Beirut')).strftime('%H:%M')
+                order_time_val = pending.iloc[0]['التاريخ و الوقت'] if 'التاريخ و الوقت' in df.columns else datetime.now(pytz.timezone('Asia/Beirut')).strftime('%Y-%m-%d %H:%M')
                 st.session_state.orders.append({"name": rep, "time": beirut_time})
         if not st.session_state.orders:
             st.toast("لا توجد طلبيات جديدة حالياً")
