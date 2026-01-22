@@ -13,7 +13,6 @@ beirut_tz = pytz.timezone('Asia/Beirut')
 
 st.markdown("""
     <style>
-    /* تنسيق زر الطباعة والوميض */
     .print-button-real {
         display: block; width: 100%; height: 60px; 
         background-color: #28a745; color: white !important; 
@@ -31,7 +30,7 @@ st.markdown("""
         border: 2px solid white !important;
     }
 
-    /* --- إصلاح الطباعة - الكتيبة من فوق --- */
+    /* --- تنسيق الطباعة المعدل (خط 22px وجدول واضح) --- */
     @media print {
         header, footer, .no-print, [data-testid="stSidebar"], [data-testid="stHeader"] { 
             display: none !important; 
@@ -39,39 +38,46 @@ st.markdown("""
         body * { visibility: hidden; }
         .print-main-wrapper, .print-main-wrapper * { 
             visibility: visible !important; 
+            color: black !important;
         }
         .print-main-wrapper { 
-            position: fixed !important; 
+            position: absolute !important; 
             top: 0 !important; 
             right: 0 !important; 
             width: 100% !important; 
             direction: rtl !important;
             margin: 0 !important;
-            padding: 0 !important;
+        }
+        .thermal-table {
+            width: 100%;
+            border-collapse: collapse;
+            border: 1px solid black !important;
+        }
+        .thermal-table th, .thermal-table td {
+            border: 1px solid black !important;
+            padding: 4px;
+            text-align: center;
+            font-size: 22px !important; /* الحجم اللي طلبته تقريباً */
+            font-weight: bold;
         }
         @page { size: 80mm auto; margin: 0; }
     }
     </style>
 """, unsafe_allow_html=True)
 
-# --- دالة اللوغو ---
 def show_full_logo():
     st.markdown('<div class="no-print">', unsafe_allow_html=True)
-    found = False
     for name in ["Logo.JPG", "logo.jpg", "Logo.png"]:
         if os.path.exists(name):
             st.image(name, use_container_width=True)
-            found = True
-            break
-    if not found:
-        st.write("### Primum Quality") # احتياط إذا الصورة ممسوحة
+            return
+    st.write("### Primum Quality")
     st.markdown('</div>', unsafe_allow_html=True)
 
-# --- نظام الدخول ---
 if 'admin_logged_in' not in st.session_state: st.session_state.admin_logged_in = False
 if not st.session_state.admin_logged_in:
     show_full_logo()
-    col1, col2, col3 = st.columns([1, 2, 1])
+    col2 = st.columns([1, 2, 1])[1]
     with col2:
         st.markdown("<h1 style='text-align: center;'>دخول الإدارة</h1>", unsafe_allow_html=True)
         pwd = st.text_input("كلمة السر", type="password")
@@ -103,7 +109,7 @@ if client:
             data = ws.get_all_values()
             if len(data) > 1:
                 df_temp = pd.DataFrame(data[1:], columns=data[0])
-                df_temp.columns = df_temp.columns.str.strip() # تنظيف الأعمدة
+                df_temp.columns = df_temp.columns.str.strip()
                 if 'الحالة' in df_temp.columns:
                     pending = df_temp[df_temp['الحالة'] == "بانتظار التصديق"]
                     if not pending.empty:
@@ -118,8 +124,7 @@ if client:
     st.markdown('</div>', unsafe_allow_html=True)
 
     active = st.session_state.get('active_rep', "-- اختر مندوب --")
-    selected_rep = st.selectbox("المندوب المختار:", ["-- اختر مندوب --"] + delegates, 
-                                index=(delegates.index(active)+1 if active in delegates else 0))
+    selected_rep = st.selectbox("المندوب المختار:", ["-- اختر مندوب --"] + delegates, index=(delegates.index(active)+1 if active in delegates else 0))
 
     if selected_rep != "-- اختر مندوب --":
         ws = spreadsheet.worksheet(selected_rep)
@@ -136,34 +141,32 @@ if client:
                     edited = st.data_editor(pending[['row_no', 'اسم الصنف', 'الكميه المطلوبه']], hide_index=True, use_container_width=True)
 
                     if st.button("🚀 تصديق وإرسال النهائي", type="primary", use_container_width=True):
-                        # العثور على رقم عمود "الحالة" بدقة
                         idx = raw_data[0].index('الحالة') + 1
                         for _, r in edited.iterrows():
                             ws.update_cell(int(r['row_no']), idx, "تم التصديق")
                         st.success("تم التصديق!"); st.rerun()
                     
-                    # وقت الطباعة الفعلي (الآن)
                     print_time = datetime.now(beirut_tz).strftime('%Y-%m-%d %H:%M:%S')
                     
-                    rows_html = "".join([f"<tr><td style='border:1px solid black; text-align:center;'>{i+1}</td><td style='border:1px solid black; text-align:center; font-size:45px; font-weight:bold;'>{r.get('الكميه المطلوبه','')}</td><td style='border:1px solid black; text-align:right; font-size:32px; padding-right:5px;'>{r.get('اسم الصنف','')}</td></tr>" for i, (_, r) in enumerate(edited.iterrows())])
+                    rows_html = "".join([f"<tr><td>{i+1}</td><td>{r.get('الكميه المطلوبه','')}</td><td style='text-align:right;'>{r.get('اسم الصنف','')}</td></tr>" for i, (_, r) in enumerate(edited.iterrows())])
                     
                     thermal_view = f"""
                     <div class="print-main-wrapper">
-                        <div style="text-align:center; border-bottom:2px dashed black; padding-bottom:5px;">
-                            <p style="font-size:55px; font-weight:900; margin:0;">طلب: {selected_rep}</p>
-                            <p style="font-size:24px; margin:0;">وقت الطباعة: {print_time}</p>
+                        <div style="text-align:center; border-bottom:1px solid black; padding-bottom:5px; margin-bottom:5px;">
+                            <p style="font-size:28px; font-weight:bold; margin:0;">طلب: {selected_rep}</p>
+                            <p style="font-size:18px; margin:0;">وقت الطباعة: {print_time}</p>
                         </div>
-                        <table style="width:100%; border-collapse:collapse; margin-top:5px;">
+                        <table class="thermal-table">
                             <thead>
                                 <tr>
-                                    <th style="border:1px solid black;">ت</th>
-                                    <th style="border:1px solid black;">العدد</th>
-                                    <th style="border:1px solid black;">الصنف</th>
+                                    <th style="width:10%;">ت</th>
+                                    <th style="width:25%;">العدد</th>
+                                    <th>الصنف</th>
                                 </tr>
                             </thead>
                             <tbody>{rows_html}</tbody>
                         </table>
-                        <p style="text-align:center; margin-top:10px;">--------------------------</p>
+                        <p style="text-align:center; margin-top:5px; font-size:16px;">*** نهاية الطلب ***</p>
                     </div>
                     """
                     st.markdown(thermal_view, unsafe_allow_html=True)
