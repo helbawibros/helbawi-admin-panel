@@ -7,78 +7,87 @@ import os
 from datetime import datetime
 import pytz 
 
-# --- 1. إعدادات الصفحة وتنسيق الطباعة الاحترافي ---
+# --- 1. إعدادات الصفحة وتنسيق الطباعة ---
 st.set_page_config(page_title="إدارة حلباوي - A4 Double", layout="wide")
 beirut_tz = pytz.timezone('Asia/Beirut')
 
 st.markdown("""
     <style>
-    /* تنسيق البرنامج الأساسي */
+    /* تنسيق الزر والبرنامج */
     .print-button-real {
         display: block; width: 100%; height: 60px; 
         background-color: #28a745; color: white !important; 
         border: 2px solid #ffffff; border-radius: 10px; 
         cursor: pointer; font-weight: bold; font-size: 22px; margin-top: 20px;
     }
+
+    /* --- تنسيق الطباعة والشاشة --- */
+    .print-container {
+        display: flex;
+        flex-direction: row;
+        justify-content: space-between;
+        direction: rtl;
+        width: 100%;
+        margin-top: 20px;
+    }
+
+    .invoice-half {
+        width: 48%;
+        padding: 10px;
+        border: 1px dashed #ccc;
+        background-color: #fff;
+    }
+
+    .thermal-table {
+        width: 100%;
+        border-collapse: collapse;
+        border: 2px solid black;
+    }
     
-    /* --- حل مشكلة كعب الصفحة والخط --- */
+    .thermal-table th, .thermal-table td {
+        border: 2px solid black;
+        padding: 5px;
+        text-align: center;
+        font-size: 19px;
+        font-weight: bold;
+        color: black;
+    }
+
     @media print {
-        /* إخفاء كل شيء تماماً */
-        header, footer, .no-print, [data-testid="stSidebar"], [data-testid="stHeader"], .stApp { 
+        /* إخفاء كل شيء إلا حاوية الطباعة */
+        body * { visibility: hidden !important; }
+        .print-container, .print-container * { visibility: visible !important; }
+        
+        /* إجبار الحاوية تطلع براس الصفحة */
+        .print-container {
+            position: absolute !important;
+            top: 0 !important;
+            right: 0 !important;
+            width: 100% !important;
+            margin: 0 !important;
+            padding: 0 !important;
+        }
+        
+        header, footer, .no-print, [data-testid="stSidebar"], [data-testid="stHeader"] { 
             display: none !important; 
         }
-        
-        /* إظهار حاوية الطباعة فقط في أعلى الصفحة */
-        .print-container {
-            visibility: visible !important;
-            position: fixed !important; /* تجبر المحتوى يطلع فوق */
-            top: 0 !important;
-            left: 0 !important;
-            width: 100% !important;
-            display: flex !important;
-            flex-direction: row !important;
-            justify-content: space-between !important;
-            direction: rtl !important;
-            background-color: white !important;
-            padding-top: 5mm !important;
-        }
 
-        .invoice-half {
-            width: 48% !important;
-            padding: 5px !important;
-            border-left: 1px dashed #000 !important; /* خط وهمي للقص */
-        }
-
-        .thermal-table {
-            width: 100% !important;
-            border-collapse: collapse !important;
-            border: 1.5px solid black !important;
-        }
-        
-        .thermal-table th, .thermal-table td {
-            border: 1.5px solid black !important;
-            padding: 3px 5px !important;
-            text-align: center !important;
-            font-size: 19px !important; /* خط مقروء ويساع 30 صنف */
-            font-weight: bold !important;
-            color: black !important;
-        }
-        
-        .invoice-title { font-size: 26px !important; margin: 0 !important; padding: 0 !important; }
-        .invoice-time { font-size: 16px !important; margin-bottom: 5px !important; }
-
-        @page { size: A4 landscape; margin: 0; }
+        @page { size: A4 landscape; margin: 10mm; }
     }
     </style>
 """, unsafe_allow_html=True)
 
-# --- 2. دالة اللوغو الأساسية ---
+# --- 2. دالة اللوغو (الأساسية) ---
 def show_full_logo():
     st.markdown('<div class="no-print">', unsafe_allow_html=True)
-    if os.path.exists("Logo.JPG"):
-        st.image("Logo.JPG", use_container_width=True)
-    else:
-        st.markdown("<h1 style='text-align:center;'>Primum Quality</h1>", unsafe_allow_html=True)
+    found = False
+    for name in ["Logo.JPG", "logo.jpg", "Logo.png"]:
+        if os.path.exists(name):
+            st.image(name, use_container_width=True)
+            found = True
+            break
+    if not found:
+        st.markdown("<h1 style='text-align:center;'>PRIMUM QUALITY</h1>", unsafe_allow_html=True)
     st.markdown('</div>', unsafe_allow_html=True)
 
 # --- نظام الدخول ---
@@ -150,14 +159,14 @@ if client:
                     st.success("تم التصديق!"); st.rerun()
                 st.markdown('</div>', unsafe_allow_html=True)
 
-                # --- محتوى الفاتورة المزدوجة ---
+                # --- الفاتورة ---
                 print_time = datetime.now(beirut_tz).strftime('%Y-%m-%d %H:%M:%S')
                 rows_html = "".join([f"<tr><td>{i+1}</td><td>{r.get('الكميه المطلوبه','')}</td><td style='text-align:right;'>{r.get('اسم الصنف','')}</td></tr>" for i, (_, r) in enumerate(edited.iterrows())])
                 
                 invoice_html = f"""
                 <div style="text-align:center; border-bottom:2px solid black; margin-bottom:5px;">
-                    <h2 class="invoice-title">طلب: {selected_rep}</h2>
-                    <p class="invoice-time">وقت الطباعة: {print_time}</p>
+                    <h2 style="margin:0; font-size:24px;">طلب: {selected_rep}</h2>
+                    <p style="margin:0; font-size:14px;">وقت الطباعة: {print_time}</p>
                 </div>
                 <table class="thermal-table">
                     <thead><tr><th style="width:10%;">ت</th><th style="width:20%;">العدد</th><th>الصنف</th></tr></thead>
@@ -165,7 +174,7 @@ if client:
                 </table>
                 """
 
-                # كود عرض الحاوية للطباعة
+                # عرض الفاتورة (شاشة + طباعة)
                 st.markdown(f"""
                 <div class="print-container">
                     <div class="invoice-half">{invoice_html}</div>
