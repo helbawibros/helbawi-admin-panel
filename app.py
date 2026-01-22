@@ -7,13 +7,13 @@ import os
 from datetime import datetime
 import pytz 
 
-# --- 1. إعدادات الصفحة وتنسيق الطباعة ---
+# --- 1. إعدادات الصفحة وتنسيق الطباعة الإجباري ---
 st.set_page_config(page_title="إدارة حلباوي - A4 Double", layout="wide")
 beirut_tz = pytz.timezone('Asia/Beirut')
 
 st.markdown("""
     <style>
-    /* تنسيق الزر والبرنامج */
+    /* تنسيق زر الطباعة في البرنامج */
     .print-button-real {
         display: block; width: 100%; height: 60px; 
         background-color: #28a745; color: white !important; 
@@ -21,63 +21,83 @@ st.markdown("""
         cursor: pointer; font-weight: bold; font-size: 22px; margin-top: 20px;
     }
 
-    /* --- تنسيق الطباعة والشاشة --- */
-    .print-container {
-        display: flex;
-        flex-direction: row;
-        justify-content: space-between;
-        direction: rtl;
-        width: 100%;
-        margin-top: 20px;
-    }
-
-    .invoice-half {
-        width: 48%;
-        padding: 10px;
-        border: 1px dashed #ccc;
-        background-color: #fff;
-    }
-
-    .thermal-table {
-        width: 100%;
-        border-collapse: collapse;
-        border: 2px solid black;
-    }
-    
-    .thermal-table th, .thermal-table td {
-        border: 2px solid black;
-        padding: 5px;
-        text-align: center;
-        font-size: 19px;
-        font-weight: bold;
-        color: black;
-    }
-
+    /* --- كود الطباعة الإجباري (Force Top) --- */
     @media print {
-        /* إخفاء كل شيء إلا حاوية الطباعة */
-        body * { visibility: hidden !important; }
-        .print-container, .print-container * { visibility: visible !important; }
-        
-        /* إجبار الحاوية تطلع براس الصفحة */
-        .print-container {
+        /* 1. إخفاء كل شيء في Streamlit تماماً */
+        div[data-testid="stToolbar"], 
+        header, footer, 
+        .no-print,
+        [data-testid="stSidebar"], 
+        [data-testid="stHeader"],
+        .stApp > header {
+            display: none !important;
+            height: 0 !important;
+        }
+
+        /* 2. تنظيف مساحة العمل */
+        .stApp {
             position: absolute !important;
             top: 0 !important;
-            right: 0 !important;
-            width: 100% !important;
             margin: 0 !important;
             padding: 0 !important;
         }
-        
-        header, footer, .no-print, [data-testid="stSidebar"], [data-testid="stHeader"] { 
-            display: none !important; 
+
+        /* 3. إظهار الحاوية في أعلى الورقة حصراً */
+        .print-container {
+            visibility: visible !important;
+            position: absolute !important;
+            top: 0mm !important; /* بداية الورقة */
+            left: 0 !important;
+            width: 100% !important;
+            display: flex !important;
+            flex-direction: row !important;
+            justify-content: space-around !important;
+            direction: rtl !important;
+            background: white !important;
         }
 
-        @page { size: A4 landscape; margin: 10mm; }
+        .invoice-half {
+            width: 46% !important;
+            padding: 10px !important;
+            border: 1px dashed #444 !important;
+        }
+
+        .thermal-table {
+            width: 100% !important;
+            border-collapse: collapse !important;
+            border: 2px solid black !important;
+        }
+        
+        .thermal-table th, .thermal-table td {
+            border: 2px solid black !important;
+            padding: 5px !important;
+            text-align: center !important;
+            font-size: 18px !important; /* حجم ممتاز لـ 30 صنف */
+            font-weight: bold !important;
+            color: black !important;
+        }
+
+        @page { 
+            size: A4 landscape; 
+            margin: 0 !important; /* إلغاء هوامش المتصفح */
+        }
     }
+
+    /* تنسيق العرض على الشاشة */
+    .print-container {
+        display: flex;
+        justify-content: space-around;
+        direction: rtl;
+        margin-top: 20px;
+        background: #f9f9f9;
+        padding: 10px;
+        border: 1px solid #ddd;
+    }
+    .invoice-half { width: 48%; border: 1px solid #ccc; padding: 10px; background: white; }
     </style>
 """, unsafe_allow_html=True)
 
-# --- 2. دالة اللوغو (الأساسية) ---
+# --- 2. دالة اللوغو (استرجاع الصورة الأساسية) ---
 def show_full_logo():
     st.markdown('<div class="no-print">', unsafe_allow_html=True)
     found = False
@@ -159,22 +179,23 @@ if client:
                     st.success("تم التصديق!"); st.rerun()
                 st.markdown('</div>', unsafe_allow_html=True)
 
-                # --- الفاتورة ---
+                # --- محتوى الفاتورة ---
                 print_time = datetime.now(beirut_tz).strftime('%Y-%m-%d %H:%M:%S')
-                rows_html = "".join([f"<tr><td>{i+1}</td><td>{r.get('الكميه المطلوبه','')}</td><td style='text-align:right;'>{r.get('اسم الصنف','')}</td></tr>" for i, (_, r) in enumerate(edited.iterrows())])
+                rows_html = "".join([f"<tr><td>{i+1}</td><td>{r.get('الكميه المطلوبه','')}</td><td style='text-align:right; padding-right:5px;'>{r.get('اسم الصنف','')}</td></tr>" for i, (_, r) in enumerate(edited.iterrows())])
                 
                 invoice_html = f"""
                 <div style="text-align:center; border-bottom:2px solid black; margin-bottom:5px;">
-                    <h2 style="margin:0; font-size:24px;">طلب: {selected_rep}</h2>
+                    <h2 style="margin:0; font-size:26px;">طلب: {selected_rep}</h2>
                     <p style="margin:0; font-size:14px;">وقت الطباعة: {print_time}</p>
                 </div>
                 <table class="thermal-table">
                     <thead><tr><th style="width:10%;">ت</th><th style="width:20%;">العدد</th><th>الصنف</th></tr></thead>
                     <tbody>{rows_html}</tbody>
                 </table>
+                <p style="text-align:center; font-size:12px; margin-top:5px;">*** نهاية الطلب ***</p>
                 """
 
-                # عرض الفاتورة (شاشة + طباعة)
+                # عرض الحاوية (مكررة مرتين للقص)
                 st.markdown(f"""
                 <div class="print-container">
                     <div class="invoice-half">{invoice_html}</div>
