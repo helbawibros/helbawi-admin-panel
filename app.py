@@ -13,6 +13,7 @@ beirut_tz = pytz.timezone('Asia/Beirut')
 
 st.markdown("""
     <style>
+    /* تنسيق زر الطباعة والوميض */
     .print-button-real {
         display: block; width: 100%; height: 60px; 
         background-color: #28a745; color: white !important; 
@@ -29,24 +30,41 @@ st.markdown("""
         color: white !important;
         border: 2px solid white !important;
     }
+
+    /* --- إصلاح الطباعة - الكتيبة من فوق --- */
     @media print {
-        body * { visibility: hidden !important; }
-        .print-main-wrapper, .print-main-wrapper * { visibility: visible !important; color: #000000 !important; }
-        .print-main-wrapper { position: absolute !important; top: 0 !important; right: 0 !important; width: 100% !important; direction: rtl !important; }
-        header, footer, .no-print, [data-testid="stSidebar"], [data-testid="stHeader"] { display: none !important; }
-        @page { size: 80mm auto; margin: 0mm !important; }
+        header, footer, .no-print, [data-testid="stSidebar"], [data-testid="stHeader"] { 
+            display: none !important; 
+        }
+        body * { visibility: hidden; }
+        .print-main-wrapper, .print-main-wrapper * { 
+            visibility: visible !important; 
+        }
+        .print-main-wrapper { 
+            position: fixed !important; 
+            top: 0 !important; 
+            right: 0 !important; 
+            width: 100% !important; 
+            direction: rtl !important;
+            margin: 0 !important;
+            padding: 0 !important;
+        }
+        @page { size: 80mm auto; margin: 0; }
     }
     </style>
 """, unsafe_allow_html=True)
 
-# --- 2. دالة عرض اللوغو (مع التأكد من المسارات) ---
+# --- دالة اللوغو ---
 def show_full_logo():
     st.markdown('<div class="no-print">', unsafe_allow_html=True)
-    # جربنا كل الاحتمالات لاسم الملف
-    for name in ["Logo.JPG", "Logo .JPG", "logo.jpg", "Logo.jpg"]:
+    found = False
+    for name in ["Logo.JPG", "logo.jpg", "Logo.png"]:
         if os.path.exists(name):
             st.image(name, use_container_width=True)
+            found = True
             break
+    if not found:
+        st.write("### Primum Quality") # احتياط إذا الصورة ممسوحة
     st.markdown('</div>', unsafe_allow_html=True)
 
 # --- نظام الدخول ---
@@ -85,18 +103,13 @@ if client:
             data = ws.get_all_values()
             if len(data) > 1:
                 df_temp = pd.DataFrame(data[1:], columns=data[0])
-                # تنظيف أسماء الأعمدة من الفراغات لمنع الـ KeyError
-                df_temp.columns = df_temp.columns.str.strip()
-                
+                df_temp.columns = df_temp.columns.str.strip() # تنظيف الأعمدة
                 if 'الحالة' in df_temp.columns:
-                    pending_orders = df_temp[df_temp['الحالة'] == "بانتظار التصديق"]
-                    if not pending_orders.empty:
-                        # جلب الوقت من الشيت للزر
-                        order_time = pending_orders.iloc[0].get('التاريخ و الوقت', 'غير محدد')
-                        st.session_state.orders.append({"name": rep, "time": order_time})
-        
-        if not st.session_state.orders: st.toast("لا توجد طلبيات جديدة حالياً")
-
+                    pending = df_temp[df_temp['الحالة'] == "بانتظار التصديق"]
+                    if not pending.empty:
+                        t_col = 'التاريخ و الوقت' if 'التاريخ و الوقت' in df_temp.columns else data[0][0]
+                        st.session_state.orders.append({"name": rep, "time": pending.iloc[0].get(t_col, '---')})
+    
     if 'orders' in st.session_state:
         for order in st.session_state.orders:
             if st.button(f"📦 طلب من: {order['name']} | أرسل في: {order['time']}", key=f"btn_{order['name']}", use_container_width=True):
@@ -110,39 +123,47 @@ if client:
 
     if selected_rep != "-- اختر مندوب --":
         ws = spreadsheet.worksheet(selected_rep)
-        data = ws.get_all_values()
-        if len(data) > 1:
-            df = pd.DataFrame(data[1:], columns=data[0])
-            df.columns = df.columns.str.strip() # تنظيف الأعمدة
+        raw_data = ws.get_all_values()
+        if len(raw_data) > 1:
+            df = pd.DataFrame(raw_data[1:], columns=raw_data[0])
+            df.columns = df.columns.str.strip()
             df['row_no'] = range(2, len(df) + 2)
             
             if 'الحالة' in df.columns:
                 pending = df[df['الحالة'] == "بانتظار التصديق"].copy()
                 if not pending.empty:
                     st.info(f"عرض طلبات المندوب: {selected_rep}")
-                    cols_to_show = [c for c in ['row_no', 'اسم الصنف', 'الكميه المطلوبه'] if c in pending.columns]
-                    edited = st.data_editor(pending[cols_to_show], hide_index=True, use_container_width=True)
+                    edited = st.data_editor(pending[['row_no', 'اسم الصنف', 'الكميه المطلوبه']], hide_index=True, use_container_width=True)
 
                     if st.button("🚀 تصديق وإرسال النهائي", type="primary", use_container_width=True):
-                        status_col_idx = data[0].index('الحالة') + 1 if 'الحالة' in data[0] else 4
+                        # العثور على رقم عمود "الحالة" بدقة
+                        idx = raw_data[0].index('الحالة') + 1
                         for _, r in edited.iterrows():
-                            ws.update_cell(int(r['row_no']), status_col_idx, "تم التصديق")
-                        st.success("تم التصديق بنجاح!"); st.rerun()
+                            ws.update_cell(int(r['row_no']), idx, "تم التصديق")
+                        st.success("تم التصديق!"); st.rerun()
                     
-                    # وقت الطباعة الفعلي (وقت الإدارة)
+                    # وقت الطباعة الفعلي (الآن)
                     print_time = datetime.now(beirut_tz).strftime('%Y-%m-%d %H:%M:%S')
                     
-                    rows_html = "".join([f"<tr><td style='border:1px solid black; text-align:center;'>{i+1}</td><td style='border:1px solid black; text-align:center; font-size:40px; font-weight:bold;'>{r.get('الكميه المطلوبه', '')}</td><td style='border:1px solid black; text-align:right; font-size:30px;'>{r.get('اسم الصنف', '')}</td></tr>" for i, (_, r) in enumerate(edited.iterrows())])
+                    rows_html = "".join([f"<tr><td style='border:1px solid black; text-align:center;'>{i+1}</td><td style='border:1px solid black; text-align:center; font-size:45px; font-weight:bold;'>{r.get('الكميه المطلوبه','')}</td><td style='border:1px solid black; text-align:right; font-size:32px; padding-right:5px;'>{r.get('اسم الصنف','')}</td></tr>" for i, (_, r) in enumerate(edited.iterrows())])
                     
                     thermal_view = f"""
                     <div class="print-main-wrapper">
-                        <div style="text-align:center; border-bottom:2px dashed black;">
-                            <p style="font-size:50px; font-weight:900; margin:0;">طلب: {selected_rep}</p>
-                            <p style="font-size:20px;">وقت الطباعة: {print_time}</p>
+                        <div style="text-align:center; border-bottom:2px dashed black; padding-bottom:5px;">
+                            <p style="font-size:55px; font-weight:900; margin:0;">طلب: {selected_rep}</p>
+                            <p style="font-size:24px; margin:0;">وقت الطباعة: {print_time}</p>
                         </div>
-                        <table style="width:100%; border-collapse:collapse; margin-top:10px;">
-                            {rows_html}
+                        <table style="width:100%; border-collapse:collapse; margin-top:5px;">
+                            <thead>
+                                <tr>
+                                    <th style="border:1px solid black;">ت</th>
+                                    <th style="border:1px solid black;">العدد</th>
+                                    <th style="border:1px solid black;">الصنف</th>
+                                </tr>
+                            </thead>
+                            <tbody>{rows_html}</tbody>
                         </table>
+                        <p style="text-align:center; margin-top:10px;">--------------------------</p>
                     </div>
                     """
                     st.markdown(thermal_view, unsafe_allow_html=True)
