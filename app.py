@@ -7,13 +7,13 @@ import os
 from datetime import datetime
 import pytz 
 
-# --- 1. إعدادات الصفحة وتنسيق الطباعة المزدوجة النظيف ---
+# --- 1. إعدادات الصفحة وتنسيق الطباعة المزدوجة (A4) ---
 st.set_page_config(page_title="إدارة حلباوي - A4 Double", layout="wide")
 beirut_tz = pytz.timezone('Asia/Beirut')
 
 st.markdown("""
     <style>
-    /* تنسيق الأزرار العادية */
+    /* تنسيق الأزرار والوميض */
     .print-button-real {
         display: block; width: 100%; height: 60px; 
         background-color: #28a745; color: white !important; 
@@ -30,15 +30,13 @@ st.markdown("""
         color: white !important;
     }
 
-    /* --- كود الطباعة الاحترافي لـ A4 --- */
+    /* --- كود الطباعة الاحترافي لـ A4 (يسع 30 صنف) --- */
     @media print {
-        /* إخفاء كل شي بالصفحة */
         body * { visibility: hidden !important; }
-        header, footer, .no-print, [data-testid="stSidebar"], [data-testid="stHeader"], [data-testid="stNotification"], .stSelectbox { 
+        header, footer, .no-print, [data-testid="stSidebar"], [data-testid="stHeader"] { 
             display: none !important; 
         }
         
-        /* إظهار حاوية الطباعة فقط */
         .print-container, .print-container * { 
             visibility: visible !important; 
         }
@@ -50,48 +48,62 @@ st.markdown("""
             width: 100% !important;
             display: flex !important;
             flex-direction: row !important;
-            justify-content: space-around !important;
+            justify-content: space-between !important;
             direction: rtl !important;
         }
 
         .invoice-half {
-            width: 48% !important;
-            padding: 20px !important;
-            border: 1px dashed #000 !important; /* خط خفيف للقص */
+            width: 47% !important;
+            padding: 10px !important;
+            border: 1px dashed #ccc !important;
         }
 
         .thermal-table {
             width: 100% !important;
             border-collapse: collapse !important;
-            border: 2px solid black !important;
+            border: 1px solid black !important;
         }
         .thermal-table th, .thermal-table td {
-            border: 2px solid black !important;
-            padding: 10px !important;
+            border: 1px solid black !important;
+            padding: 4px !important; /* تقليل الفراغ ليسع أصناف أكثر */
             text-align: center !important;
-            font-size: 30px !important; /* خط كبير للـ A4 */
+            font-size: 18px !important; /* خط عادي ينقرا */
             font-weight: bold !important;
             color: black !important;
         }
-        @page { size: A4 landscape; margin: 0; }
+        .invoice-title { font-size: 24px !important; margin: 0 !important; }
+        .invoice-time { font-size: 14px !important; margin: 0 !important; }
+        
+        @page { size: A4 landscape; margin: 5mm; }
     }
     </style>
 """, unsafe_allow_html=True)
 
-# --- الدوال الأساسية ---
+# --- 2. دالة اللوغو (استرجاع الصورة الأساسية) ---
 def show_full_logo():
     st.markdown('<div class="no-print">', unsafe_allow_html=True)
-    if os.path.exists("Logo.JPG"): st.image("Logo.JPG", use_container_width=True)
+    # البحث عن الصورة الأصلية لعرضها في البرنامج
+    found = False
+    for name in ["Logo.JPG", "logo.jpg", "Logo.png", "Logo.jpg"]:
+        if os.path.exists(name):
+            st.image(name, use_container_width=True)
+            found = True
+            break
+    if not found:
+        st.markdown("<h2 style='text-align:center; color:orange;'>Primum Quality</h2>", unsafe_allow_html=True)
     st.markdown('</div>', unsafe_allow_html=True)
 
+# --- نظام الدخول ---
 if 'admin_logged_in' not in st.session_state: st.session_state.admin_logged_in = False
 if not st.session_state.admin_logged_in:
     show_full_logo()
-    pwd = st.text_input("كلمة السر", type="password")
-    if st.button("دخول"):
-        if pwd == "Hlb_Admin_2024":
-            st.session_state.admin_logged_in = True
-            st.rerun()
+    col1, col2, col3 = st.columns([1, 2, 1])
+    with col2:
+        pwd = st.text_input("كلمة السر الإدارة", type="password")
+        if st.button("دخول", use_container_width=True):
+            if pwd == "Hlb_Admin_2024":
+                st.session_state.admin_logged_in = True
+                st.rerun()
     st.stop()
 
 def get_client():
@@ -108,7 +120,7 @@ if client:
     delegates = [sh.title for sh in spreadsheet.worksheets() if sh.title not in ["طلبات", "الأسعار", "البيانات", "الزبائن", "Sheet1"]]
     show_full_logo()
     
-    # قسم الإشعارات (مخفي عند الطباعة)
+    # قسم الإشعارات
     st.markdown('<div class="no-print">', unsafe_allow_html=True)
     if st.button("🔔 فحص الإشعارات الجديدة", use_container_width=True):
         st.session_state.orders = []
@@ -144,7 +156,6 @@ if client:
             
             pending = df[df['الحالة'] == "بانتظار التصديق"].copy()
             if not pending.empty:
-                # محرر البيانات (مخفي عند الطباعة)
                 st.markdown('<div class="no-print">', unsafe_allow_html=True)
                 edited = st.data_editor(pending[['row_no', 'اسم الصنف', 'الكميه المطلوبه']], hide_index=True, use_container_width=True)
                 if st.button("🚀 تصديق وإرسال النهائي", type="primary", use_container_width=True):
@@ -153,23 +164,23 @@ if client:
                     st.success("تم التصديق!"); st.rerun()
                 st.markdown('</div>', unsafe_allow_html=True)
 
-                # --- تجهيز الفاتورة للطباعة ---
+                # --- بناء الفاتورة ---
                 print_time = datetime.now(beirut_tz).strftime('%Y-%m-%d %H:%M:%S')
-                rows_html = "".join([f"<tr><td>{i+1}</td><td>{r.get('الكميه المطلوبه','')}</td><td style='text-align:right;'>{r.get('اسم الصنف','')}</td></tr>" for i, (_, r) in enumerate(edited.iterrows())])
+                rows_html = "".join([f"<tr><td>{i+1}</td><td>{r.get('الكميه المطلوبه','')}</td><td style='text-align:right; padding-right:5px;'>{r.get('اسم الصنف','')}</td></tr>" for i, (_, r) in enumerate(edited.iterrows())])
                 
                 invoice_html = f"""
-                <div style="text-align:center; border-bottom:3px solid black; padding-bottom:10px; margin-bottom:15px;">
-                    <h1 style="font-size:50px; margin:0;">طلب: {selected_rep}</h1>
-                    <p style="font-size:22px; margin:5px;">وقت الطباعة: {print_time}</p>
+                <div style="text-align:center; border-bottom:1px solid black; margin-bottom:5px;">
+                    <h2 class="invoice-title">طلب: {selected_rep}</h2>
+                    <p class="invoice-time">وقت الطباعة: {print_time}</p>
                 </div>
                 <table class="thermal-table">
                     <thead><tr><th style="width:10%;">ت</th><th style="width:20%;">العدد</th><th>الصنف</th></tr></thead>
                     <tbody>{rows_html}</tbody>
                 </table>
-                <p style="text-align:center; margin-top:20px; font-size:20px; font-weight:bold;">*** نهاية الطلب ***</p>
+                <p style="text-align:center; font-size:12px; margin-top:5px;">*** نهاية الطلب ***</p>
                 """
 
-                # عرض النسختين المكررتين
+                # العرض المزدوج
                 st.markdown(f"""
                 <div class="print-container">
                     <div class="invoice-half">{invoice_html}</div>
