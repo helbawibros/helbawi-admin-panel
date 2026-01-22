@@ -7,42 +7,31 @@ import os
 from datetime import datetime
 import pytz 
 
-# --- 1. إعدادات الصفحة وتنسيق الطباعة المزدوجة (A4) ---
+# --- 1. إعدادات الصفحة وتنسيق الطباعة الاحترافي ---
 st.set_page_config(page_title="إدارة حلباوي - A4 Double", layout="wide")
 beirut_tz = pytz.timezone('Asia/Beirut')
 
 st.markdown("""
     <style>
-    /* تنسيق الأزرار والوميض */
+    /* تنسيق البرنامج الأساسي */
     .print-button-real {
         display: block; width: 100%; height: 60px; 
         background-color: #28a745; color: white !important; 
         border: 2px solid #ffffff; border-radius: 10px; 
         cursor: pointer; font-weight: bold; font-size: 22px; margin-top: 20px;
     }
-    @keyframes blinking_red {
-        0% { background-color: #ff4b4b; }
-        50% { background-color: #8b0000; }
-        100% { background-color: #ff4b4b; }
-    }
-    div.stButton > button[key^="btn_"] {
-        animation: blinking_red 1.2s infinite !important;
-        color: white !important;
-    }
-
-    /* --- كود الطباعة الاحترافي لـ A4 (يسع 30 صنف) --- */
+    
+    /* --- حل مشكلة كعب الصفحة والخط --- */
     @media print {
-        body * { visibility: hidden !important; }
-        header, footer, .no-print, [data-testid="stSidebar"], [data-testid="stHeader"] { 
+        /* إخفاء كل شيء تماماً */
+        header, footer, .no-print, [data-testid="stSidebar"], [data-testid="stHeader"], .stApp { 
             display: none !important; 
         }
         
-        .print-container, .print-container * { 
-            visibility: visible !important; 
-        }
-        
+        /* إظهار حاوية الطباعة فقط في أعلى الصفحة */
         .print-container {
-            position: absolute !important;
+            visibility: visible !important;
+            position: fixed !important; /* تجبر المحتوى يطلع فوق */
             top: 0 !important;
             left: 0 !important;
             width: 100% !important;
@@ -50,56 +39,55 @@ st.markdown("""
             flex-direction: row !important;
             justify-content: space-between !important;
             direction: rtl !important;
+            background-color: white !important;
+            padding-top: 5mm !important;
         }
 
         .invoice-half {
-            width: 47% !important;
-            padding: 10px !important;
-            border: 1px dashed #ccc !important;
+            width: 48% !important;
+            padding: 5px !important;
+            border-left: 1px dashed #000 !important; /* خط وهمي للقص */
         }
 
         .thermal-table {
             width: 100% !important;
             border-collapse: collapse !important;
-            border: 1px solid black !important;
+            border: 1.5px solid black !important;
         }
+        
         .thermal-table th, .thermal-table td {
-            border: 1px solid black !important;
-            padding: 4px !important; /* تقليل الفراغ ليسع أصناف أكثر */
+            border: 1.5px solid black !important;
+            padding: 3px 5px !important;
             text-align: center !important;
-            font-size: 18px !important; /* خط عادي ينقرا */
+            font-size: 19px !important; /* خط مقروء ويساع 30 صنف */
             font-weight: bold !important;
             color: black !important;
         }
-        .invoice-title { font-size: 24px !important; margin: 0 !important; }
-        .invoice-time { font-size: 14px !important; margin: 0 !important; }
         
-        @page { size: A4 landscape; margin: 5mm; }
+        .invoice-title { font-size: 26px !important; margin: 0 !important; padding: 0 !important; }
+        .invoice-time { font-size: 16px !important; margin-bottom: 5px !important; }
+
+        @page { size: A4 landscape; margin: 0; }
     }
     </style>
 """, unsafe_allow_html=True)
 
-# --- 2. دالة اللوغو (استرجاع الصورة الأساسية) ---
+# --- 2. دالة اللوغو الأساسية ---
 def show_full_logo():
     st.markdown('<div class="no-print">', unsafe_allow_html=True)
-    # البحث عن الصورة الأصلية لعرضها في البرنامج
-    found = False
-    for name in ["Logo.JPG", "logo.jpg", "Logo.png", "Logo.jpg"]:
-        if os.path.exists(name):
-            st.image(name, use_container_width=True)
-            found = True
-            break
-    if not found:
-        st.markdown("<h2 style='text-align:center; color:orange;'>Primum Quality</h2>", unsafe_allow_html=True)
+    if os.path.exists("Logo.JPG"):
+        st.image("Logo.JPG", use_container_width=True)
+    else:
+        st.markdown("<h1 style='text-align:center;'>Primum Quality</h1>", unsafe_allow_html=True)
     st.markdown('</div>', unsafe_allow_html=True)
 
 # --- نظام الدخول ---
 if 'admin_logged_in' not in st.session_state: st.session_state.admin_logged_in = False
 if not st.session_state.admin_logged_in:
     show_full_logo()
-    col1, col2, col3 = st.columns([1, 2, 1])
+    col2 = st.columns([1, 2, 1])[1]
     with col2:
-        pwd = st.text_input("كلمة السر الإدارة", type="password")
+        pwd = st.text_input("كلمة السر", type="password")
         if st.button("دخول", use_container_width=True):
             if pwd == "Hlb_Admin_2024":
                 st.session_state.admin_logged_in = True
@@ -120,7 +108,6 @@ if client:
     delegates = [sh.title for sh in spreadsheet.worksheets() if sh.title not in ["طلبات", "الأسعار", "البيانات", "الزبائن", "Sheet1"]]
     show_full_logo()
     
-    # قسم الإشعارات
     st.markdown('<div class="no-print">', unsafe_allow_html=True)
     if st.button("🔔 فحص الإشعارات الجديدة", use_container_width=True):
         st.session_state.orders = []
@@ -131,15 +118,14 @@ if client:
                 df_temp = pd.DataFrame(data[1:], columns=data[0])
                 df_temp.columns = df_temp.columns.str.strip()
                 if 'الحالة' in df_temp.columns:
-                    pending = df_temp[df_temp['الحالة'] == "بانتظار التصديق"]
-                    if not pending.empty:
-                        t_val = pending.iloc[0].get('التاريخ و الوقت', '---')
-                        st.session_state.orders.append({"name": rep, "time": t_val})
+                    p = df_temp[df_temp['الحالة'] == "بانتظار التصديق"]
+                    if not p.empty:
+                        st.session_state.orders.append({"name": rep, "time": p.iloc[0].get('التاريخ و الوقت', '---')})
     
     if 'orders' in st.session_state:
-        for order in st.session_state.orders:
-            if st.button(f"📦 طلب من: {order['name']} | أرسل في: {order['time']}", key=f"btn_{order['name']}", use_container_width=True):
-                st.session_state.active_rep = order['name']
+        for o in st.session_state.orders:
+            if st.button(f"📦 طلب من: {o['name']} | {o['time']}", key=f"btn_{o['name']}", use_container_width=True):
+                st.session_state.active_rep = o['name']
                 st.rerun()
     st.markdown('</div>', unsafe_allow_html=True)
 
@@ -164,12 +150,12 @@ if client:
                     st.success("تم التصديق!"); st.rerun()
                 st.markdown('</div>', unsafe_allow_html=True)
 
-                # --- بناء الفاتورة ---
+                # --- محتوى الفاتورة المزدوجة ---
                 print_time = datetime.now(beirut_tz).strftime('%Y-%m-%d %H:%M:%S')
-                rows_html = "".join([f"<tr><td>{i+1}</td><td>{r.get('الكميه المطلوبه','')}</td><td style='text-align:right; padding-right:5px;'>{r.get('اسم الصنف','')}</td></tr>" for i, (_, r) in enumerate(edited.iterrows())])
+                rows_html = "".join([f"<tr><td>{i+1}</td><td>{r.get('الكميه المطلوبه','')}</td><td style='text-align:right;'>{r.get('اسم الصنف','')}</td></tr>" for i, (_, r) in enumerate(edited.iterrows())])
                 
                 invoice_html = f"""
-                <div style="text-align:center; border-bottom:1px solid black; margin-bottom:5px;">
+                <div style="text-align:center; border-bottom:2px solid black; margin-bottom:5px;">
                     <h2 class="invoice-title">طلب: {selected_rep}</h2>
                     <p class="invoice-time">وقت الطباعة: {print_time}</p>
                 </div>
@@ -177,10 +163,9 @@ if client:
                     <thead><tr><th style="width:10%;">ت</th><th style="width:20%;">العدد</th><th>الصنف</th></tr></thead>
                     <tbody>{rows_html}</tbody>
                 </table>
-                <p style="text-align:center; font-size:12px; margin-top:5px;">*** نهاية الطلب ***</p>
                 """
 
-                # العرض المزدوج
+                # كود عرض الحاوية للطباعة
                 st.markdown(f"""
                 <div class="print-container">
                     <div class="invoice-half">{invoice_html}</div>
