@@ -4,16 +4,17 @@ import json
 import gspread
 from google.oauth2.service_account import Credentials
 import os
-# --- إضافة مكتبات الوقت الجديدة ---
 from datetime import datetime
 import pytz 
 
 # --- 1. إعدادات الصفحة وتنسيق الطباعة والوميض ---
 st.set_page_config(page_title="إدارة حلباوي - حراري", layout="wide")
 
+# توقيت بيروت للاستخدام العام
+beirut_tz = pytz.timezone('Asia/Beirut')
+
 st.markdown("""
     <style>
-    /* تنسيق الزر والشاشة العادية */
     .screen-info { color: white; font-size: 18px; text-align: right; }
     
     .print-button-real {
@@ -23,37 +24,33 @@ st.markdown("""
         cursor: pointer; font-weight: bold; font-size: 22px; margin-top: 20px;
     }
 
-    /* --- كود الوميض الأحمر للأزرار الجديدة --- */
+    /* --- إصلاح كود الوميض ليعمل على أزرار الطلبات --- */
     @keyframes blinking_red {
-        0% { background-color: #ff4b4b; color: white; box-shadow: 0 0 5px #ff0000; }
-        50% { background-color: #8b0000; color: white; box-shadow: 0 0 20px #ff0000; }
-        100% { background-color: #ff4b4b; color: white; box-shadow: 0 0 5px #ff0000; }
+        0% { background-color: #ff4b4b; box-shadow: 0 0 5px #ff0000; }
+        50% { background-color: #8b0000; box-shadow: 0 0 20px #ff0000; }
+        100% { background-color: #ff4b4b; box-shadow: 0 0 5px #ff0000; }
     }
 
-    div[data-testid="stVerticalBlock"] div:has(button[key^="btn_"]) button {
+    /* استهداف أزرار التنبيه حصراً */
+    div.stButton > button[key^="btn_"] {
         animation: blinking_red 1.2s infinite !important;
+        color: white !important;
         border: 2px solid white !important;
-        font-weight: bold !important;
     }
 
-    /* --- كود الطباعة المحسن --- */
+    /* --- كود الطباعة --- */
     @media print {
         body * { visibility: hidden !important; }
-        html, body { margin: 0 !important; padding: 0 !important; height: auto !important; }
+        html, body { margin: 0 !important; padding: 0 !important; }
         .print-main-wrapper, .print-main-wrapper * { visibility: visible !important; color: #000000 !important; }
-        .print-main-wrapper { position: fixed !important; top: 0 !important; right: 0 !important; width: 72mm !important; direction: rtl !important; }
+        .print-main-wrapper { position: absolute !important; top: 0 !important; right: 0 !important; width: 100% !important; direction: rtl !important; }
         header, footer, .no-print, [data-testid="stSidebar"], [data-testid="stHeader"] { display: none !important; }
         @page { size: 80mm auto; margin: 0mm !important; }
-        .header-box { border-bottom: 2px dashed #000 !important; text-align: center; }
-        .name-txt { font-size: 26px !important; font-weight: 900 !important; margin: 0; }
-        .table-style { width: 100%; border-collapse: collapse; border: 1px solid #000 !important; }
-        .table-style th, .table-style td { border: 1px solid #000 !important; padding: 6px !important; text-align: center; font-size: 19px !important; font-weight: 900 !important; }
-        .col-qty { width: 25%; font-size: 26px !important; background-color: #f0f0f0 !important; }
     }
     </style>
 """, unsafe_allow_html=True)
 
-# --- 2. الدوال الأساسية ونظام الدخول ---
+# --- 2. الدوال الأساسية ---
 def show_full_logo():
     st.markdown('<div class="no-print">', unsafe_allow_html=True)
     possible_names = ["Logo.JPG", "Logo .JPG", "logo.jpg"]
@@ -63,8 +60,7 @@ def show_full_logo():
             st.image(name, use_container_width=True)
             found = True
             break
-    if not found:
-        st.info("⚠️ يرجى التأكد من رفع صورة Logo.JPG")
+    if not found: st.info("⚠️ يرجى التأكد من رفع صورة Logo.JPG")
     st.markdown('</div>', unsafe_allow_html=True)
 
 if 'admin_logged_in' not in st.session_state: st.session_state.admin_logged_in = False
@@ -85,13 +81,16 @@ def get_client():
         info = json.loads(st.secrets["gcp_service_account"]["json_data"].strip(), strict=False)
         creds = Credentials.from_service_account_info(info, scopes=["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"])
         return gspread.authorize(creds)
-    except: return None
+    except Exception as e:
+        st.error(f"خطأ في الاتصال: {e}")
+        return None
 
 client = get_client()
 
 # --- 3. معالجة البيانات والطلبات ---
 if client:
     spreadsheet = client.open_by_key("1-Abj-Kvbe02az8KYZfQL0eal2arKw_wgjVQdJX06IA0")
+    # استثناء الصفحات غير المتعلقة بالمناديب
     delegates = [sh.title for sh in spreadsheet.worksheets() if sh.title not in ["طلبات", "الأسعار", "البيانات", "الزبائن", "Sheet1"]]
     show_full_logo()
     
@@ -100,19 +99,23 @@ if client:
         st.session_state.orders = []
         for rep in delegates:
             ws = spreadsheet.worksheet(rep)
-            # فحص عمود الحالة (الرابع)
-            status_vals = ws.col_values(4)
-            if "بانتظار التصديق" in status_vals:
-                # توليد توقيت بيروت الحالي لحظة الفحص
-                beirut_time = datetime.now(pytz.timezone('Asia/Beirut')).strftime('%H:%M')
-                st.session_state.orders.append({"name": rep, "time": beirut_time})
+            all_vals = ws.get_all_records()
+            # البحث عن طلبات بانتظار التصديق
+            pending_orders = [row for row in all_vals if row.get('الحالة') == "بانتظار التصديق"]
+            
+            if pending_orders:
+                # أخذ وقت الطلب من الشيت (أول طلب موجود)
+                order_time = pending_orders[0].get('التاريخ و الوقت', 'غير محدد')
+                st.session_state.orders.append({"name": rep, "time": order_time})
+        
         if not st.session_state.orders:
             st.toast("لا توجد طلبيات جديدة حالياً")
 
+    # عرض الأزرار الوامضة
     if 'orders' in st.session_state:
         for order in st.session_state.orders:
-            # الزر سيومض باللون الأحمر بفضل الـ Key الموحد btn_
-            if st.button(f"📦 طلب من: {order['name']} | 🕒 {order['time']}", key=f"btn_{order['name']}", use_container_width=True):
+            # الزر يظهر وقت إرسال المندوب
+            if st.button(f"📦 طلب من: {order['name']} | أرسل في: {order['time']}", key=f"btn_{order['name']}", use_container_width=True):
                 st.session_state.active_rep = order['name']
                 st.rerun()
     st.markdown('</div>', unsafe_allow_html=True)
@@ -129,36 +132,43 @@ if client:
         pending = df[df['الحالة'] == "بانتظار التصديق"].copy()
 
         if not pending.empty:
-            # استخدام الوقت المولد تلقائياً أو الموجود في الشيت
-            order_time_val = pending.iloc[0]['التاريخ و الوقت'] if 'التاريخ و الوقت' in df.columns else datetime.now(pytz.timezone('Asia/Beirut')).strftime('%Y-%m-%d %H:%M')
+            st.info(f"عرض طلبات المندوب: {selected_rep}")
             edited = st.data_editor(pending[['row_no', 'اسم الصنف', 'الكميه المطلوبه']], hide_index=True, use_container_width=True)
 
             if st.button("🚀 تصديق وإرسال النهائي", type="primary", use_container_width=True):
-                for _, r in edited.iterrows(): ws.update_cell(int(r['row_no']), 4, "تم التصديق")
-                st.success("تم!"); st.rerun()
+                for _, r in edited.iterrows():
+                    ws.update_cell(int(r['row_no']), 4, "تم التصديق")
+                st.success("تم التصديق بنجاح!")
+                st.rerun()
             
-                
-                        # 1. بناء صفوف الجدول - طريقة بسيطة جداً لمنع تداخل الأكواد
-                        # تعديل السطر الذي ينجح معك دائماً ليحتوي على الترقيم والخط الكبير
-                        # 1. بناء الصفوف (بقي كما هو لضمان عدم ظهور أكواد)
-                        # تعديل السطر الذي ينجح معك دائماً ليحتوي على الترقيم والخط الكبير
-            rows_html = "".join([f"<tr><td style='border:1px solid black; text-align:center; width:10%; font-size:25px;'>{i+1}</td><td class='col-qty' style='font-size:45px !important;'>{r['الكميه المطلوبه']}</td><td style='text-align:right; font-size:36px !important; white-space:nowrap;'>{r['اسم الصنف']}</td></tr>" for i, (_, r) in enumerate(edited.iterrows())])
+            # وقت الطباعة الحالي (وقت الإدارة)
+            print_time = datetime.now(beirut_tz).strftime('%Y-%m-%d %H:%M:%S')
+            
+            # بناء صفوف الجدول للطباعة
+            rows_html = "".join([
+                f"<tr>"
+                f"<td style='border:1px solid black; text-align:center; font-size:25px;'>{i+1}</td>"
+                f"<td style='border:1px solid black; text-align:center; font-size:45px; font-weight:bold; background-color:#f0f0f0;'>{r['الكميه المطلوبه']}</td>"
+                f"<td style='border:1px solid black; text-align:right; font-size:36px; padding-right:10px;'>{r['اسم الصنف']}</td>"
+                f"</tr>" 
+                for i, (_, r) in enumerate(edited.iterrows())
+            ])
             
             thermal_view = f"""
-            <div class="print-main-wrapper" style="width:100%; direction:rtl;">
-                <div class="header-box" style="text-align:center;">
-                    <p style="font-size:75px !important; font-weight:900; margin:0;">طلب: {selected_rep}</p>
-                    <p style="font-size:35px !important; font-weight:bold; margin-top:5px;">{order_time_val}</p>
+            <div class="print-main-wrapper">
+                <div style="text-align:center; border-bottom:2px dashed black; padding-bottom:10px; margin-bottom:10px;">
+                    <p style="font-size:60px; font-weight:900; margin:0;">طلب: {selected_rep}</p>
+                    <p style="font-size:28px; font-weight:bold; margin:5px 0;">وقت الطباعة: {print_time}</p>
                 </div>
-                <table class="table-style" style="width:100%; border-collapse:collapse;">
+                <table style="width:100%; border-collapse:collapse;">
                     <thead>
-                        <tr style="background-color:#eee; font-size:25px;">
-                            <th style="width:12%; border:1px solid black;">ت</th>
-                            <th style="width:23%; border:1px solid black;">العدد</th>
-                            <th style="border:1px solid black;">الصنف</th>
+                        <tr style="background-color:#eee;">
+                            <th style="width:10%; border:1px solid black; font-size:20px;">ت</th>
+                            <th style="width:25%; border:1px solid black; font-size:20px;">العدد</th>
+                            <th style="border:1px solid black; font-size:20px;">الصنف</th>
                         </tr>
                     </thead>
-                    <tbody style="font-weight:900;">
+                    <tbody>
                         {rows_html}
                     </tbody>
                 </table>
@@ -167,7 +177,8 @@ if client:
             """
             st.markdown(thermal_view, unsafe_allow_html=True)
             st.markdown("""<button onclick="window.print()" class="print-button-real no-print">🖨️ طباعة الفاتورة</button>""", unsafe_allow_html=True)
+        else:
+            st.success("لا توجد طلبات معلقة لهذا المندوب.")
 
 if st.sidebar.button("خروج"):
     st.session_state.clear(); st.rerun()
-
