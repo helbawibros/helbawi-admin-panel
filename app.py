@@ -169,34 +169,38 @@ if client:
             df.columns = df.columns.str.strip()
             df['row_no'] = range(2, len(df) + 2)
             
+                        # 1. جلب البيانات والتأكد من وجود الأعمدة
             pending = df[df['الحالة'] == "بانتظار التصديق"].copy()
             
             if not pending.empty:
-                st.markdown('<div class="no-print">', unsafe_allow_html=True)
+                # التأكد من اسم العمود: في صورتك اسمه "اسم الزبون" في العمود E
+                # سنحاول قراءة العمود الخامس، وإذا لم نجد "اسم الزبون" سننشئه
+                col_name = 'اسم الزبون' if 'اسم الزبون' in pending.columns else (pending.columns[4] if len(pending.columns) > 4 else None)
                 
-                # إظهار العمود الخامس (الوجهة) إذا كان موجوداً
-                # ملاحظة: تأكد أن اسم العمود في جوجل شيت هو "الوجهة"
-                if 'الوجهة' not in pending.columns:
+                if col_name:
+                    pending['الوجهة'] = pending[col_name].replace('', 'جردة سيارة').fillna('جردة سيارة')
+                else:
                     pending['الوجهة'] = "جردة سيارة"
-                
-                # عرض البيانات للإدارة للتعديل قبل الطباعة
+
+                st.markdown('<div class="no-print">', unsafe_allow_html=True)
+                # عرض المحرر للإدارة
                 edited = st.data_editor(pending[['row_no', 'اسم الصنف', 'الكميه المطلوبه', 'الوجهة']], hide_index=True, use_container_width=True)
                 
                 if st.button("🚀 تصديق وإرسال النهائي", type="primary", use_container_width=True):
-                    idx = raw_data[0].index('الحالة') + 1
-                    for _, r in edited.iterrows(): 
-                        ws.update_cell(int(r['row_no']), idx, "تم التصديق")
-                    st.success("تم التصديق!"); st.rerun()
+                    idx_status = raw_data[0].index('الحالة') + 1
+                    for _, r in edited.iterrows():
+                        ws.update_cell(int(r['row_no']), idx_status, "تم التصديق")
+                    st.success("تم التصديق بنجاح!"); st.rerun()
                 st.markdown('</div>', unsafe_allow_html=True)
 
-                # --- منطق الفرز التلقائي للطباعة ---
+                # --- 2. منطق الفرز التلقائي للطباعة ---
                 unique_targets = edited['الوجهة'].unique()
                 
                 for target in unique_targets:
                     target_df = edited[edited['الوجهة'] == target]
                     print_time = datetime.now(beirut_tz).strftime('%Y-%m-%d %H:%M:%S')
                     
-                    # تمييز العنوان: إذا زبون يكتب اسمه، إذا سيارة يكتب اسم المندوب
+                    # عنوان الفاتورة بناءً على الوجهة
                     display_title = f"طلب خاص: {target}" if target != "جردة سيارة" else f"طلب سيارة: {selected_rep}"
                     
                     rows_html = "".join([f"<tr><td>{i+1}</td><td>{r.get('الكميه المطلوبه','')}</td><td style='text-align:right; padding-right:5px;'>{r.get('اسم الصنف','')}</td></tr>" for i, (_, r) in enumerate(target_df.iterrows())])
@@ -213,17 +217,12 @@ if client:
                     <p style="text-align:center; font-size:12px; margin-top:5px;">*** نهاية طلب ({target}) ***</p>
                     """
 
-                    # عرض الفواتير المفرزة (نسختين لكل زبون أو للسيارة)
                     st.markdown(f"""
                     <div class="print-container">
                         <div class="invoice-half">{invoice_html}</div>
                         <div class="invoice-half">{invoice_html}</div>
                     </div>
-                    <div class="no-print" style="margin-bottom:30px; border-bottom: 3px dashed #ccc; padding-top:20px;"></div>
+                    <div class="no-print" style="margin-bottom:30px; border-bottom: 2px dashed #ccc; padding-top:20px;"></div>
                     """, unsafe_allow_html=True)
                 
                 st.markdown("""<button onclick="window.print()" class="print-button-real no-print">🖨️ طباعة كل الطلبيات المفرزة</button>""", unsafe_allow_html=True)
-
-# --- هنا ينتهي التعديل، السطر التالي هو سطر الخروج الأصلي عندك ---
-if st.sidebar.button("خروج"):
-    st.session_state.clear(); st.rerun()
