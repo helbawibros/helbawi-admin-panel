@@ -169,7 +169,7 @@ if client:
             df.columns = df.columns.str.strip()
             df['row_no'] = range(2, len(df) + 2)
             
-                        pending = df[df['الحالة'] == "بانتظار التصديق"].copy()
+            pending = df[df['الحالة'] == "بانتظار التصديق"].copy()
             
             if not pending.empty:
                 st.markdown('<div class="no-print">', unsafe_allow_html=True)
