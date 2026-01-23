@@ -169,41 +169,61 @@ if client:
             df.columns = df.columns.str.strip()
             df['row_no'] = range(2, len(df) + 2)
             
-            pending = df[df['الحالة'] == "بانتظار التصديق"].copy()
+                        pending = df[df['الحالة'] == "بانتظار التصديق"].copy()
+            
             if not pending.empty:
                 st.markdown('<div class="no-print">', unsafe_allow_html=True)
-                edited = st.data_editor(pending[['row_no', 'اسم الصنف', 'الكميه المطلوبه']], hide_index=True, use_container_width=True)
+                
+                # إظهار العمود الخامس (الوجهة) إذا كان موجوداً
+                # ملاحظة: تأكد أن اسم العمود في جوجل شيت هو "الوجهة"
+                if 'الوجهة' not in pending.columns:
+                    pending['الوجهة'] = "جردة سيارة"
+                
+                # عرض البيانات للإدارة للتعديل قبل الطباعة
+                edited = st.data_editor(pending[['row_no', 'اسم الصنف', 'الكميه المطلوبه', 'الوجهة']], hide_index=True, use_container_width=True)
+                
                 if st.button("🚀 تصديق وإرسال النهائي", type="primary", use_container_width=True):
                     idx = raw_data[0].index('الحالة') + 1
-                    for _, r in edited.iterrows(): ws.update_cell(int(r['row_no']), idx, "تم التصديق")
+                    for _, r in edited.iterrows(): 
+                        ws.update_cell(int(r['row_no']), idx, "تم التصديق")
                     st.success("تم التصديق!"); st.rerun()
                 st.markdown('</div>', unsafe_allow_html=True)
 
-                # --- محتوى الفاتورة ---
-                print_time = datetime.now(beirut_tz).strftime('%Y-%m-%d %H:%M:%S')
-                rows_html = "".join([f"<tr><td>{i+1}</td><td>{r.get('الكميه المطلوبه','')}</td><td style='text-align:right; padding-right:5px;'>{r.get('اسم الصنف','')}</td></tr>" for i, (_, r) in enumerate(edited.iterrows())])
+                # --- منطق الفرز التلقائي للطباعة ---
+                unique_targets = edited['الوجهة'].unique()
                 
-                invoice_html = f"""
-                <div style="text-align:center; border-bottom:2px solid black; margin-bottom:5px;">
-                    <h2 style="margin:0; font-size:26px;">طلب: {selected_rep}</h2>
-                    <p style="margin:0; font-size:14px;">وقت الطباعة: {print_time}</p>
-                </div>
-                <table class="thermal-table">
-                    <thead><tr><th style="width:10%;">ت</th><th style="width:20%;">العدد</th><th>الصنف</th></tr></thead>
-                    <tbody>{rows_html}</tbody>
-                </table>
-                <p style="text-align:center; font-size:12px; margin-top:5px;">*** نهاية الطلب ***</p>
-                """
+                for target in unique_targets:
+                    target_df = edited[edited['الوجهة'] == target]
+                    print_time = datetime.now(beirut_tz).strftime('%Y-%m-%d %H:%M:%S')
+                    
+                    # تمييز العنوان: إذا زبون يكتب اسمه، إذا سيارة يكتب اسم المندوب
+                    display_title = f"طلب خاص: {target}" if target != "جردة سيارة" else f"طلب سيارة: {selected_rep}"
+                    
+                    rows_html = "".join([f"<tr><td>{i+1}</td><td>{r.get('الكميه المطلوبه','')}</td><td style='text-align:right; padding-right:5px;'>{r.get('اسم الصنف','')}</td></tr>" for i, (_, r) in enumerate(target_df.iterrows())])
+                    
+                    invoice_html = f"""
+                    <div style="text-align:center; border-bottom:2px solid black; margin-bottom:5px;">
+                        <h2 style="margin:0; font-size:24px;">{display_title}</h2>
+                        <p style="margin:0; font-size:14px;">المندوب: {selected_rep} | الوقت: {print_time}</p>
+                    </div>
+                    <table class="thermal-table">
+                        <thead><tr><th style="width:10%;">ت</th><th style="width:20%;">العدد</th><th>الصنف</th></tr></thead>
+                        <tbody>{rows_html}</tbody>
+                    </table>
+                    <p style="text-align:center; font-size:12px; margin-top:5px;">*** نهاية طلب ({target}) ***</p>
+                    """
 
-                # عرض الحاوية (مكررة مرتين للقص)
-                st.markdown(f"""
-                <div class="print-container">
-                    <div class="invoice-half">{invoice_html}</div>
-                    <div class="invoice-half">{invoice_html}</div>
-                </div>
-                """, unsafe_allow_html=True)
+                    # عرض الفواتير المفرزة (نسختين لكل زبون أو للسيارة)
+                    st.markdown(f"""
+                    <div class="print-container">
+                        <div class="invoice-half">{invoice_html}</div>
+                        <div class="invoice-half">{invoice_html}</div>
+                    </div>
+                    <div class="no-print" style="margin-bottom:30px; border-bottom: 3px dashed #ccc; padding-top:20px;"></div>
+                    """, unsafe_allow_html=True)
                 
-                st.markdown("""<button onclick="window.print()" class="print-button-real no-print">🖨️ طباعة النسخة المزدوجة A4</button>""", unsafe_allow_html=True)
+                st.markdown("""<button onclick="window.print()" class="print-button-real no-print">🖨️ طباعة كل الطلبيات المفرزة</button>""", unsafe_allow_html=True)
 
+# --- هنا ينتهي التعديل، السطر التالي هو سطر الخروج الأصلي عندك ---
 if st.sidebar.button("خروج"):
     st.session_state.clear(); st.rerun()
