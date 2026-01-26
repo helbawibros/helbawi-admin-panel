@@ -20,61 +20,53 @@ st.markdown("""
         cursor: pointer; font-weight: bold; font-size: 22px; margin-top: 20px;
     }
 
-    @media print {
-        /* 1. إخفاء شامل لكل شيء بـ Streamlit */
-        header, footer, .no-print, [data-testid="stHeader"], 
-        [data-testid="stSidebar"], [data-testid="stToolbar"],
-        .stButton, .stSelectbox, img, h1 {
+        @media print {
+        /* 1. إخفاء شامل لكل شيء بما فيهم الجدول العلوي (data_editor) واللوغو */
+        header, footer, .no-print, 
+        [data-testid="stHeader"], [data-testid="stSidebar"], [data-testid="stToolbar"],
+        [data-testid="stDataEditor"], /* هيدا السطر بيخفي الجدول اللي فوق */
+        h1, h2, img, .stMarkdownContainer p {
             display: none !important;
+            height: 0 !important;
+            margin: 0 !important;
+            padding: 0 !important;
         }
 
-        /* 2. أهم حركة: سحب محتوى الصفحة لأعلى نقطة (0 فراغ) */
+        /* 2. رفع كل محتوى الصفحة للأعلى لإلغاء الفراغ الأبيض */
         .stApp {
             position: absolute !important;
-            top: -60px !important; /* منسحب الصفحة لفوق لتمحي فراغ اللوغو */
+            top: -220px !important; /* جرب -220 أو -250 لحد ما تلمس السقف تماماً */
             left: 0 !important;
             width: 100% !important;
-        }
-        
-        .main .block-container {
-            padding-top: 0 !important;
-            margin-top: 0 !important;
+            margin: 0 !important;
+            padding: 0 !important;
         }
 
-        /* 3. تنسيق النسختين يمين وشمال */
+        .main .block-container {
+            padding: 0 !important;
+            margin: 0 !important;
+        }
+
+        /* 3. تنسيق الفواتير المفرزة لتظهر هي فقط */
         .print-container {
             visibility: visible !important;
             display: flex !important;
             flex-direction: row !important;
             justify-content: space-around !important;
             width: 100% !important;
-            direction: rtl !important;
-            margin: 0 !important;
-            padding: 0 !important;
+            margin-top: 0 !important;
         }
 
         .invoice-half {
-            width: 47% !important;
-            padding: 10px !important;
+            width: 48% !important;
             border: 2px dashed black !important;
+            padding: 10px !important;
+            visibility: visible !important;
         }
 
-        .thermal-table {
-            width: 100% !important;
-            border-collapse: collapse !important;
-            border: 2px solid black !important;
-        }
-        
-        .thermal-table th, .thermal-table td {
-            border: 2px solid black !important;
-            padding: 5px !important;
-            text-align: center !important;
-            font-size: 20px !important; /* الخط اللي طلبته */
-            font-weight: bold !important;
-            color: black !important;
-        }
+        @page { size: A4 landscape; margin: 0 !important; }
+    }
 
-        @page { size: A4 landscape; margin: 5mm !important; }
     }
     </style>
 """, unsafe_allow_html=True)
