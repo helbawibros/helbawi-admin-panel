@@ -7,7 +7,7 @@ import os
 from datetime import datetime
 import pytz 
 
-# --- 1. إعدادات الصفحة وتنسيق الطباعة الإجباري ---
+# --- 1. إعدادات الصفحة وتنسيق الطباعة الإجباري (A4 Double) ---
 st.set_page_config(page_title="إدارة حلباوي - A4 Double", layout="wide")
 beirut_tz = pytz.timezone('Asia/Beirut')
 
@@ -21,45 +21,33 @@ st.markdown("""
         cursor: pointer; font-weight: bold; font-size: 22px; margin-top: 20px;
     }
 
-    /* --- كود الطباعة الإجباري (Force Top) --- */
+    /* --- كود الطباعة الإجباري --- */
     @media print {
-        /* 1. إخفاء كل شيء في Streamlit تماماً */
-        div[data-testid="stToolbar"], 
-        header, footer, 
-        .no-print,
-        [data-testid="stSidebar"], 
-        [data-testid="stHeader"],
-        .stApp > header {
+        /* إخفاء كل زوائد ستريمليت واللوغو والكبسات */
+        div[data-testid="stToolbar"], header, footer, .no-print,
+        [data-testid="stSidebar"], [data-testid="stHeader"], .stApp > header {
             display: none !important;
-            height: 0 !important;
         }
 
-        /* 2. تنظيف مساحة العمل */
-        .stApp {
-            position: absolute !important;
-            top: 0 !important;
-            margin: 0 !important;
-            padding: 0 !important;
-        }
+        .stApp { position: absolute !important; top: 0 !important; margin: 0 !important; padding: 0 !important; }
 
-        /* 3. إظهار الحاوية في أعلى الورقة حصراً */
+        /* إعداد الصفحة A4 بالعرض لتقسيمها نصين */
+        @page { size: A4 landscape; margin: 10mm !important; }
+
         .print-container {
             visibility: visible !important;
-            position: absolute !important;
-            top: 0mm !important; /* بداية الورقة */
-            left: 0 !important;
-            width: 100% !important;
             display: flex !important;
             flex-direction: row !important;
-            justify-content: space-around !important;
+            justify-content: space-between !important;
+            width: 100% !important;
             direction: rtl !important;
             background: white !important;
         }
 
         .invoice-half {
-            width: 46% !important;
+            width: 48% !important;
             padding: 10px !important;
-            border: 1px dashed #444 !important;
+            border: 2px dashed #000 !important; /* خط القص */
         }
 
         .thermal-table {
@@ -70,34 +58,21 @@ st.markdown("""
         
         .thermal-table th, .thermal-table td {
             border: 2px solid black !important;
-            padding: 5px !important;
+            padding: 8px !important;
             text-align: center !important;
-            font-size: 18px !important; /* حجم ممتاز لـ 30 صنف */
+            font-size: 20px !important; /* الخط المطلوب 20 */
             font-weight: bold !important;
             color: black !important;
         }
-
-        @page { 
-            size: A4 landscape; 
-            margin: 0 !important; /* إلغاء هوامش المتصفح */
-        }
     }
 
-    /* تنسيق العرض على الشاشة */
-    .print-container {
-        display: flex;
-        justify-content: space-around;
-        direction: rtl;
-        margin-top: 20px;
-        background: #f9f9f9;
-        padding: 10px;
-        border: 1px solid #ddd;
-    }
+    /* التنسيق على الشاشة */
+    .print-container { display: flex; justify-content: space-around; direction: rtl; margin-top: 20px; }
     .invoice-half { width: 48%; border: 1px solid #ccc; padding: 10px; background: white; }
     </style>
 """, unsafe_allow_html=True)
 
-# --- 2. دالة اللوغو (استرجاع الصورة الأساسية) ---
+# --- 2. دالة اللوغو (مغلفة بـ no-print عشان تختفي بالطباعة) ---
 def show_full_logo():
     st.markdown('<div class="no-print">', unsafe_allow_html=True)
     found = False
@@ -135,8 +110,10 @@ client = get_client()
 if client:
     spreadsheet = client.open_by_key("1-Abj-Kvbe02az8KYZfQL0eal2arKw_wgjVQdJX06IA0")
     delegates = [sh.title for sh in spreadsheet.worksheets() if sh.title not in ["طلبات", "الأسعار", "البيانات", "الزبائن", "Sheet1"]]
+    
     show_full_logo()
     
+    # كل عناصر التحكم مغلفة بـ no-print
     st.markdown('<div class="no-print">', unsafe_allow_html=True)
     if st.button("🔔 فحص الإشعارات الجديدة", use_container_width=True):
         st.session_state.orders = []
@@ -145,7 +122,6 @@ if client:
             data = ws.get_all_values()
             if len(data) > 1:
                 df_temp = pd.DataFrame(data[1:], columns=data[0])
-                df_temp.columns = df_temp.columns.str.strip()
                 if 'الحالة' in df_temp.columns:
                     p = df_temp[df_temp['الحالة'] == "بانتظار التصديق"]
                     if not p.empty:
@@ -156,10 +132,10 @@ if client:
             if st.button(f"📦 طلب من: {o['name']} | {o['time']}", key=f"btn_{o['name']}", use_container_width=True):
                 st.session_state.active_rep = o['name']
                 st.rerun()
-    st.markdown('</div>', unsafe_allow_html=True)
 
     active = st.session_state.get('active_rep', "-- اختر مندوب --")
     selected_rep = st.selectbox("المندوب المختار:", ["-- اختر مندوب --"] + delegates, index=(delegates.index(active)+1 if active in delegates else 0))
+    st.markdown('</div>', unsafe_allow_html=True)
 
     if selected_rep != "-- اختر مندوب --":
         ws = spreadsheet.worksheet(selected_rep)
@@ -169,23 +145,16 @@ if client:
             df.columns = df.columns.str.strip()
             df['row_no'] = range(2, len(df) + 2)
             
-                        # 1. جلب البيانات والتأكد من وجود الأعمدة
             pending = df[df['الحالة'] == "بانتظار التصديق"].copy()
             
             if not pending.empty:
-                # 1. تنظيف البيانات وجلب اسم الزبون بطريقة ذكية
                 if 'اسم الزبون' in pending.columns:
-                    # تحويل القيم إلى نص وتنظيفها من الـ nan والمسافات
                     pending['الوجهة'] = pending['اسم الزبون'].astype(str).replace(['nan', '', 'None'], 'جردة سيارة').str.strip()
                 else:
-                    # إذا المندوب ما بعت عمود الاسم أصلاً
                     pending['الوجهة'] = "جردة سيارة"
 
                 st.markdown('<div class="no-print">', unsafe_allow_html=True)
-                # 2. عرض المحرر للإدارة (تأكد من ترتيب الأعمدة)
-                # عرضنا 'الوجهة' بدل 'اسم الزبون' لأننا نظفناها فوق
                 edited = st.data_editor(pending[['row_no', 'اسم الصنف', 'الكميه المطلوبه', 'الوجهة']], hide_index=True, use_container_width=True)
-
                 
                 if st.button("🚀 تصديق وإرسال النهائي", type="primary", use_container_width=True):
                     idx_status = raw_data[0].index('الحالة') + 1
@@ -194,36 +163,36 @@ if client:
                     st.success("تم التصديق بنجاح!"); st.rerun()
                 st.markdown('</div>', unsafe_allow_html=True)
 
-                # --- 2. منطق الفرز التلقائي للطباعة ---
                 unique_targets = edited['الوجهة'].unique()
                 
                 for target in unique_targets:
                     target_df = edited[edited['الوجهة'] == target]
                     print_time = datetime.now(beirut_tz).strftime('%Y-%m-%d %H:%M:%S')
+                    display_title = f"طلب: {target}" if target != "جردة سيارة" else f"جردة: {selected_rep}"
                     
-                    # عنوان الفاتورة بناءً على الوجهة
-                    display_title = f"طلب خاص: {target}" if target != "جردة سيارة" else f"طلب سيارة: {selected_rep}"
+                    # إنشاء أسطر الجدول
+                    rows_html = "".join([f"<tr><td>{i+1}</td><td>{r.get('الكميه المطلوبه','')}</td><td style='text-align:right; padding-right:10px;'>{r.get('اسم الصنف','')}</td></tr>" for i, (_, r) in enumerate(target_df.iterrows())])
                     
-                    rows_html = "".join([f"<tr><td>{i+1}</td><td>{r.get('الكميه المطلوبه','')}</td><td style='text-align:right; padding-right:5px;'>{r.get('اسم الصنف','')}</td></tr>" for i, (_, r) in enumerate(target_df.iterrows())])
-                    
-                    invoice_html = f"""
-                    <div style="text-align:center; border-bottom:2px solid black; margin-bottom:5px;">
-                        <h2 style="margin:0; font-size:24px;">{display_title}</h2>
-                        <p style="margin:0; font-size:14px;">المندوب: {selected_rep} | الوقت: {print_time}</p>
+                    # قالب النسخة الواحدة
+                    single_invoice = f"""
+                    <div style="text-align:center; border-bottom:2px solid black; margin-bottom:10px; padding-bottom:5px;">
+                        <h1 style="margin:0; font-size:28px;">{display_title}</h1>
+                        <p style="margin:5px 0; font-size:18px; font-weight:bold;">المندوب: {selected_rep} | التاريخ: {print_time}</p>
                     </div>
                     <table class="thermal-table">
-                        <thead><tr><th style="width:10%;">ت</th><th style="width:20%;">العدد</th><th>الصنف</th></tr></thead>
+                        <thead><tr><th style="width:10%;">ت</th><th style="width:20%;">العدد</th><th>اسم الصنف والبيان</th></tr></thead>
                         <tbody>{rows_html}</tbody>
                     </table>
-                    <p style="text-align:center; font-size:12px; margin-top:5px;">*** نهاية طلب ({target}) ***</p>
+                    <div style="margin-top:10px; text-align:center; font-weight:bold; font-size:16px;">*** نسخة (تحضير / فواتير) ***</div>
                     """
 
+                    # عرض النسختين جنب بعض للـ A4 Landscape
                     st.markdown(f"""
                     <div class="print-container">
-                        <div class="invoice-half">{invoice_html}</div>
-                        <div class="invoice-half">{invoice_html}</div>
+                        <div class="invoice-half">{single_invoice}</div>
+                        <div class="invoice-half">{single_invoice}</div>
                     </div>
-                    <div class="no-print" style="margin-bottom:30px; border-bottom: 2px dashed #ccc; padding-top:20px;"></div>
+                    <div class="no-print" style="page-break-after: always; border-bottom: 2px dashed #ccc; margin: 30px 0;"></div>
                     """, unsafe_allow_html=True)
                 
-                st.markdown("""<button onclick="window.print()" class="print-button-real no-print">🖨️ طباعة كل الطلبيات المفرزة</button>""", unsafe_allow_html=True)
+                st.markdown("""<button onclick="window.print()" class="print-button-real no-print">🖨️ طباعة الفواتير المفرزة</button>""", unsafe_allow_html=True)
