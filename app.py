@@ -8,87 +8,94 @@ from datetime import datetime
 import pytz 
 import time
 
-# --- 1. إعدادات الصفحة والـ CSS بمقاسات السنتيمتر ---
-st.set_page_config(page_title="إدارة حلباوي - مقاسات دقيقة", layout="wide")
+# --- 1. إعدادات الصفحة والـ CSS الاحترافي (تنظيف كامل) ---
+st.set_page_config(page_title="إدارة حلباوي - نسخة المقاسات الدقيقة", layout="wide")
 beirut_tz = pytz.timezone('Asia/Beirut')
 
 st.markdown("""
     <style>
+    /* إخفاء محتوى الطباعة عن الشاشة العادية نهائياً لمنع ظهور الكود */
+    .printable-content { display: none; }
+    
     .print-button-real {
         display: block; width: 100%; height: 60px; 
         background-color: #28a745; color: white !important; 
         border-radius: 10px; cursor: pointer; font-weight: bold; font-size: 22px; 
         margin-top: 20px; text-align: center; line-height: 60px; border: none;
     }
-    @media screen { .printable-content { display: none; } }
+
     @media print {
+        /* إخفاء عناصر الموقع */
         [data-testid="stHeader"], [data-testid="stSidebar"], [data-testid="stToolbar"],
         footer, header, .no-print, .stButton, [data-testid="stDataEditor"], .stSelectbox {
             display: none !important;
         }
-        .printable-content {
-            display: block !important; visibility: visible !important;
-            position: absolute !important; top: 0 !important; left: 0 !important;
-            width: 100% !important; margin: 0 !important; padding: 0 !important;
+        
+        /* إظهار المحتوى المخصص للطباعة فقط وبدقة */
+        .printable-content { 
+            display: block !important; 
+            visibility: visible !important;
+            position: absolute !important;
+            top: 0 !important; left: 0 !important; width: 100% !important;
         }
-        @page { size: A4 landscape; margin: 5mm !important; }
+
+        @page { size: A4 landscape; margin: 8mm !important; }
         
         .print-row {
             display: flex !important; flex-direction: row !important;
-            justify-content: space-around !important; width: 100% !important;
-            direction: rtl !important;
+            justify-content: space-between !important; width: 100% !important;
+            direction: rtl !important; gap: 5mm !important;
+            page-break-inside: avoid !important;
+            margin-bottom: 10mm !important;
         }
 
         .invoice-box {
-            width: 10.5cm !important; /* نصف عرض الـ A4 تقريباً */
-            border: 1px dashed #000 !important;
+            width: 48% !important; /* لضمان نسختين جنب بعض بالظبط */
+            border: 1px dashed black !important;
             padding: 5px !important;
             box-sizing: border-box !important;
         }
 
-        table { width: 10cm !important; border-collapse: collapse; margin: auto; }
+        table { width: 10cm !important; border-collapse: collapse; margin: 5px auto; }
         
-        /* المقاسات اللي طلبتها بالظبط */
-        .col-id { width: 2cm !important; }
-        .col-qty { width: 2cm !important; }
-        .col-name { width: 6cm !important; }
+        /* المقاسات اللي طلبتها بالظبط بالسم */
+        .col-id { width: 2cm !important; text-align: center !important; }
+        .col-qty { width: 2cm !important; text-align: center !important; }
+        .col-name { width: 6cm !important; text-align: right !important; padding-right: 5px !important; }
 
         th, td { 
-            border: 1.5px solid black !important; 
-            padding: 3px !important; 
-            text-align: center !important; 
+            border: 2px solid black !important; 
+            padding: 4px !important; 
             font-size: 16px !important; 
             font-weight: bold !important;
-            overflow: hidden;
-            white-space: nowrap;
+            color: black !important;
         }
-        h2 { font-size: 20px; margin: 2px 0; text-align: center; }
-        .info-bar { display: flex; justify-content: space-between; font-size: 14px; margin-bottom: 5px; }
+        h2 { font-size: 18px; margin: 0; text-align: center; }
+        .info-bar { display: flex; justify-content: space-between; font-size: 14px; margin-bottom: 2px; }
     }
     </style>
 """, unsafe_allow_html=True)
 
 # --- 2. الدخول واللوغو ---
 def show_full_logo():
-    found = False
     for name in ["Logo.JPG", "logo.jpg", "Logo.png"]:
         if os.path.exists(name):
             st.image(name, use_container_width=True)
-            found = True; break
-    if not found: st.markdown("<h1 style='text-align:center;' class='no-print'>PRIMUM QUALITY</h1>", unsafe_allow_html=True)
+            return
+    st.markdown("<h1 style='text-align:center;'>PRIMUM QUALITY</h1>", unsafe_allow_html=True)
 
 if 'admin_logged_in' not in st.session_state: st.session_state.admin_logged_in = False
 if not st.session_state.admin_logged_in:
     show_full_logo()
-    col2 = st.columns([1, 2, 1])[1]
-    with col2:
+    col = st.columns([1, 2, 1])[1]
+    with col:
         pwd = st.text_input("كلمة السر", type="password")
         if st.button("دخول", use_container_width=True):
             if pwd == "Hlb_Admin_2024":
                 st.session_state.admin_logged_in = True; st.rerun()
     st.stop()
 
-# --- 3. الربط الذكي ---
+# --- 3. الربط مع جوجل شيت ---
 @st.cache_resource
 def get_client():
     try:
@@ -113,10 +120,10 @@ if client:
                 ws = spreadsheet.worksheet(rep)
                 data = ws.get_all_values()
                 if len(data) > 1:
-                    df_temp = pd.DataFrame(data[1:], columns=data[0])
-                    df_temp.columns = df_temp.columns.str.strip()
-                    if 'الحالة' in df_temp.columns:
-                        p = df_temp[df_temp['الحالة'] == "بانتظار التصديق"]
+                    df_t = pd.DataFrame(data[1:], columns=data[0])
+                    df_t.columns = df_t.columns.str.strip()
+                    if 'الحالة' in df_t.columns:
+                        p = df_t[df_t['الحالة'] == "بانتظار التصديق"]
                         if not p.empty:
                             st.session_state.orders.append({"name": rep, "time": p.iloc[0].get('التاريخ و الوقت', '---')})
             except: continue
@@ -126,8 +133,7 @@ if client:
             if st.button(f"📦 طلب من: {o['name']} | 🕒 أرسل: {o['time']}", key=f"btn_{o['name']}", use_container_width=True):
                 st.session_state.active_rep = o['name']; st.rerun()
     
-    active = st.session_state.get('active_rep', "-- اختر مندوب --")
-    selected_rep = st.selectbox("المندوب المختار:", ["-- اختر مندوب --"] + delegates, index=(delegates.index(active)+1 if active in delegates else 0))
+    selected_rep = st.selectbox("المندوب المختار:", ["-- اختر مندوب --"] + delegates, index=(delegates.index(st.session_state.get('active_rep', ""))+1 if st.session_state.get('active_rep', "") in delegates else 0))
     st.markdown('</div>', unsafe_allow_html=True)
 
     if selected_rep != "-- اختر مندوب --":
@@ -141,8 +147,8 @@ if client:
                 pending = df[df['الحالة'] == "بانتظار التصديق"].copy()
                 
                 if not pending.empty:
-                    pending['الوجهة'] = pending['اسم الزبون'].astype(str).replace(['nan', '', 'None'], 'جردة سيارة').str.strip() if 'اسم الزبون' in pending.columns else "جردة سيارة"
-
+                    pending['الوجهة'] = pending['اسم الزبون'].astype(str).replace(['nan', '', 'None'], 'جردة سيارة').str.strip()
+                    
                     st.markdown('<div class="no-print">', unsafe_allow_html=True)
                     edited = st.data_editor(pending[['row_no', 'اسم الصنف', 'الكميه المطلوبه', 'الوجهة']], hide_index=True, use_container_width=True)
                     
@@ -152,40 +158,28 @@ if client:
                             try:
                                 ws.update_cell(int(r['row_no']), idx_status, "تم التصديق")
                                 time.sleep(0.2)
-                            except: st.error(f"خطأ في سطر {r['row_no']}")
-                        st.success("تم التصديق!"); time.sleep(1); st.rerun()
+                            except: pass
+                        st.success("تم التصديق!"); time.sleep(0.5); st.rerun()
                     st.markdown('</div>', unsafe_allow_html=True)
 
-                    # --- منطقة الطباعة بالقياسات المطلوبة ---
-                    st.markdown('<div class="printable-content">', unsafe_allow_html=True)
+                    # --- هندسة الطباعة (مخفية عن الشاشة وتظهر فقط بالطباعة) ---
                     print_now = datetime.now(beirut_tz).strftime('%Y-%m-%d | %I:%M %p')
-                    
+                    all_invoices_html = ""
                     for target in edited['الوجهة'].unique():
-                        target_df = edited[edited['الوجهة'] == target]
-                        display_title = f"طلب: {target}" if target != "جردة سيارة" else f"جردة: {selected_rep}"
+                        t_df = edited[edited['الوجهة'] == target]
+                        rows = "".join([f"<tr><td class='col-id'>{i+1}</td><td class='col-qty'>{r['الكميه المطلوبه']}</td><td class='col-name'>{r['اسم الصنف']}</td></tr>" for i, (_, r) in enumerate(t_df.iterrows())])
                         
-                        # بناء الأسطر مع الكلاسات للتحكم بالمقاسات
-                        rows_html = "".join([
-                            f"<tr><td class='col-id'>{i+1}</td><td class='col-qty'>{r['الكميه المطلوبه']}</td><td class='col-name' style='text-align:right;'>{r['اسم الصنف']}</td></tr>" 
-                            for i, (_, r) in enumerate(target_df.iterrows())
-                        ])
-                        
-                        invoice_html = f"""
+                        inv = f"""
                         <div class="invoice-box">
-                            <h2>{display_title}</h2>
-                            <div class="info-bar">
-                                <span>المندوب: {selected_rep}</span><span>{print_now}</span>
-                            </div>
+                            <h2>{"طلب: " + target if target != "جردة سيارة" else "جردة: " + selected_rep}</h2>
+                            <div class="info-bar"><span>المندوب: {selected_rep}</span><span>{print_now}</span></div>
                             <table>
-                                <thead>
-                                    <tr><th class="col-id">ت</th><th class="col-qty">العدد</th><th class="col-name">اسم الصنف</th></tr>
-                                </thead>
-                                <tbody>{rows_html}</tbody>
+                                <thead><tr><th class="col-id">ت</th><th class="col-qty">العدد</th><th class="col-name">اسم الصنف</th></tr></thead>
+                                <tbody>{rows}</tbody>
                             </table>
-                        </div>
-                        """
-                        # وضع الفاتورتين جنب بعض
-                        st.markdown(f'<div class="print-row">{invoice_html}{invoice_html}</div>', unsafe_allow_html=True)
+                        </div>"""
+                        all_invoices_html += f'<div class="print-row">{inv}{inv}</div>'
                     
-                    st.markdown('</div>', unsafe_allow_html=True)
-                    st.markdown('<button onclick="window.print()" class="print-button-real no-print">🖨️ طباعة بمقاسات (2+2+6 سم)</button>', unsafe_allow_html=True)
+                    # هذا الجزء هو اللي بيطبع النسخ جنب بعض
+                    st.markdown(f'<div class="printable-content">{all_invoices_html}</div>', unsafe_allow_html=True)
+                    st.markdown('<button onclick="window.print()" class="print-button-real no-print">🖨️ طباعة الفواتير (2+2+6 سم)</button>', unsafe_allow_html=True)
