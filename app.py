@@ -12,61 +12,81 @@ st.set_page_config(page_title="إدارة حلباوي - الكامل", layout="
 beirut_tz = pytz.timezone('Asia/Beirut')
 
 # CSS لإخفاء كل شيء وقت الطباعة وتنسيق النسختين
+import streamlit as st
+
+# --- 1. التنسيق (النسخة الإجبارية) ---
 st.markdown("""
     <style>
-    /* تنسيق زر الطباعة ليظهر بوضوح على الشاشة */
-    .print-btn-container {
-        display: block;
-        width: 100%;
-        padding: 20px;
-        background-color: #28a745;
-        color: white !important;
-        text-align: center;
-        border-radius: 15px;
-        font-size: 25px;
-        font-weight: bold;
-        cursor: pointer;
-        text-decoration: none;
-        margin-bottom: 20px;
-        border: 2px solid white;
-    }
-
+    /* تنسيق الجداول على الشاشة */
+    .print-container { display: block; direction: rtl; }
+    
     @media print {
-        /* 1. إخفاء العناصر الخارجية فقط */
-        header, footer, [data-testid="stHeader"], [data-testid="stSidebar"], 
-        [data-testid="stToolbar"], .no-print, button {
+        /* إخفاء كل شيء حرفياً ما عدا منطقة الطباعة */
+        body * { visibility: hidden !important; }
+        .printable-area, .printable-area * { visibility: visible !important; }
+        
+        /* سحب منطقة الطباعة لأعلى الورقة تماماً */
+        .printable-area {
+            position: absolute !important;
+            left: 0 !important;
+            top: 0 !important;
+            width: 100% !important;
+            margin: 0 !important;
+            padding: 0 !important;
+        }
+
+        /* إخفاء زوائد Streamlit اللعينة */
+        header, footer, [data-testid="stHeader"], [data-testid="stSidebar"], .stButton {
             display: none !important;
         }
 
-        /* 2. إجبار الجداول والحاوية على الظهور */
-        .print-container, .print-container *, .thermal-table, .thermal-table * {
-            visibility: visible !important;
-            display: block !important;
-        }
-        
-        /* 3. تنظيف الهوامش */
-        .stApp { position: absolute !important; top: 0 !important; width: 100% !important; }
-        .main .block-container { padding: 0 !important; margin: 0 !important; }
-        
         @page { size: A4 landscape; margin: 5mm !important; }
 
-        /* تنسيق النسختين يمين وشمال */
-        .print-container {
+        .print-row {
             display: flex !important;
             flex-direction: row !important;
             justify-content: space-between !important;
             width: 100% !important;
-            direction: rtl !important;
         }
-        .invoice-half { width: 48% !important; border: 2px dashed black !important; padding: 10px !important; }
-        .thermal-table { display: table !important; width: 100% !important; border-collapse: collapse !important; }
-        .thermal-table th, .thermal-table td { border: 2px solid black !important; padding: 8px !important; font-size: 20px !important; font-weight: bold !important; }
+        .invoice-box {
+            width: 48% !important;
+            border: 2px dashed black !important;
+            padding: 10px !important;
+        }
+        table { width: 100% !important; border-collapse: collapse !important; }
+        th, td { border: 2px solid black !important; padding: 5px !important; font-size: 18px !important; font-weight: bold !important; text-align: center !important; }
     }
     </style>
 """, unsafe_allow_html=True)
 
-# --- زر الطباعة (استخدم هاد الرابط حصراً) ---
-st.markdown('<a href="javascript:window.print()" class="no-print print-btn-container">🖨️ اضغط هنا لفتح نافذة الطباعة</a>', unsafe_allow_html=True)
+# --- 2. البرنامج (على الشاشة) ---
+# ... (هنا كود المندوبين والفحص والجدول الأصلي) ...
+# ملاحظة: تأكد أن كود الطباعة يكون داخل شرط "if selected_rep != '-- اختر مندوب --':"
+
+if st.button("🖨️ تجهيز الطباعة الآن"):
+    st.info("💡 تم تفعيل نمط الطباعة. الآن اضغط Ctrl + P")
+    
+    # --- 3. منطقة الطباعة (هيدي اللي رح تظهر بالورقة بس) ---
+    st.markdown('<div class="printable-area">', unsafe_allow_html=True)
+    
+    # مثال على المحتوى (كرره حسب الداتا اللي عندك)
+    content = """
+    <div class="print-row">
+        <div class="invoice-box">
+            <center><h3>طلب: زبون تجريبي</h3></center>
+            <table><tr><th>ت</th><th>العدد</th><th>الصنف</th></tr><tr><td>1</td><td>5</td><td>صنف 1</td></tr></table>
+        </div>
+        <div class="invoice-half" style="width:48%; border:2px dashed black; padding:10px;">
+            <center><h3>طلب: زبون تجريبي</h3></center>
+            <table><tr><th>ت</th><th>العدد</th><th>الصنف</th></tr><tr><td>1</td><td>5</td><td>صنف 1</td></tr></table>
+        </div>
+    </div>
+    """
+    st.markdown(content, unsafe_allow_html=True)
+    st.markdown('</div>', unsafe_allow_html=True)
+
+
+
 
 
 
