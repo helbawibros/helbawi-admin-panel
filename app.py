@@ -13,6 +13,7 @@ beirut_tz = pytz.timezone('Asia/Beirut')
 
 st.markdown("""
     <style>
+    /* تنسيق زر الطباعة في البرنامج */
     .print-button-real {
         display: block; width: 100%; height: 60px; 
         background-color: #28a745; color: white !important; 
@@ -20,15 +21,18 @@ st.markdown("""
         cursor: pointer; font-weight: bold; font-size: 22px; margin-top: 20px;
     }
 
+    /* كود الطباعة الإجباري - إخفاء كل شيء فوق الجداول */
     @media print {
-        /* إخفاء كل شيء بـ Streamlit واللوغو والكبسات */
-        div[data-testid="stToolbar"], header, footer, .no-print,
-        [data-testid="stSidebar"], [data-testid="stHeader"], .stApp > header {
+        header, footer, .no-print, [data-testid="stHeader"], 
+        [data-testid="stSidebar"], [data-testid="stToolbar"],
+        .stButton, .stSelectbox, .stMarkdownContainer h1, img {
             display: none !important;
             height: 0 !important;
         }
 
+        /* سحب المحتوى لأعلى الورقة تماماً */
         .stApp { position: absolute !important; top: 0 !important; margin: 0 !important; padding: 0 !important; }
+        .main .block-container { padding: 0 !important; }
 
         @page { size: A4 landscape; margin: 5mm !important; }
 
@@ -82,8 +86,8 @@ def show_full_logo():
 if 'admin_logged_in' not in st.session_state: st.session_state.admin_logged_in = False
 if not st.session_state.admin_logged_in:
     show_full_logo()
-    col = st.columns([1, 2, 1])[1]
-    with col:
+    col2 = st.columns([1, 2, 1])[1]
+    with col2:
         pwd = st.text_input("كلمة السر", type="password")
         if st.button("دخول", use_container_width=True):
             if pwd == "Hlb_Admin_2024":
@@ -97,7 +101,7 @@ def get_client():
         info = json.loads(st.secrets["gcp_service_account"]["json_data"].strip(), strict=False)
         creds = Credentials.from_service_account_info(info, scopes=["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"])
         return gspread.authorize(creds)
-    except: return None
+    except Exception: return None
 
 client = get_client()
 
@@ -138,6 +142,7 @@ if client:
             pending = df[df['الحالة'] == "بانتظار التصديق"].copy()
             
             if not pending.empty:
+                # تجهيز الوجهات
                 if 'اسم الزبون' in pending.columns:
                     pending['الوجهة'] = pending['اسم الزبون'].astype(str).replace(['nan', '', 'None'], 'جردة سيارة').str.strip()
                 else:
@@ -153,7 +158,7 @@ if client:
                     st.success("تم التصديق بنجاح!"); st.rerun()
                 st.markdown('</div>', unsafe_allow_html=True)
 
-                # --- 5. منطق الطباعة النهائي (يمين وشمال) ---
+                # --- 5. منطق الطباعة النهائي ---
                 unique_targets = edited['الوجهة'].unique()
                 for target in unique_targets:
                     target_df = edited[edited['الوجهة'] == target]
@@ -165,7 +170,7 @@ if client:
                     invoice_content = f"""
                     <div style="text-align:center; border-bottom:2px solid black; margin-bottom:10px;">
                         <h1 style="margin:0; font-size:26px;">{display_title}</h1>
-                        <p style="margin:5px 0; font-size:18px;">المندوب: {selected_rep} | {print_time}</p>
+                        <p style="margin:5px 0; font-size:18px; font-weight:bold;">المندوب: {selected_rep} | التاريخ: {print_time}</p>
                     </div>
                     <table class="thermal-table">
                         <thead><tr><th style="width:10%;">ت</th><th style="width:20%;">العدد</th><th>اسم الصنف والبيان</th></tr></thead>
@@ -179,7 +184,7 @@ if client:
                         <div class="invoice-half">{invoice_content}</div>
                         <div class="invoice-half">{invoice_content}</div>
                     </div>
-                    <div class="no-print" style="page-break-after: always; border-bottom: 2px dashed #ccc; margin: 20px 0;"></div>
+                    <div class="no-print" style="page-break-after: always; border-bottom: 2px dashed #ccc; margin: 30px 0;"></div>
                     """, unsafe_allow_html=True)
                 
-                st.markdown("""<button onclick="window.print()" class="print-button-real no-print">🖨️ طباعة الفواتير</button>""", unsafe_allow_html=True)
+                st.markdown("""<button onclick="window.print()" class="print-button-real no-print">🖨️ طباعة الفواتير المفرزة</button>""", unsafe_allow_html=True)
