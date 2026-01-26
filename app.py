@@ -13,89 +13,53 @@ beirut_tz = pytz.timezone('Asia/Beirut')
 
 st.markdown("""
     <style>
-    /* تنسيق زر الطباعة في البرنامج */
-    .print-button-real {
-        display: block; width: 100%; height: 60px; 
-        background-color: #28a745; color: white !important; 
-        border: 2px solid #ffffff; border-radius: 10px; 
-        cursor: pointer; font-weight: bold; font-size: 22px; margin-top: 20px;
-    }
-
-    /* --- كود الطباعة الإجباري (Force Top) --- */
     @media print {
-        /* 1. إخفاء كل شيء في Streamlit تماماً */
-        div[data-testid="stToolbar"], 
-        header, footer, 
-        .no-print,
-        [data-testid="stSidebar"], 
-        [data-testid="stHeader"],
-        .stApp > header {
+        /* إخفاء كل زوائد الموقع */
+        [data-testid="stHeader"], [data-testid="stSidebar"], footer, header, .stButton, .no-print {
             display: none !important;
-            height: 0 !important;
         }
 
-        /* 2. تنظيف مساحة العمل */
-        .stApp {
-            position: absolute !important;
-            top: 0 !important;
-            margin: 0 !important;
-            padding: 0 !important;
-        }
-
-        /* 3. إظهار الحاوية في أعلى الورقة حصراً */
-        .print-container {
+        /* إجبار منطقة الطباعة على الظهور بالكامل وبأعلى الصفحة */
+        .printable-content {
+            display: block !important;
             visibility: visible !important;
             position: absolute !important;
-            top: 0mm !important; /* بداية الورقة */
+            top: 0 !important;
             left: 0 !important;
             width: 100% !important;
+        }
+
+        /* إجبار النصوص والعناوين على الظهور باللون الأسود الواضح */
+        h2, span, td, th {
+            color: black !important;
+            -webkit-print-color-adjust: exact !important;
+            print-color-adjust: exact !important;
+        }
+
+        @page { size: A4 landscape; margin: 0 !important; }
+
+        .print-row {
             display: flex !important;
             flex-direction: row !important;
-            justify-content: space-around !important;
-            direction: rtl !important;
-            background: white !important;
-        }
-
-        .invoice-half {
-            width: 46% !important;
-            padding: 10px !important;
-            border: 1px dashed #444 !important;
-        }
-
-        .thermal-table {
+            justify-content: space-between !important;
             width: 100% !important;
-            border-collapse: collapse !important;
-            border: 2px solid black !important;
-        }
-        
-        .thermal-table th, .thermal-table td {
-            border: 2px solid black !important;
-            padding: 5px !important;
-            text-align: center !important;
-            font-size: 18px !important; /* حجم ممتاز لـ 30 صنف */
-            font-weight: bold !important;
-            color: black !important;
+            margin-bottom: 20px !important;
+            page-break-inside: avoid !important;
         }
 
-        @page { 
-            size: A4 landscape; 
-            margin: 0 !important; /* إلغاء هوامش المتصفح */
+        .invoice-box {
+            width: 48% !important;
+            border: 2px dashed black !important;
+            padding: 10px !important;
+            box-sizing: border-box !important;
         }
-    }
 
-    /* تنسيق العرض على الشاشة */
-    .print-container {
-        display: flex;
-        justify-content: space-around;
-        direction: rtl;
-        margin-top: 20px;
-        background: #f9f9f9;
-        padding: 10px;
-        border: 1px solid #ddd;
+        table { width: 100% !important; border-collapse: collapse !important; }
+        th, td { border: 2px solid black !important; padding: 4px !important; font-size: 18px !important; font-weight: bold !important; }
     }
-    .invoice-half { width: 48%; border: 1px solid #ccc; padding: 10px; background: white; }
     </style>
 """, unsafe_allow_html=True)
+
 
 # --- 2. دالة اللوغو (استرجاع الصورة الأساسية) ---
 def show_full_logo():
