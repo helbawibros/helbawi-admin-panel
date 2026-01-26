@@ -12,61 +12,89 @@ st.set_page_config(page_title="إدارة حلباوي - النسخة الاحت
 beirut_tz = pytz.timezone('Asia/Beirut')
 
 st.markdown("""
-        <style>
-    /* زر الطباعة على الشاشة */
-    .print-button-real {
-        display: block; width: 100%; height: 60px; 
-        background-color: #28a745; color: white !important; 
-        border-radius: 10px; cursor: pointer; font-weight: bold; font-size: 22px; margin-top: 20px;
-        text-align: center; line-height: 60px;
-    }
-
+    <style>
+    /* تنسيق الشاشة العادي */
+    .screen-only { display: block; }
+    
     @media print {
-        /* 1. إخفاء مطلق لكل شيء في الموقع بدون استثناء */
-        [data-testid="stAppViewContainer"], [data-testid="stHeader"], 
-        [data-testid="stToolbar"], [data-testid="stSidebar"], 
-        footer, header, .no-print, h1, h2, img, button, .stMarkdown {
+        /* 1. إخفاء واجهة ستريمليت الإدارية */
+        [data-testid="stHeader"], [data-testid="stSidebar"], footer, header, .stButton {
             display: none !important;
-            height: 0 !important;
-            margin: 0 !important;
         }
 
-        /* 2. إجبار حاوية الفواتير على الظهور في أول صفحة وبالسقف */
-        .print-container {
+        /* 2. جعل منطقة الطباعة تملأ الورقة وتظهر إجبارياً */
+        .printable-area {
+            display: block !important;
             visibility: visible !important;
-            display: flex !important;
-            flex-direction: row !important;
-            justify-content: space-between !important;
-            position: fixed !important; /* تثبيت في أعلى الورقة تماماً */
+            position: absolute !important;
             top: 0 !important;
             left: 0 !important;
             width: 100% !important;
-            z-index: 9999999 !important; /* فوق كل شيء */
-            background: white !important;
+            margin: 0 !important;
+            padding: 0 !important;
+            background-color: white !important;
         }
 
-        .invoice-half {
-            visibility: visible !important;
+        /* 3. إخفاء أي شيء آخر غير منطقة الطباعة */
+        body { background: white !important; }
+        .stApp > div:not(.printable-area) { display: none !important; }
+
+        @page { size: A4 landscape; margin: 5mm !important; }
+
+        .print-row {
+            display: flex !important;
+            flex-direction: row !important;
+            justify-content: space-between !important;
+            width: 100% !important;
+            page-break-inside: avoid !important;
+            margin-bottom: 10px !important;
+        }
+        .invoice-box {
             width: 48% !important;
             border: 2px dashed black !important;
             padding: 10px !important;
+            box-sizing: border-box !important;
         }
-
-        /* 3. إعداد الورقة عرضياً وتصفير هوامش المتصفح */
-        @page { 
-            size: A4 landscape; 
-            margin: 0 !important; 
-        }
-
-        /* تكبير الخط */
-        .thermal-table th, .thermal-table td {
-            font-size: 20px !important;
-            border: 2px solid black !important;
-        }
+        table { width: 100% !important; border-collapse: collapse !important; }
+        th, td { border: 2px solid black !important; padding: 6px !important; font-size: 20px !important; font-weight: bold !important; text-align: center !important; }
     }
     </style>
-
 """, unsafe_allow_html=True)
+
+# --- 2. واجهة البرنامج (اللوغو والكبسات) ---
+# حط كل شي بدك اياه يختفي بالطباعة جوا هيدا الـ Div
+st.markdown('<div class="no-print">', unsafe_allow_html=True)
+st.title("PRIMUM QUALITY")
+# ... كود اختيار المندوب والفحص هنا ...
+st.markdown('</div>', unsafe_allow_html=True)
+
+# --- 3. منطقة الطباعة (هيدي اللي بتطلع بالورقة) ---
+# ملاحظة: هيدي الحاوية لازم تكون برا أي Div تاني
+st.markdown('<div class="printable-area">', unsafe_allow_html=True)
+
+# هنا نضع محتوى الفواتير (يمين وشمال)
+# تأكد إنك عم تعمل Loop على الداتا تبعك وتعبيهم هون
+target_name = "زبون تجريبي"
+rows_html = "<tr><td>1</td><td>10</td><td>صنف ممتاز</td></tr>"
+
+st.markdown(f"""
+<div class="print-row">
+    <div class="invoice-box">
+        <h3 style="text-align:center;">طلب: {target_name}</h3>
+        <table><thead><tr><th>ت</th><th>العدد</th><th>الصنف</th></tr></thead><tbody>{rows_html}</tbody></table>
+    </div>
+    <div class="invoice-box">
+        <h3 style="text-align:center;">طلب: {target_name}</h3>
+        <table><thead><tr><th>ت</th><th>العدد</th><th>الصنف</th></tr></thead><tbody>{rows_html}</tbody></table>
+    </div>
+</div>
+""", unsafe_allow_html=True)
+
+st.markdown('</div>', unsafe_allow_html=True)
+
+# زر التنبيه (اختياري)
+st.button("💡 جاهز؟ اضغط Ctrl + P للطباعة")
+
 
 # --- 2. دالة اللوغو ---
 def show_full_logo():
