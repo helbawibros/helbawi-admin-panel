@@ -163,36 +163,47 @@ if client:
                     st.success("تم التصديق بنجاح!"); st.rerun()
                 st.markdown('</div>', unsafe_allow_html=True)
 
+                                # --- منطق الفرز والطباعة الموحد ---
                 unique_targets = edited['الوجهة'].unique()
                 
+                # 1. تجميع كل الفواتير في نص واحد
+                all_invoices_html = ""
                 for target in unique_targets:
                     target_df = edited[edited['الوجهة'] == target]
                     print_time = datetime.now(beirut_tz).strftime('%Y-%m-%d %H:%M:%S')
                     display_title = f"طلب: {target}" if target != "جردة سيارة" else f"جردة: {selected_rep}"
                     
-                    # إنشاء أسطر الجدول
                     rows_html = "".join([f"<tr><td>{i+1}</td><td>{r.get('الكميه المطلوبه','')}</td><td style='text-align:right; padding-right:10px;'>{r.get('اسم الصنف','')}</td></tr>" for i, (_, r) in enumerate(target_df.iterrows())])
                     
-                    # قالب النسخة الواحدة
                     single_invoice = f"""
-                    <div style="text-align:center; border-bottom:2px solid black; margin-bottom:10px; padding-bottom:5px;">
-                        <h1 style="margin:0; font-size:28px;">{display_title}</h1>
-                        <p style="margin:5px 0; font-size:18px; font-weight:bold;">المندوب: {selected_rep} | التاريخ: {print_time}</p>
-                    </div>
-                    <table class="thermal-table">
-                        <thead><tr><th style="width:10%;">ت</th><th style="width:20%;">العدد</th><th>اسم الصنف والبيان</th></tr></thead>
-                        <tbody>{rows_html}</tbody>
-                    </table>
-                    <div style="margin-top:10px; text-align:center; font-weight:bold; font-size:16px;">*** نسخة (تحضير / فواتير) ***</div>
-                    """
-
-                    # عرض النسختين جنب بعض للـ A4 Landscape
-                    st.markdown(f"""
                     <div class="print-container">
-                        <div class="invoice-half">{single_invoice}</div>
-                        <div class="invoice-half">{single_invoice}</div>
+                        <div class="invoice-half">
+                            <div style="text-align:center; border-bottom:2px solid black; margin-bottom:10px;">
+                                <h1 style="margin:0; font-size:28px;">{display_title}</h1>
+                                <p style="margin:5px 0; font-size:18px; font-weight:bold;">المندوب: {selected_rep} | {print_time}</p>
+                            </div>
+                            <table class="thermal-table">
+                                <thead><tr><th style="width:10%;">ت</th><th style="width:20%;">العدد</th><th>اسم الصنف والبيان</th></tr></thead>
+                                <tbody>{rows_html}</tbody>
+                            </table>
+                        </div>
+                        <div class="invoice-half">
+                            <div style="text-align:center; border-bottom:2px solid black; margin-bottom:10px;">
+                                <h1 style="margin:0; font-size:28px;">{display_title}</h1>
+                                <p style="margin:5px 0; font-size:18px; font-weight:bold;">المندوب: {selected_rep} | {print_time}</p>
+                            </div>
+                            <table class="thermal-table">
+                                <thead><tr><th style="width:10%;">ت</th><th style="width:20%;">العدد</th><th>اسم الصنف والبيان</th></tr></thead>
+                                <tbody>{rows_html}</tbody>
+                            </table>
+                        </div>
                     </div>
-                    <div class="no-print" style="page-break-after: always; border-bottom: 2px dashed #ccc; margin: 30px 0;"></div>
-                    """, unsafe_allow_html=True)
+                    <div class="page-break"></div>
+                    """
+                    all_invoices_html += single_invoice
+
+                # 2. عرض كل الفواتير دفعة واحدة
+                st.markdown(all_invoices_html, unsafe_allow_html=True)
                 
+                # 3. زر الطباعة النهائي
                 st.markdown("""<button onclick="window.print()" class="print-button-real no-print">🖨️ طباعة الفواتير المفرزة</button>""", unsafe_allow_html=True)
