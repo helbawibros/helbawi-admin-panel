@@ -8,8 +8,8 @@ from datetime import datetime
 import pytz 
 import time
 
-# --- 1. إعدادات الصفحة والـ CSS للطباعة الاحترافية ---
-st.set_page_config(page_title="إدارة حلباوي - النسخة النهائية المستقرة", layout="wide")
+# --- 1. إعدادات الصفحة والـ CSS بمقاسات السنتيمتر ---
+st.set_page_config(page_title="إدارة حلباوي - مقاسات دقيقة", layout="wide")
 beirut_tz = pytz.timezone('Asia/Beirut')
 
 st.markdown("""
@@ -18,12 +18,12 @@ st.markdown("""
         display: block; width: 100%; height: 60px; 
         background-color: #28a745; color: white !important; 
         border-radius: 10px; cursor: pointer; font-weight: bold; font-size: 22px; 
-        margin-top: 20px; text-align: center; line-height: 60px; text-decoration: none; border: none;
+        margin-top: 20px; text-align: center; line-height: 60px; border: none;
     }
     @media screen { .printable-content { display: none; } }
     @media print {
         [data-testid="stHeader"], [data-testid="stSidebar"], [data-testid="stToolbar"],
-        footer, header, .no-print, .stButton, [data-testid="stDataEditor"], .stSelectbox, .stAlert {
+        footer, header, .no-print, .stButton, [data-testid="stDataEditor"], .stSelectbox {
             display: none !important;
         }
         .printable-content {
@@ -31,19 +31,39 @@ st.markdown("""
             position: absolute !important; top: 0 !important; left: 0 !important;
             width: 100% !important; margin: 0 !important; padding: 0 !important;
         }
-        .stApp { background: white !important; }
-        @page { size: A4 landscape; margin: 0 !important; }
+        @page { size: A4 landscape; margin: 5mm !important; }
+        
         .print-row {
             display: flex !important; flex-direction: row !important;
-            justify-content: space-between !important; width: 100% !important;
-            page-break-inside: avoid !important; margin-bottom: 20px !important; direction: rtl !important;
+            justify-content: space-around !important; width: 100% !important;
+            direction: rtl !important;
         }
+
         .invoice-box {
-            width: 48% !important; border: 2px dashed black !important;
-            padding: 10px !important; box-sizing: border-box !important;
+            width: 10.5cm !important; /* نصف عرض الـ A4 تقريباً */
+            border: 1px dashed #000 !important;
+            padding: 5px !important;
+            box-sizing: border-box !important;
         }
-        table { width: 100%; border-collapse: collapse; margin-top: 10px; }
-        th, td { border: 2px solid black; padding: 5px; text-align: center; font-size: 18px; font-weight: bold; color: black !important; }
+
+        table { width: 10cm !important; border-collapse: collapse; margin: auto; }
+        
+        /* المقاسات اللي طلبتها بالظبط */
+        .col-id { width: 2cm !important; }
+        .col-qty { width: 2cm !important; }
+        .col-name { width: 6cm !important; }
+
+        th, td { 
+            border: 1.5px solid black !important; 
+            padding: 3px !important; 
+            text-align: center !important; 
+            font-size: 16px !important; 
+            font-weight: bold !important;
+            overflow: hidden;
+            white-space: nowrap;
+        }
+        h2 { font-size: 20px; margin: 2px 0; text-align: center; }
+        .info-bar { display: flex; justify-content: space-between; font-size: 14px; margin-bottom: 5px; }
     }
     </style>
 """, unsafe_allow_html=True)
@@ -126,43 +146,46 @@ if client:
                     st.markdown('<div class="no-print">', unsafe_allow_html=True)
                     edited = st.data_editor(pending[['row_no', 'اسم الصنف', 'الكميه المطلوبه', 'الوجهة']], hide_index=True, use_container_width=True)
                     
-                    # --- منطق التصديق المحمي من الأخطاء ---
                     if st.button("🚀 تصديق وإرسال النهائي", type="primary", use_container_width=True):
                         idx_status = raw_data[0].index('الحالة') + 1
-                        success_count = 0
-                        progress_bar = st.progress(0)
-                        total = len(edited)
-                        
-                        for i, (_, r) in enumerate(edited.iterrows()):
+                        for _, r in edited.iterrows():
                             try:
                                 ws.update_cell(int(r['row_no']), idx_status, "تم التصديق")
-                                success_count += 1
-                                progress_bar.progress((i + 1) / total)
-                                time.sleep(0.2) # تأخير بسيط لمنع حظر جوجل
-                            except:
-                                st.error(f"فشل تصديق السطر {r['row_no']}")
-                        
-                        if success_count > 0:
-                            st.success(f"تم تصديق {success_count} صنف بنجاح!")
-                            time.sleep(1)
-                            st.rerun()
+                                time.sleep(0.2)
+                            except: st.error(f"خطأ في سطر {r['row_no']}")
+                        st.success("تم التصديق!"); time.sleep(1); st.rerun()
                     st.markdown('</div>', unsafe_allow_html=True)
 
-                    # --- منطقة الطباعة ---
+                    # --- منطقة الطباعة بالقياسات المطلوبة ---
                     st.markdown('<div class="printable-content">', unsafe_allow_html=True)
                     print_now = datetime.now(beirut_tz).strftime('%Y-%m-%d | %I:%M %p')
+                    
                     for target in edited['الوجهة'].unique():
                         target_df = edited[edited['الوجهة'] == target]
                         display_title = f"طلب: {target}" if target != "جردة سيارة" else f"جردة: {selected_rep}"
-                        rows_html = "".join([f"<tr><td>{i+1}</td><td>{r['الكميه المطلوبه']}</td><td style='text-align:right;'>{r['اسم الصنف']}</td></tr>" for i, (_, r) in enumerate(target_df.iterrows())])
-                        invoice = f"""
+                        
+                        # بناء الأسطر مع الكلاسات للتحكم بالمقاسات
+                        rows_html = "".join([
+                            f"<tr><td class='col-id'>{i+1}</td><td class='col-qty'>{r['الكميه المطلوبه']}</td><td class='col-name' style='text-align:right;'>{r['اسم الصنف']}</td></tr>" 
+                            for i, (_, r) in enumerate(target_df.iterrows())
+                        ])
+                        
+                        invoice_html = f"""
                         <div class="invoice-box">
-                            <h2 style="text-align:center; margin:0;">{display_title}</h2>
-                            <div style="display:flex; justify-content:space-between; font-weight:bold; direction:rtl; margin-top:5px;">
+                            <h2>{display_title}</h2>
+                            <div class="info-bar">
                                 <span>المندوب: {selected_rep}</span><span>{print_now}</span>
                             </div>
-                            <table><thead><tr><th>ت</th><th>العدد</th><th>اسم الصنف</th></tr></thead><tbody>{rows_html}</tbody></table>
-                        </div>"""
-                        st.markdown(f'<div class="print-row">{invoice}{invoice}</div>', unsafe_allow_html=True)
+                            <table>
+                                <thead>
+                                    <tr><th class="col-id">ت</th><th class="col-qty">العدد</th><th class="col-name">اسم الصنف</th></tr>
+                                </thead>
+                                <tbody>{rows_html}</tbody>
+                            </table>
+                        </div>
+                        """
+                        # وضع الفاتورتين جنب بعض
+                        st.markdown(f'<div class="print-row">{invoice_html}{invoice_html}</div>', unsafe_allow_html=True)
+                    
                     st.markdown('</div>', unsafe_allow_html=True)
-                    st.markdown('<button onclick="window.print()" class="print-button-real no-print">🖨️ طباعة الفواتير المفرزة</button>', unsafe_allow_html=True)
+                    st.markdown('<button onclick="window.print()" class="print-button-real no-print">🖨️ طباعة بمقاسات (2+2+6 سم)</button>', unsafe_allow_html=True)
