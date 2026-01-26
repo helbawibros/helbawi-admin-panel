@@ -12,73 +12,64 @@ st.set_page_config(page_title="إدارة حلباوي - A4 Double", layout="wid
 beirut_tz = pytz.timezone('Asia/Beirut')
 
 st.markdown("""
-    <style>
+        <style>
+    /* زر الطباعة على الشاشة */
     .print-button-real {
         display: block; width: 100%; height: 60px; 
         background-color: #28a745; color: white !important; 
-        border: 2px solid #ffffff; border-radius: 10px; 
-        cursor: pointer; font-weight: bold; font-size: 22px; margin-top: 20px;
+        border-radius: 10px; cursor: pointer; font-weight: bold; font-size: 22px; margin-top: 20px;
     }
 
-            @media print {
-        /* 1. إخفاء شامل ومطلق لكل زوائد ستريمليت والجدول العلوي */
+    @media print {
+        /* 1. إخفاء شامل لكل شيء يسبب زحمة أو مساحة بيضاء */
         header, footer, .no-print, [data-testid="stHeader"], 
         [data-testid="stSidebar"], [data-testid="stToolbar"],
-        [data-testid="stDataEditor"], /* إخفاء الجدول العلوي */
-        .stImage, h1, h2, h3, .stMarkdown p {
+        [data-testid="stDataEditor"], .stImage, h1, h2, h3, .stMarkdown p {
             display: none !important;
-            height: 0 !important;
-            margin: 0 !important;
-            padding: 0 !important;
         }
 
-        /* 2. تصفير هوامش التطبيق بالكامل */
+        /* 2. تصفير هوامش الصفحة بالكامل لتلتصق بالسقف */
         .stApp {
-            position: absolute !important;
-            top: 0 !important;
             margin: 0 !important;
             padding: 0 !important;
         }
-
+        
         .main .block-container {
-            padding: 0 !important;
-            margin: 0 !important;
+            padding-top: 0 !important;
+            margin-top: -50px !important; /* رفعة بسيطة للسقف بدون تداخل */
         }
 
-        /* 3. إجبار الصفحة على البدء من الصفر المطلق */
+        /* 3. إعداد الورقة بالعرض */
         @page { 
             size: A4 landscape; 
-            margin: 0 !important; 
+            margin: 0.5cm !important; 
         }
 
-        /* 4. تنسيق الفواتير (يمين وشمال) في أعلى الورقة */
+        /* 4. تنسيق حاوية الفواتير (بدون Absolute لعدم التداخل) */
         .print-container {
             visibility: visible !important;
             display: flex !important;
             flex-direction: row !important;
             justify-content: space-between !important;
             width: 100% !important;
-            position: fixed !important; /* تثبيت في أعلى الورقة */
-            top: 0 !important;
-            left: 0 !important;
-            direction: rtl !important;
+            page-break-inside: avoid !important; /* تمنع كسر الفاتورة بين صفحتين */
+            margin-bottom: 20px !important; /* مسافة بسيطة بين كل طلب والتاني */
         }
 
         .invoice-half {
             width: 48% !important;
             border: 2px dashed black !important;
-            padding: 5px !important;
-            box-sizing: border-box !important;
+            padding: 10px !important;
         }
 
-        /* تكبير الخط للتوضيح */
+        /* تكبير الخط */
         .thermal-table th, .thermal-table td {
-            font-size: 22px !important; 
+            font-size: 20px !important; 
             border: 2px solid black !important;
         }
     }
-
     </style>
+
 """, unsafe_allow_html=True)
 
 
