@@ -12,7 +12,7 @@ st.set_page_config(page_title="إدارة حلباوي - A4 Double", layout="wid
 beirut_tz = pytz.timezone('Asia/Beirut')
 
 st.markdown("""
-        <style>
+            <style>
     /* زر الطباعة على الشاشة */
     .print-button-real {
         display: block; width: 100%; height: 60px; 
@@ -21,54 +21,57 @@ st.markdown("""
     }
 
     @media print {
-        /* 1. إخفاء شامل لكل شيء يسبب زحمة أو مساحة بيضاء */
-        header, footer, .no-print, [data-testid="stHeader"], 
-        [data-testid="stSidebar"], [data-testid="stToolbar"],
-        [data-testid="stDataEditor"], .stImage, h1, h2, h3, .stMarkdown p {
+        /* 1. إخفاء كل شيء (لوغو، جداول تعديل، زوائد) */
+        [data-testid="stHeader"], [data-testid="stSidebar"], [data-testid="stToolbar"],
+        footer, header, .no-print, [data-testid="stDataEditor"], h1, h2, img {
             display: none !important;
         }
 
-        /* 2. تصفير هوامش الصفحة بالكامل لتلتصق بالسقف */
+        /* 2. تصفير هوامش المتصفح والبرنامج */
         .stApp {
             margin: 0 !important;
             padding: 0 !important;
         }
-        
+
+        /* 3. سحب المحتوى للأعلى وتوسيع العرض */
         .main .block-container {
             padding-top: 0 !important;
-            margin-top: -50px !important; /* رفعة بسيطة للسقف بدون تداخل */
+            margin-top: -100px !important; /* رفع الجداول للسقف */
+            max-width: 100% !important;
         }
 
-        /* 3. إعداد الورقة بالعرض */
+        /* 4. إعدادات الورقة A4 بالعرض */
         @page { 
             size: A4 landscape; 
-            margin: 0.5cm !important; 
+            margin: 0 !important; /* إلغاء الهوامش البيضاء تماماً */
         }
 
-        /* 4. تنسيق حاوية الفواتير (بدون Absolute لعدم التداخل) */
+        /* 5. تنسيق الفواتير (جنب بعض وبدون تداخل) */
         .print-container {
             visibility: visible !important;
             display: flex !important;
             flex-direction: row !important;
             justify-content: space-between !important;
             width: 100% !important;
-            page-break-inside: avoid !important; /* تمنع كسر الفاتورة بين صفحتين */
-            margin-bottom: 20px !important; /* مسافة بسيطة بين كل طلب والتاني */
+            page-break-inside: avoid !important;
+            margin-bottom: 10px !important;
+            padding: 10px !important;
         }
 
         .invoice-half {
             width: 48% !important;
             border: 2px dashed black !important;
             padding: 10px !important;
+            box-sizing: border-box !important;
         }
 
-        /* تكبير الخط */
         .thermal-table th, .thermal-table td {
             font-size: 20px !important; 
             border: 2px solid black !important;
         }
     }
     </style>
+
 
 """, unsafe_allow_html=True)
 
