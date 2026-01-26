@@ -12,84 +12,60 @@ st.set_page_config(page_title="إدارة حلباوي - النسخة الاحت
 beirut_tz = pytz.timezone('Asia/Beirut')
 
 st.markdown("""
-    <style>
+        <style>
     /* زر الطباعة على الشاشة */
     .print-button-real {
         display: block; width: 100%; height: 60px; 
         background-color: #28a745; color: white !important; 
-        border-radius: 10px; cursor: pointer; font-weight: bold; font-size: 22px; 
-        margin-top: 20px; text-align: center; line-height: 60px; text-decoration: none;
+        border-radius: 10px; cursor: pointer; font-weight: bold; font-size: 22px; margin-top: 20px;
+        text-align: center; line-height: 60px;
     }
 
     @media print {
-        /* 1. إخفاء شامل لكل شيء (لوغو، جداول تعديل، زوائد ستريمليت) */
-        [data-testid="stHeader"], [data-testid="stSidebar"], [data-testid="stToolbar"],
-        footer, header, .no-print, [data-testid="stDataEditor"], h1, h2, img, .stMarkdown p {
+        /* 1. إخفاء مطلق لكل شيء في الموقع بدون استثناء */
+        [data-testid="stAppViewContainer"], [data-testid="stHeader"], 
+        [data-testid="stToolbar"], [data-testid="stSidebar"], 
+        footer, header, .no-print, h1, h2, img, button, .stMarkdown {
             display: none !important;
-        }
-
-        /* 2. تصفير هوامش المتصفح وسحب المحتوى للسقف */
-        .stApp {
+            height: 0 !important;
             margin: 0 !important;
-            padding: 0 !important;
         }
 
-        .main .block-container {
-            padding-top: 0 !important;
-            margin-top: -100px !important; /* لسحب أول فاتورة للسقف تماماً */
-            max-width: 100% !important;
-        }
-
-        /* 3. إعداد الورقة A4 بالعرض (Landscape) */
-        @page { 
-            size: A4 landscape; 
-            margin: 0 !important; 
-        }
-
-        /* 4. تنسيق الفواتير (يمين وشمال) */
+        /* 2. إجبار حاوية الفواتير على الظهور في أول صفحة وبالسقف */
         .print-container {
             visibility: visible !important;
             display: flex !important;
             flex-direction: row !important;
             justify-content: space-between !important;
+            position: fixed !important; /* تثبيت في أعلى الورقة تماماً */
+            top: 0 !important;
+            left: 0 !important;
             width: 100% !important;
-            direction: rtl !important;
-            page-break-inside: avoid !important;
+            z-index: 9999999 !important; /* فوق كل شيء */
+            background: white !important;
         }
 
         .invoice-half {
+            visibility: visible !important;
             width: 48% !important;
             border: 2px dashed black !important;
             padding: 10px !important;
-            box-sizing: border-box !important;
         }
 
-        /* تنسيق جدول الأصناف والخط الكبير */
-        .thermal-table {
-            width: 100% !important;
-            border-collapse: collapse !important;
-            margin-top: 10px;
+        /* 3. إعداد الورقة عرضياً وتصفير هوامش المتصفح */
+        @page { 
+            size: A4 landscape; 
+            margin: 0 !important; 
         }
-        
+
+        /* تكبير الخط */
         .thermal-table th, .thermal-table td {
+            font-size: 20px !important;
             border: 2px solid black !important;
-            padding: 6px !important;
-            text-align: center !important;
-            font-size: 20px !important; 
-            font-weight: bold !important;
-            color: black !important;
-        }
-
-        /* تنسيق ترويسة الفاتورة (اسم المندوب والتاريخ) */
-        .invoice-header {
-            display: flex;
-            justify-content: space-between;
-            border-bottom: 2px solid black;
-            padding-bottom: 5px;
-            margin-bottom: 10px;
         }
     }
     </style>
+
 """, unsafe_allow_html=True)
 
 # --- 2. دالة اللوغو ---
