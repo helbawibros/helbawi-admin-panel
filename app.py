@@ -7,7 +7,7 @@ import os
 from datetime import datetime
 import pytz 
 
-# --- 1. إعدادات الصفحة وتنسيق الطباعة ---
+# --- 1. إعدادات الصفحة وتنسيق الطباعة الإجباري ---
 st.set_page_config(page_title="إدارة حلباوي - A4 Double", layout="wide")
 beirut_tz = pytz.timezone('Asia/Beirut')
 
@@ -21,35 +21,30 @@ st.markdown("""
     }
 
     @media print {
-        /* إخفاء كل شيء غير مرغوب فيه */
-        header, footer, .no-print, [data-testid="stHeader"], [data-testid="stSidebar"], [data-testid="stToolbar"] {
+        /* إخفاء كل شي بالمعاينة (اللوغو، الكبسات، القوائم) */
+        div[data-testid="stToolbar"], header, footer, .no-print,
+        [data-testid="stSidebar"], [data-testid="stHeader"], .stApp > header {
             display: none !important;
+            height: 0 !important;
         }
-        
-        .stApp { margin: 0 !important; padding: 0 !important; }
-        
+
+        .stApp { position: absolute !important; top: 0 !important; margin: 0 !important; padding: 0 !important; }
+
         @page { size: A4 landscape; margin: 5mm !important; }
 
-        .print-main-container {
+        .print-container {
             visibility: visible !important;
-            display: block !important;
-            width: 100% !important;
-            direction: rtl !important;
-        }
-
-        .print-row {
             display: flex !important;
             flex-direction: row !important;
             justify-content: space-between !important;
             width: 100% !important;
-            margin-bottom: 20px !important;
-            page-break-inside: avoid !important;
+            direction: rtl !important;
         }
 
         .invoice-half {
             width: 48% !important;
             padding: 10px !important;
-            border: 2px dashed black !important;
+            border: 2px dashed #000 !important;
         }
 
         .thermal-table {
@@ -62,7 +57,7 @@ st.markdown("""
             border: 2px solid black !important;
             padding: 8px !important;
             text-align: center !important;
-            font-size: 20px !important; /* الخط اللي طلبته 20 */
+            font-size: 20px !important;
             font-weight: bold !important;
             color: black !important;
         }
@@ -70,7 +65,7 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-# --- 2. دالة اللوغو (مع إخفاء بالطباعة) ---
+# --- 2. دالة اللوغو (مخفية بالطباعة) ---
 def show_full_logo():
     st.markdown('<div class="no-print">', unsafe_allow_html=True)
     found = False
@@ -83,7 +78,7 @@ def show_full_logo():
         st.markdown("<h1 style='text-align:center;'>PRIMUM QUALITY</h1>", unsafe_allow_html=True)
     st.markdown('</div>', unsafe_allow_html=True)
 
-# --- 3. نظام الدخول ---
+# --- 3. نظام الدخول والاتصال ---
 if 'admin_logged_in' not in st.session_state: st.session_state.admin_logged_in = False
 if not st.session_state.admin_logged_in:
     show_full_logo()
@@ -96,7 +91,6 @@ if not st.session_state.admin_logged_in:
                 st.rerun()
     st.stop()
 
-# --- 4. جلب البيانات ---
 def get_client():
     try:
         info = json.loads(st.secrets["gcp_service_account"]["json_data"].strip(), strict=False)
@@ -125,7 +119,7 @@ if client:
     
     if 'orders' in st.session_state:
         for o in st.session_state.orders:
-            if st.button(f"📦 طلب من: {o['name']}", use_container_width=True):
+            if st.button(f"📦 طلب من: {o['name']}", key=f"btn_{o['name']}", use_container_width=True):
                 st.session_state.active_rep = o['name']
                 st.rerun()
 
@@ -143,7 +137,6 @@ if client:
             pending = df[df['الحالة'] == "بانتظار التصديق"].copy()
             
             if not pending.empty:
-                # تجهيز الوجهات
                 if 'اسم الزبون' in pending.columns:
                     pending['الوجهة'] = pending['اسم الزبون'].astype(str).replace(['nan', '', 'None'], 'جردة سيارة').str.strip()
                 else:
@@ -159,10 +152,8 @@ if client:
                     st.success("تم التصديق بنجاح!"); st.rerun()
                 st.markdown('</div>', unsafe_allow_html=True)
 
-                # --- 5. منطق الطباعة (بدون أخطاء البرمجة) ---
-                st.markdown('<div class="print-main-container">', unsafe_allow_html=True)
+                # --- 4. منطق الطباعة (المقصوص) ---
                 unique_targets = edited['الوجهة'].unique()
-                
                 for target in unique_targets:
                     target_df = edited[edited['الوجهة'] == target]
                     print_time = datetime.now(beirut_tz).strftime('%Y-%m-%d %H:%M')
@@ -179,14 +170,15 @@ if client:
                         <thead><tr><th style="width:10%;">ت</th><th style="width:20%;">العدد</th><th>اسم الصنف والبيان</th></tr></thead>
                         <tbody>{rows_html}</tbody>
                     </table>
+                    <div style="margin-top:10px; text-align:center; font-weight:bold;">*** نسخة (تحضير / فواتير) ***</div>
                     """
 
                     st.markdown(f"""
-                    <div class="print-row">
+                    <div class="print-container">
                         <div class="invoice-half">{invoice_content}</div>
                         <div class="invoice-half">{invoice_content}</div>
                     </div>
+                    <div class="no-print" style="page-break-after: always; border-bottom: 2px dashed #ccc; margin: 20px 0;"></div>
                     """, unsafe_allow_html=True)
-                st.markdown('</div>', unsafe_allow_html=True)
                 
                 st.markdown("""<button onclick="window.print()" class="print-button-real no-print">🖨️ طباعة الفواتير</button>""", unsafe_allow_html=True)
