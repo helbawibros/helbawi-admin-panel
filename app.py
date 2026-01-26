@@ -14,46 +14,71 @@ beirut_tz = pytz.timezone('Asia/Beirut')
 # CSS لإخفاء كل شيء وقت الطباعة وتنسيق النسختين
 st.markdown("""
     <style>
+    /* زر الطباعة الأخضر الواضح */
     .print-button-real {
         display: block; width: 100%; height: 60px; 
         background-color: #28a745; color: white !important; 
-        border-radius: 10px; cursor: pointer; font-weight: bold; font-size: 22px; margin-top: 20px;
+        border-radius: 10px; cursor: pointer; font-weight: bold; font-size: 22px; 
+        margin-top: 20px; text-align: center; line-height: 60px; text-decoration: none;
     }
 
     @media print {
-        /* إخفاء واجهة الموقع واللوغو والكبسات */
-        header, footer, .no-print, [data-testid="stHeader"], 
-        [data-testid="stSidebar"], [data-testid="stToolbar"],
-        .stButton, .stSelectbox, img, .stMarkdownContainer h1 {
+        /* 1. إخفاء إجباري وشامل لكل شيء (اللوغو، الكبسات، العناوين، القوائم) */
+        header, footer, .no-print, 
+        [data-testid="stHeader"], [data-testid="stSidebar"], [data-testid="stToolbar"],
+        .stButton, .stSelectbox, img, h1, h2, h3, .stMarkdownContainer,
+        div[class*="st-emotion-cache"] {
             display: none !important;
             height: 0 !important;
+            margin: 0 !important;
+            padding: 0 !important;
+            visibility: hidden !important;
         }
 
-        /* تصفير الهوامش لتبدأ من أعلى الورقة */
-        .stApp { position: absolute !important; top: 0 !important; margin: 0 !important; padding: 0 !important; }
-        .main .block-container { padding: 0 !important; }
+        /* 2. تنظيف الورقة وسحب الجداول لأعلى نقطة (0 فراغ) */
+        .stApp { 
+            position: absolute !important; 
+            top: 0 !important; 
+            margin: 0 !important; 
+            padding: 0 !important; 
+        }
+        
+        .main .block-container { 
+            padding: 0 !important; 
+            margin: 0 !important; 
+            max-width: 100% !important;
+        }
 
-        @page { size: A4 landscape; margin: 5mm !important; }
+        /* 3. إعداد الصفحة بالعرض A4 */
+        @page { 
+            size: A4 landscape; 
+            margin: 5mm !important; 
+        }
 
-        /* حاوية النسختين (يمين وشمال) */
+        /* 4. إظهار حاوية الجداول فقط رغماً عن أي أمر إخفاء */
         .print-container {
             display: flex !important;
+            visibility: visible !important;
             flex-direction: row !important;
             justify-content: space-between !important;
             width: 100% !important;
             direction: rtl !important;
+            position: relative !important;
+            top: 0 !important;
         }
 
         .invoice-half {
             width: 48% !important;
             padding: 10px !important;
             border: 2px dashed #000 !important;
+            visibility: visible !important;
         }
 
         .thermal-table {
             width: 100% !important;
             border-collapse: collapse !important;
             border: 2px solid black !important;
+            visibility: visible !important;
         }
         
         .thermal-table th, .thermal-table td {
@@ -63,10 +88,12 @@ st.markdown("""
             font-size: 20px !important;
             font-weight: bold !important;
             color: black !important;
+            visibility: visible !important;
         }
     }
     </style>
 """, unsafe_allow_html=True)
+
 
 # --- 2. نظام اللوغو ---
 def show_full_logo():
