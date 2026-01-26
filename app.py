@@ -14,85 +14,60 @@ beirut_tz = pytz.timezone('Asia/Beirut')
 # CSS لإخفاء كل شيء وقت الطباعة وتنسيق النسختين
 st.markdown("""
     <style>
-    /* زر الطباعة الأخضر الواضح */
-    .print-button-real {
-        display: block; width: 100%; height: 60px; 
-        background-color: #28a745; color: white !important; 
-        border-radius: 10px; cursor: pointer; font-weight: bold; font-size: 22px; 
-        margin-top: 20px; text-align: center; line-height: 60px; text-decoration: none;
+    /* تنسيق زر الطباعة ليظهر بوضوح على الشاشة */
+    .print-btn-container {
+        display: block;
+        width: 100%;
+        padding: 20px;
+        background-color: #28a745;
+        color: white !important;
+        text-align: center;
+        border-radius: 15px;
+        font-size: 25px;
+        font-weight: bold;
+        cursor: pointer;
+        text-decoration: none;
+        margin-bottom: 20px;
+        border: 2px solid white;
     }
 
     @media print {
-        /* 1. إخفاء إجباري وشامل لكل شيء (اللوغو، الكبسات، العناوين، القوائم) */
-        header, footer, .no-print, 
-        [data-testid="stHeader"], [data-testid="stSidebar"], [data-testid="stToolbar"],
-        .stButton, .stSelectbox, img, h1, h2, h3, .stMarkdownContainer,
-        div[class*="st-emotion-cache"] {
+        /* 1. إخفاء العناصر الخارجية فقط */
+        header, footer, [data-testid="stHeader"], [data-testid="stSidebar"], 
+        [data-testid="stToolbar"], .no-print, button {
             display: none !important;
-            height: 0 !important;
-            margin: 0 !important;
-            padding: 0 !important;
-            visibility: hidden !important;
         }
 
-        /* 2. تنظيف الورقة وسحب الجداول لأعلى نقطة (0 فراغ) */
-        .stApp { 
-            position: absolute !important; 
-            top: 0 !important; 
-            margin: 0 !important; 
-            padding: 0 !important; 
+        /* 2. إجبار الجداول والحاوية على الظهور */
+        .print-container, .print-container *, .thermal-table, .thermal-table * {
+            visibility: visible !important;
+            display: block !important;
         }
         
-        .main .block-container { 
-            padding: 0 !important; 
-            margin: 0 !important; 
-            max-width: 100% !important;
-        }
+        /* 3. تنظيف الهوامش */
+        .stApp { position: absolute !important; top: 0 !important; width: 100% !important; }
+        .main .block-container { padding: 0 !important; margin: 0 !important; }
+        
+        @page { size: A4 landscape; margin: 5mm !important; }
 
-        /* 3. إعداد الصفحة بالعرض A4 */
-        @page { 
-            size: A4 landscape; 
-            margin: 5mm !important; 
-        }
-
-        /* 4. إظهار حاوية الجداول فقط رغماً عن أي أمر إخفاء */
+        /* تنسيق النسختين يمين وشمال */
         .print-container {
             display: flex !important;
-            visibility: visible !important;
             flex-direction: row !important;
             justify-content: space-between !important;
             width: 100% !important;
             direction: rtl !important;
-            position: relative !important;
-            top: 0 !important;
         }
-
-        .invoice-half {
-            width: 48% !important;
-            padding: 10px !important;
-            border: 2px dashed #000 !important;
-            visibility: visible !important;
-        }
-
-        .thermal-table {
-            width: 100% !important;
-            border-collapse: collapse !important;
-            border: 2px solid black !important;
-            visibility: visible !important;
-        }
-        
-        .thermal-table th, .thermal-table td {
-            border: 2px solid black !important;
-            padding: 8px !important;
-            text-align: center !important;
-            font-size: 20px !important;
-            font-weight: bold !important;
-            color: black !important;
-            visibility: visible !important;
-        }
+        .invoice-half { width: 48% !important; border: 2px dashed black !important; padding: 10px !important; }
+        .thermal-table { display: table !important; width: 100% !important; border-collapse: collapse !important; }
+        .thermal-table th, .thermal-table td { border: 2px solid black !important; padding: 8px !important; font-size: 20px !important; font-weight: bold !important; }
     }
     </style>
 """, unsafe_allow_html=True)
+
+# --- زر الطباعة (استخدم هاد الرابط حصراً) ---
+st.markdown('<a href="javascript:window.print()" class="no-print print-btn-container">🖨️ اضغط هنا لفتح نافذة الطباعة</a>', unsafe_allow_html=True)
+
 
 
 # --- 2. نظام اللوغو ---
