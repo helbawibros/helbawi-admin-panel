@@ -20,24 +20,22 @@ st.markdown("""
         cursor: pointer; font-weight: bold; font-size: 22px; margin-top: 20px;
     }
 
-        @media print {
-        /* 1. إخفاء شامل لكل شيء بما فيهم الجدول العلوي (data_editor) واللوغو */
-        header, footer, .no-print, 
-        [data-testid="stHeader"], [data-testid="stSidebar"], [data-testid="stToolbar"],
-        [data-testid="stDataEditor"], /* هيدا السطر بيخفي الجدول اللي فوق */
-        h1, h2, img, .stMarkdownContainer p {
+            @media print {
+        /* 1. إخفاء شامل ومطلق لكل زوائد ستريمليت والجدول العلوي */
+        header, footer, .no-print, [data-testid="stHeader"], 
+        [data-testid="stSidebar"], [data-testid="stToolbar"],
+        [data-testid="stDataEditor"], /* إخفاء الجدول العلوي */
+        .stImage, h1, h2, h3, .stMarkdown p {
             display: none !important;
             height: 0 !important;
             margin: 0 !important;
             padding: 0 !important;
         }
 
-        /* 2. رفع كل محتوى الصفحة للأعلى لإلغاء الفراغ الأبيض */
+        /* 2. تصفير هوامش التطبيق بالكامل */
         .stApp {
             position: absolute !important;
-            top: -220px !important; /* جرب -220 أو -250 لحد ما تلمس السقف تماماً */
-            left: 0 !important;
-            width: 100% !important;
+            top: 0 !important;
             margin: 0 !important;
             padding: 0 !important;
         }
@@ -47,27 +45,39 @@ st.markdown("""
             margin: 0 !important;
         }
 
-        /* 3. تنسيق الفواتير المفرزة لتظهر هي فقط */
+        /* 3. إجبار الصفحة على البدء من الصفر المطلق */
+        @page { 
+            size: A4 landscape; 
+            margin: 0 !important; 
+        }
+
+        /* 4. تنسيق الفواتير (يمين وشمال) في أعلى الورقة */
         .print-container {
             visibility: visible !important;
             display: flex !important;
             flex-direction: row !important;
-            justify-content: space-around !important;
+            justify-content: space-between !important;
             width: 100% !important;
-            margin-top: 0 !important;
+            position: fixed !important; /* تثبيت في أعلى الورقة */
+            top: 0 !important;
+            left: 0 !important;
+            direction: rtl !important;
         }
 
         .invoice-half {
             width: 48% !important;
             border: 2px dashed black !important;
-            padding: 10px !important;
-            visibility: visible !important;
+            padding: 5px !important;
+            box-sizing: border-box !important;
         }
 
-        @page { size: A4 landscape; margin: 0 !important; }
+        /* تكبير الخط للتوضيح */
+        .thermal-table th, .thermal-table td {
+            font-size: 22px !important; 
+            border: 2px solid black !important;
+        }
     }
 
-    }
     </style>
 """, unsafe_allow_html=True)
 
