@@ -195,4 +195,4 @@ if client:
                     
                     # هذا الجزء هو اللي بيطبع النسخ جنب بعض
                     st.markdown(f'<div class="printable-content">{all_invoices_html}</div>', unsafe_allow_html=True)
-                    st.markdown('<button onclick="window.print()" class="print-button-real no-print">🖨️ طباعة الفواتير (2+2+6 سم)</button>', unsafe_allow_html=True)
+                    st.markdown('<button onclick="window.print()" class="print-button-real no-print">🖨️ طباعة الفواتير (ctrl-p)</button>', unsafe_allow_html=True)
