@@ -13,63 +13,74 @@ beirut_tz = pytz.timezone('Asia/Beirut')
 
 st.markdown("""
     <style>
+    /* زر الطباعة الأخضر */
+    .print-button-real {
+        display: block; width: 100%; height: 60px; 
+        background-color: #28a745; color: white !important; 
+        border: 2px solid #ffffff; border-radius: 10px; 
+        cursor: pointer; font-weight: bold; font-size: 22px; margin-top: 20px;
+    }
+
     @media print {
-        /* 1. إخفاء كلي وشامل لكل شيء ما عدا الفاتورة */
-        .no-print, [data-testid="stSidebar"], [data-testid="stHeader"], 
-        footer, header, .stHeader, div.stButton, div.stSelectbox,
-        div[data-testid="stToolbar"], .embeddedAppMetaBar_container__D_90n {
+        /* 1. الضربة القاضية: إخفاء كل شي بـ Streamlit إجبارياً */
+        div[data-testid="stToolbar"], 
+        header, footer, .no-print,
+        [data-testid="stSidebar"], 
+        [data-testid="stHeader"],
+        .stApp > header {
             display: none !important;
-            visibility: hidden !important;
             height: 0 !important;
-            margin: 0 !important;
+            visibility: hidden !important;
         }
 
-        /* 2. إجبار المحتوى على البدء من نقطة الصفر في أعلى الصفحة */
-        .main .block-container {
-            padding: 0 !important;
-            margin: 0 !important;
-            top: 0 !important;
-        }
-        
+        /* 2. سحب الصفحة لفوق لتمحي فراغ اللوغو */
         .stApp {
             position: absolute !important;
-            top: 0 !important;
-            width: 100% !important;
-        }
-
-        /* 3. تنسيق الحاوية لتناسب وضعية الطول (Portrait) */
-        .print-container {
-            display: flex !important;
-            flex-direction: column !important; /* جعلهم فوق بعض إذا كنت بالطول */
-            width: 100% !important;
+            top: -100px !important; /* منسحب الكود لفوق عشان يغطي مكان اللوغو */
             margin: 0 !important;
             padding: 0 !important;
+        }
+
+        /* 3. إرجاع الجدولين (يمين وشمال) */
+        .print-container {
+            visibility: visible !important;
+            display: flex !important;
+            flex-direction: row !important; /* يمين وشمال */
+            justify-content: space-between !important;
+            width: 100% !important;
+            direction: rtl !important;
+            margin-top: 0 !important;
         }
 
         .invoice-half {
-            width: 100% !important; /* تأخذ كامل العرض */
-            border: 2px dashed black !important;
-            margin-bottom: 20px !important; /* مسافة بسيطة بين النسختين للقص */
-            padding: 15px !important;
-            page-break-inside: avoid !important;
+            width: 47% !important; /* عرض كل نسخة */
+            padding: 10px !important;
+            border: 2px dashed black !important; /* خط القص */
         }
 
         .thermal-table {
             width: 100% !important;
             border-collapse: collapse !important;
-            margin-top: 10px !important;
+            border: 2px solid black !important;
         }
         
         .thermal-table th, .thermal-table td {
             border: 2px solid black !important;
-            padding: 10px !important;
-            font-size: 22px !important; /* خط كبير وواضح */
+            padding: 5px !important;
+            text-align: center !important;
+            font-size: 20px !important; /* الخط الواضح اللي طلبته */
             font-weight: bold !important;
             color: black !important;
+        }
+
+        @page { 
+            size: A4 landscape; /* عشان الجدولين يوسعوا يمين وشمال */
+            margin: 0 !important; 
         }
     }
     </style>
 """, unsafe_allow_html=True)
+
 
 # --- 2. دالة اللوغو (مخفية بالطباعة) ---
 def show_full_logo():
