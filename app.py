@@ -14,31 +14,34 @@ beirut_tz = pytz.timezone('Asia/Beirut')
 # CSS لإخفاء كل شيء وقت الطباعة وتنسيق النسختين
 import streamlit as st
 
-# --- 1. التنسيق (النسخة الإجبارية) ---
+# --- 1. الـ CSS الجبار (حل مشكلة الصفحة الفاضية) ---
 st.markdown("""
     <style>
-    /* تنسيق الجداول على الشاشة */
-    .print-container { display: block; direction: rtl; }
+    /* تنسيق الشاشة العادي */
+    .screen-only { display: block; }
     
     @media print {
-        /* إخفاء كل شيء حرفياً ما عدا منطقة الطباعة */
-        body * { visibility: hidden !important; }
-        .printable-area, .printable-area * { visibility: visible !important; }
-        
-        /* سحب منطقة الطباعة لأعلى الورقة تماماً */
+        /* إخفاء واجهة ستريمليت الإدارية */
+        [data-testid="stHeader"], [data-testid="stSidebar"], footer, header, .stButton {
+            display: none !important;
+        }
+
+        /* جعل منطقة الطباعة تملأ الورقة وتظهر إجبارياً */
         .printable-area {
+            display: block !important;
+            visibility: visible !important;
             position: absolute !important;
-            left: 0 !important;
             top: 0 !important;
+            left: 0 !important;
             width: 100% !important;
             margin: 0 !important;
             padding: 0 !important;
+            background-color: white !important;
         }
 
-        /* إخفاء زوائد Streamlit اللعينة */
-        header, footer, [data-testid="stHeader"], [data-testid="stSidebar"], .stButton {
-            display: none !important;
-        }
+        /* إخفاء أي شيء آخر غير منطقة الطباعة */
+        body { background: white !important; }
+        .stApp > div:not(.printable-area) { display: none !important; }
 
         @page { size: A4 landscape; margin: 5mm !important; }
 
@@ -47,24 +50,57 @@ st.markdown("""
             flex-direction: row !important;
             justify-content: space-between !important;
             width: 100% !important;
+            page-break-inside: avoid !important;
+            margin-bottom: 10px !important;
         }
         .invoice-box {
             width: 48% !important;
             border: 2px dashed black !important;
             padding: 10px !important;
+            box-sizing: border-box !important;
         }
         table { width: 100% !important; border-collapse: collapse !important; }
-        th, td { border: 2px solid black !important; padding: 5px !important; font-size: 18px !important; font-weight: bold !important; text-align: center !important; }
+        th, td { border: 2px solid black !important; padding: 6px !important; font-size: 20px !important; font-weight: bold !important; text-align: center !important; }
     }
     </style>
 """, unsafe_allow_html=True)
 
-# --- 2. البرنامج (على الشاشة) ---
-# ... (هنا كود المندوبين والفحص والجدول الأصلي) ...
-# ملاحظة: تأكد أن كود الطباعة يكون داخل شرط "if selected_rep != '-- اختر مندوب --':"
+# --- 2. واجهة البرنامج (اللوغو والكبسات) ---
+# حط كل شي بدك اياه يختفي بالطباعة جوا هيدا الـ Div
+st.markdown('<div class="no-print">', unsafe_allow_html=True)
+st.title("PRIMUM QUALITY")
+# ... كود اختيار المندوب والفحص هنا ...
+st.markdown('</div>', unsafe_allow_html=True)
 
-if st.button("🖨️ تجهيز الطباعة الآن"):
-    st.info("💡 تم تفعيل نمط الطباعة. الآن اضغط Ctrl + P")
+# --- 3. منطقة الطباعة (هيدي اللي بتطلع بالورقة) ---
+# ملاحظة: هيدي الحاوية لازم تكون برا أي Div تاني
+st.markdown('<div class="printable-area">', unsafe_allow_html=True)
+
+# هنا نضع محتوى الفواتير (يمين وشمال)
+# تأكد إنك عم تعمل Loop على الداتا تبعك وتعبيهم هون
+target_name = "زبون تجريبي"
+rows_html = "<tr><td>1</td><td>10</td><td>صنف ممتاز</td></tr>"
+
+st.markdown(f"""
+<div class="print-row">
+    <div class="invoice-box">
+        <h3 style="text-align:center;">طلب: {target_name}</h3>
+        <table><thead><tr><th>ت</th><th>العدد</th><th>الصنف</th></tr></thead><tbody>{rows_html}</tbody></table>
+    </div>
+    <div class="invoice-box">
+        <h3 style="text-align:center;">طلب: {target_name}</h3>
+        <table><thead><tr><th>ت</th><th>العدد</th><th>الصنف</th></tr></thead><tbody>{rows_html}</tbody></table>
+    </div>
+</div>
+""", unsafe_allow_html=True)
+
+st.markdown('</div>', unsafe_allow_html=True)
+
+# زر التنبيه (اختياري)
+st.button("💡 جاهز؟ اضغط Ctrl + P للطباعة")
+
+
+
     
     # --- 3. منطقة الطباعة (هيدي اللي رح تظهر بالورقة بس) ---
     st.markdown('<div class="printable-area">', unsafe_allow_html=True)
