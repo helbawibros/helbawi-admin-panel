@@ -78,11 +78,24 @@ st.markdown("""
 
 # --- 2. الدخول واللوغو ---
 def show_full_logo():
-    for name in ["Logo.JPG", "logo.jpg", "Logo.png"]:
+    # قائمة بأسماء الملفات المحتملة مع مراعاة الفراغ اللي عندك
+    possible_names = ["Logo .JPG", "Logo.JPG", "logo.jpg", "Logo .png", "Logo.png"]
+    found = False
+    for name in possible_names:
         if os.path.exists(name):
-            st.image(name, use_container_width=True)
-            return
-    st.markdown("<h1 style='text-align:center;'>PRIMUM QUALITY</h1>", unsafe_allow_html=True)
+            try:
+                with open(name, "rb") as f:
+                    image_data = f.read()
+                st.image(image_data, use_container_width=True)
+                found = True
+                break
+            except:
+                continue
+    
+    if not found:
+        # إذا ما لقى الصورة بيعرض النص الاحتياطي
+        st.markdown("<h1 style='text-align:center; color:#d32f2f;'>PRIMUM QUALITY</h1>", unsafe_allow_html=True)
+
 
 if 'admin_logged_in' not in st.session_state: st.session_state.admin_logged_in = False
 if not st.session_state.admin_logged_in:
