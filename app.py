@@ -13,7 +13,6 @@ beirut_tz = pytz.timezone('Asia/Beirut')
 
 st.markdown("""
     <style>
-    /* زر الطباعة الأخضر */
     .print-button-real {
         display: block; width: 100%; height: 60px; 
         background-color: #28a745; color: white !important; 
@@ -22,40 +21,30 @@ st.markdown("""
     }
 
     @media print {
-        /* 1. الضربة القاضية: إخفاء كل شي بـ Streamlit إجبارياً */
-        div[data-testid="stToolbar"], 
-        header, footer, .no-print,
-        [data-testid="stSidebar"], 
-        [data-testid="stHeader"],
-        .stApp > header {
+        /* إخفاء كل شيء بـ Streamlit واللوغو والكبسات */
+        div[data-testid="stToolbar"], header, footer, .no-print,
+        [data-testid="stSidebar"], [data-testid="stHeader"], .stApp > header {
             display: none !important;
             height: 0 !important;
-            visibility: hidden !important;
         }
 
-        /* 2. سحب الصفحة لفوق لتمحي فراغ اللوغو */
-        .stApp {
-            position: absolute !important;
-            top: -100px !important; /* منسحب الكود لفوق عشان يغطي مكان اللوغو */
-            margin: 0 !important;
-            padding: 0 !important;
-        }
+        .stApp { position: absolute !important; top: 0 !important; margin: 0 !important; padding: 0 !important; }
 
-        /* 3. إرجاع الجدولين (يمين وشمال) */
+        @page { size: A4 landscape; margin: 5mm !important; }
+
         .print-container {
             visibility: visible !important;
             display: flex !important;
-            flex-direction: row !important; /* يمين وشمال */
+            flex-direction: row !important;
             justify-content: space-between !important;
             width: 100% !important;
             direction: rtl !important;
-            margin-top: 0 !important;
         }
 
         .invoice-half {
-            width: 47% !important; /* عرض كل نسخة */
+            width: 48% !important;
             padding: 10px !important;
-            border: 2px dashed black !important; /* خط القص */
+            border: 2px dashed #000 !important;
         }
 
         .thermal-table {
@@ -66,23 +55,17 @@ st.markdown("""
         
         .thermal-table th, .thermal-table td {
             border: 2px solid black !important;
-            padding: 5px !important;
+            padding: 8px !important;
             text-align: center !important;
-            font-size: 20px !important; /* الخط الواضح اللي طلبته */
+            font-size: 20px !important; /* الخط المطلوب */
             font-weight: bold !important;
             color: black !important;
-        }
-
-        @page { 
-            size: A4 landscape; /* عشان الجدولين يوسعوا يمين وشمال */
-            margin: 0 !important; 
         }
     }
     </style>
 """, unsafe_allow_html=True)
 
-
-# --- 2. دالة اللوغو (مخفية بالطباعة) ---
+# --- 2. دالة اللوغو (مغلفة بـ no-print) ---
 def show_full_logo():
     st.markdown('<div class="no-print">', unsafe_allow_html=True)
     found = False
@@ -95,7 +78,7 @@ def show_full_logo():
         st.markdown("<h1 style='text-align:center;'>PRIMUM QUALITY</h1>", unsafe_allow_html=True)
     st.markdown('</div>', unsafe_allow_html=True)
 
-# --- 3. نظام الدخول والاتصال ---
+# --- 3. نظام الدخول ---
 if 'admin_logged_in' not in st.session_state: st.session_state.admin_logged_in = False
 if not st.session_state.admin_logged_in:
     show_full_logo()
@@ -108,6 +91,7 @@ if not st.session_state.admin_logged_in:
                 st.rerun()
     st.stop()
 
+# --- 4. الاتصال بجوجل شيت ---
 def get_client():
     try:
         info = json.loads(st.secrets["gcp_service_account"]["json_data"].strip(), strict=False)
@@ -169,7 +153,7 @@ if client:
                     st.success("تم التصديق بنجاح!"); st.rerun()
                 st.markdown('</div>', unsafe_allow_html=True)
 
-                # --- 4. منطق الطباعة (المقصوص) ---
+                # --- 5. منطق الطباعة النهائي (يمين وشمال) ---
                 unique_targets = edited['الوجهة'].unique()
                 for target in unique_targets:
                     target_df = edited[edited['الوجهة'] == target]
