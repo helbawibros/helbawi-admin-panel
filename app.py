@@ -13,51 +13,57 @@ beirut_tz = pytz.timezone('Asia/Beirut')
 
 st.markdown("""
     <style>
-    .print-button-real {
-        display: block; width: 100%; height: 60px; 
-        background-color: #28a745; color: white !important; 
-        border: 2px solid #ffffff; border-radius: 10px; 
-        cursor: pointer; font-weight: bold; font-size: 22px; margin-top: 20px;
-    }
-
     @media print {
-        /* إخفاء كل شي بالمعاينة (اللوغو، الكبسات، القوائم) */
-        div[data-testid="stToolbar"], header, footer, .no-print,
-        [data-testid="stSidebar"], [data-testid="stHeader"], .stApp > header {
+        /* 1. إخفاء كلي وشامل لكل شيء ما عدا الفاتورة */
+        .no-print, [data-testid="stSidebar"], [data-testid="stHeader"], 
+        footer, header, .stHeader, div.stButton, div.stSelectbox,
+        div[data-testid="stToolbar"], .embeddedAppMetaBar_container__D_90n {
             display: none !important;
+            visibility: hidden !important;
             height: 0 !important;
+            margin: 0 !important;
         }
 
-        .stApp { position: absolute !important; top: 0 !important; margin: 0 !important; padding: 0 !important; }
-
-        @page { size: A4 landscape; margin: 5mm !important; }
-
-        .print-container {
-            visibility: visible !important;
-            display: flex !important;
-            flex-direction: row !important;
-            justify-content: space-between !important;
+        /* 2. إجبار المحتوى على البدء من نقطة الصفر في أعلى الصفحة */
+        .main .block-container {
+            padding: 0 !important;
+            margin: 0 !important;
+            top: 0 !important;
+        }
+        
+        .stApp {
+            position: absolute !important;
+            top: 0 !important;
             width: 100% !important;
-            direction: rtl !important;
+        }
+
+        /* 3. تنسيق الحاوية لتناسب وضعية الطول (Portrait) */
+        .print-container {
+            display: flex !important;
+            flex-direction: column !important; /* جعلهم فوق بعض إذا كنت بالطول */
+            width: 100% !important;
+            margin: 0 !important;
+            padding: 0 !important;
         }
 
         .invoice-half {
-            width: 48% !important;
-            padding: 10px !important;
-            border: 2px dashed #000 !important;
+            width: 100% !important; /* تأخذ كامل العرض */
+            border: 2px dashed black !important;
+            margin-bottom: 20px !important; /* مسافة بسيطة بين النسختين للقص */
+            padding: 15px !important;
+            page-break-inside: avoid !important;
         }
 
         .thermal-table {
             width: 100% !important;
             border-collapse: collapse !important;
-            border: 2px solid black !important;
+            margin-top: 10px !important;
         }
         
         .thermal-table th, .thermal-table td {
             border: 2px solid black !important;
-            padding: 8px !important;
-            text-align: center !important;
-            font-size: 20px !important;
+            padding: 10px !important;
+            font-size: 22px !important; /* خط كبير وواضح */
             font-weight: bold !important;
             color: black !important;
         }
