@@ -6,6 +6,7 @@ from google.oauth2.service_account import Credentials
 import os
 from datetime import datetime
 import pytz 
+import time
 
 # --- 1. إعدادات الصفحة والـ CSS للطباعة الاحترافية ---
 st.set_page_config(page_title="إدارة حلباوي - النسخة النهائية المستقرة", layout="wide")
@@ -97,9 +98,8 @@ if client:
                     if 'الحالة' in df_temp.columns:
                         p = df_temp[df_temp['الحالة'] == "بانتظار التصديق"]
                         if not p.empty:
-                            # حطيت لك التاريخ والوقت هون عشان يظهروا بالكبسات
                             st.session_state.orders.append({"name": rep, "time": p.iloc[0].get('التاريخ و الوقت', '---')})
-            except: continue # تخطي أي ورقة فيها مشكلة
+            except: continue
 
     if 'orders' in st.session_state and st.session_state.orders:
         for o in st.session_state.orders:
@@ -125,12 +125,30 @@ if client:
 
                     st.markdown('<div class="no-print">', unsafe_allow_html=True)
                     edited = st.data_editor(pending[['row_no', 'اسم الصنف', 'الكميه المطلوبه', 'الوجهة']], hide_index=True, use_container_width=True)
+                    
+                    # --- منطق التصديق المحمي من الأخطاء ---
                     if st.button("🚀 تصديق وإرسال النهائي", type="primary", use_container_width=True):
                         idx_status = raw_data[0].index('الحالة') + 1
-                        for _, r in edited.iterrows(): ws.update_cell(int(r['row_no']), idx_status, "تم التصديق")
-                        st.success("تم التصديق!"); st.rerun()
+                        success_count = 0
+                        progress_bar = st.progress(0)
+                        total = len(edited)
+                        
+                        for i, (_, r) in enumerate(edited.iterrows()):
+                            try:
+                                ws.update_cell(int(r['row_no']), idx_status, "تم التصديق")
+                                success_count += 1
+                                progress_bar.progress((i + 1) / total)
+                                time.sleep(0.2) # تأخير بسيط لمنع حظر جوجل
+                            except:
+                                st.error(f"فشل تصديق السطر {r['row_no']}")
+                        
+                        if success_count > 0:
+                            st.success(f"تم تصديق {success_count} صنف بنجاح!")
+                            time.sleep(1)
+                            st.rerun()
                     st.markdown('</div>', unsafe_allow_html=True)
 
+                    # --- منطقة الطباعة ---
                     st.markdown('<div class="printable-content">', unsafe_allow_html=True)
                     print_now = datetime.now(beirut_tz).strftime('%Y-%m-%d | %I:%M %p')
                     for target in edited['الوجهة'].unique():
