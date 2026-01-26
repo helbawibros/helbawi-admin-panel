@@ -7,128 +7,188 @@ import os
 from datetime import datetime
 import pytz 
 
-# --- 1. إعدادات الصفحة وتنسيق الطباعة "القاضي" ---
-st.set_page_config(page_title="إدارة حلباوي - النسخة النهائية", layout="wide")
+# --- 1. إعدادات الصفحة والـ CSS الاحترافي للطباعة ---
+st.set_page_config(page_title="إدارة حلباوي - النسخة النهائية 2026", layout="wide")
 beirut_tz = pytz.timezone('Asia/Beirut')
 
 st.markdown("""
     <style>
-    /* زر الطباعة على الشاشة */
+    /* زر الطباعة الأخضر على الشاشة */
     .print-button-real {
         display: block; width: 100%; height: 60px; 
         background-color: #28a745; color: white !important; 
         border-radius: 10px; cursor: pointer; font-weight: bold; font-size: 22px; 
         margin-top: 20px; text-align: center; line-height: 60px; text-decoration: none;
+        border: none;
+    }
+
+    @media screen {
+        .printable-content { display: none; }
     }
 
     @media print {
-        /* 1. إخفاء كل شيء (الموقع، اللوغو، الكبسات، القوائم) */
-        header, footer, .no-print, [data-testid="stHeader"], 
-        [data-testid="stSidebar"], [data-testid="stToolbar"],
-        [data-testid="stDataEditor"], .stImage, h1, h2, h3 {
+        /* إخفاء واجهة الموقع بالكامل وقت الطباعة */
+        [data-testid="stHeader"], [data-testid="stSidebar"], [data-testid="stToolbar"],
+        footer, header, .no-print, .stButton, [data-testid="stDataEditor"], .stSelectbox {
             display: none !important;
-            height: 0 !important;
         }
 
-        /* 2. تصفير الهوامش وسحب الفواتير للسقف */
-        .stApp {
+        /* سحب منطقة الطباعة للسقف تماماً */
+        .printable-content {
+            display: block !important;
+            visibility: visible !important;
             position: absolute !important;
-            top: -100px !important; /* ارفعها لـ -120 إذا لسه في فراغ */
-            margin: 0 !important;
-            padding: 0 !important;
+            top: 0 !important;
+            left: 0 !important;
             width: 100% !important;
-        }
-        
-        .main .block-container {
-            padding: 0 !important;
             margin: 0 !important;
+            padding: 0 !important;
         }
 
-        /* 3. إعداد الورقة بالعرض */
+        .stApp { background: white !important; }
+        
+        /* إعداد الورقة بالعرض */
         @page { 
             size: A4 landscape; 
-            margin: 5mm !important; 
+            margin: 0 !important; 
         }
 
-        /* 4. تنسيق الفواتير (يمين وشمال) */
-        .print-container {
-            visibility: visible !important;
+        .print-row {
             display: flex !important;
             flex-direction: row !important;
             justify-content: space-between !important;
             width: 100% !important;
-            direction: rtl !important;
             page-break-inside: avoid !important;
+            margin-bottom: 20px !important;
+            direction: rtl !important;
         }
 
-        .invoice-half {
+        .invoice-box {
             width: 48% !important;
             border: 2px dashed black !important;
             padding: 10px !important;
             box-sizing: border-box !important;
         }
 
-        /* تنسيق الجدول والخط الكبير */
-        .thermal-table {
-            width: 100% !important;
-            border-collapse: collapse !important;
-            margin-top: 10px;
-        }
-        
-        .thermal-table th, .thermal-table td {
-            border: 2px solid black !important;
-            padding: 6px !important;
-            text-align: center !important;
-            font-size: 20px !important;
-            font-weight: bold !important;
-            color: black !important;
-        }
+        table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+        th, td { border: 2px solid black; padding: 5px; text-align: center; font-size: 19px; font-weight: bold; color: black !important; }
+        h2, span { color: black !important; }
     }
     </style>
 """, unsafe_allow_html=True)
 
-# --- (هنا تضع كود الدخول والربط مع Google Sheets كما هو عندك) ---
-# ... (ننتقل مباشرة لمنطق إنشاء محتوى الطباعة) ...
+# --- 2. وظائف الربط واللوغو ---
+def show_full_logo():
+    found = False
+    for name in ["Logo.JPG", "logo.jpg", "Logo.png"]:
+        if os.path.exists(name):
+            st.image(name, use_container_width=True)
+            found = True
+            break
+    if not found:
+        st.markdown("<h1 style='text-align:center;' class='no-print'>PRIMUM QUALITY</h1>", unsafe_allow_html=True)
 
-# مثال على كيفية بناء "حاوية الطباعة" داخل الكود:
-def generate_print_content(target, selected_rep, target_df):
-    print_time = datetime.now(beirut_tz).strftime('%Y-%m-%d | %I:%M %p')
-    display_title = f"طلب: {target}" if target != "جردة سيارة" else f"جردة: {selected_rep}"
-    
-    rows_html = "".join([
-        f"<tr><td>{i+1}</td><td>{r.get('الكميه المطلوبه','')}</td><td style='text-align:right; padding-right:5px;'>{r.get('اسم الصنف','')}</td></tr>" 
-        for i, (_, r) in enumerate(target_df.iterrows())
-    ])
-    
-    # هاد هو "العنوان" اللي كان ضايع (المندوب، التاريخ، الساعة)
-    invoice_header = f"""
-    <div style="text-align:center; border-bottom:2px solid black; margin-bottom:5px;">
-        <h2 style="margin:0; font-size:26px;">{display_title}</h2>
-        <div style="display:flex; justify-content:space-between; font-size:18px; font-weight:bold; margin-top:5px;">
-            <span>المندوب: {selected_rep}</span>
-            <span>التاريخ: {print_time}</span>
-        </div>
-    </div>
-    """
-    
-    invoice_body = f"""
-    <table class="thermal-table">
-        <thead><tr><th style="width:10%;">ت</th><th style="width:20%;">العدد</th><th>اسم الصنف</th></tr></thead>
-        <tbody>{rows_html}</tbody>
-    </table>
-    <p style="text-align:center; font-weight:bold; margin-top:5px;">*** نسخة تحضير وفواتير ***</p>
-    """
-    
-    full_invoice = invoice_header + invoice_body
-    
-    # عرض النسختين جنب بعض
-    st.markdown(f"""
-    <div class="print-container">
-        <div class="invoice-half">{full_invoice}</div>
-        <div class="invoice-half">{full_invoice}</div>
-    </div>
-    <div class="no-print" style="border-bottom: 2px dashed #ccc; margin: 30px 0;"></div>
-    """, unsafe_allow_html=True)
+if 'admin_logged_in' not in st.session_state: st.session_state.admin_logged_in = False
+if not st.session_state.admin_logged_in:
+    show_full_logo()
+    col2 = st.columns([1, 2, 1])[1]
+    with col2:
+        pwd = st.text_input("كلمة السر", type="password")
+        if st.button("دخول", use_container_width=True):
+            if pwd == "Hlb_Admin_2024":
+                st.session_state.admin_logged_in = True
+                st.rerun()
+    st.stop()
 
-# --- زر الطباعة النهائي ---
-st.markdown('<button onclick="window.print()" class="print-button-real no-print">🖨️ طباعة الفواتير المفرزة بالعنوان</button>', unsafe_allow_html=True)
+def get_client():
+    try:
+        info = json.loads(st.secrets["gcp_service_account"]["json_data"].strip(), strict=False)
+        creds = Credentials.from_service_account_info(info, scopes=["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"])
+        return gspread.authorize(creds)
+    except: return None
+
+client = get_client()
+
+# --- 3. معالجة البيانات والطلبات ---
+if client:
+    spreadsheet = client.open_by_key("1-Abj-Kvbe02az8KYZfQL0eal2arKw_wgjVQdJX06IA0")
+    delegates = [sh.title for sh in spreadsheet.worksheets() if sh.title not in ["طلبات", "الأسعار", "البيانات", "الزبائن", "Sheet1"]]
+    
+    st.markdown('<div class="no-print">', unsafe_allow_html=True)
+    show_full_logo()
+    
+    if st.button("🔔 فحص الإشعارات الجديدة", use_container_width=True):
+        st.session_state.orders = []
+        for rep in delegates:
+            ws = spreadsheet.worksheet(rep)
+            data = ws.get_all_values()
+            if len(data) > 1:
+                df_temp = pd.DataFrame(data[1:], columns=data[0])
+                p = df_temp[df_temp['الحالة'] == "بانتظار التصديق"]
+                if not p.empty:
+                    st.session_state.orders.append({"name": rep, "time": p.iloc[0].get('التاريخ و الوقت', '---')})
+    
+    if 'orders' in st.session_state:
+        for o in st.session_state.orders:
+            # الكبسة تظهر اسم المندوب ووقت إرساله للطلب
+            if st.button(f"📦 طلب من: {o['name']} | 🕒 أرسل: {o['time']}", key=f"btn_{o['name']}", use_container_width=True):
+                st.session_state.active_rep = o['name']
+                st.rerun()
+    
+    active = st.session_state.get('active_rep', "-- اختر مندوب --")
+    selected_rep = st.selectbox("المندوب المختار:", ["-- اختر مندوب --"] + delegates, index=(delegates.index(active)+1 if active in delegates else 0))
+    st.markdown('</div>', unsafe_allow_html=True)
+
+    if selected_rep != "-- اختر مندوب --":
+        ws = spreadsheet.worksheet(selected_rep)
+        raw_data = ws.get_all_values()
+        if len(raw_data) > 1:
+            df = pd.DataFrame(raw_data[1:], columns=raw_data[0])
+            df.columns = df.columns.str.strip()
+            df['row_no'] = range(2, len(df) + 2)
+            pending = df[df['الحالة'] == "بانتظار التصديق"].copy()
+            
+            if not pending.empty:
+                # معالجة الوجهة (اسم الزبون)
+                pending['الوجهة'] = pending['اسم الزبون'].astype(str).replace(['nan', '', 'None'], 'جردة سيارة').str.strip() if 'اسم الزبون' in pending.columns else "جردة سيارة"
+
+                st.markdown('<div class="no-print">', unsafe_allow_html=True)
+                st.warning(f"تعديل طلبات المندوب: {selected_rep}")
+                edited = st.data_editor(pending[['row_no', 'اسم الصنف', 'الكميه المطلوبه', 'الوجهة']], hide_index=True, use_container_width=True)
+                
+                if st.button("🚀 تصديق وإرسال النهائي", type="primary", use_container_width=True):
+                    idx_status = raw_data[0].index('الحالة') + 1
+                    for _, r in edited.iterrows():
+                        ws.update_cell(int(r['row_no']), idx_status, "تم التصديق")
+                    st.success("تم التصديق بنجاح!"); st.rerun()
+                st.markdown('</div>', unsafe_allow_html=True)
+
+                # --- 4. منطقة الطباعة (التي تظهر في المعاينة فقط) ---
+                st.markdown('<div class="printable-content">', unsafe_allow_html=True)
+                print_now = datetime.now(beirut_tz).strftime('%Y-%m-%d | %I:%M %p')
+                unique_targets = edited['الوجهة'].unique()
+
+                for target in unique_targets:
+                    target_df = edited[edited['الوجهة'] == target]
+                    display_title = f"طلب: {target}" if target != "جردة سيارة" else f"جردة: {selected_rep}"
+                    rows_html = "".join([f"<tr><td>{i+1}</td><td>{r['الكميه المطلوبه']}</td><td style='text-align:right;'>{r['اسم الصنف']}</td></tr>" for i, (_, r) in enumerate(target_df.iterrows())])
+                    
+                    invoice_content = f"""
+                    <div class="invoice-box">
+                        <h2 style="text-align:center; margin:0; font-size:26px;">{display_title}</h2>
+                        <div style="display:flex; justify-content:space-between; font-weight:bold; margin-top:5px; direction:rtl; font-size:18px;">
+                            <span>المندوب: {selected_rep}</span>
+                            <span>{print_now}</span>
+                        </div>
+                        <table>
+                            <thead><tr><th style="width:10%;">ت</th><th style="width:20%;">العدد</th><th>اسم الصنف</th></tr></thead>
+                            <tbody>{rows_html}</tbody>
+                        </table>
+                    </div>
+                    """
+                    # عرض النسختين المتطابقتين جنب بعض
+                    st.markdown(f'<div class="print-row">{invoice_content}{invoice_content}</div>', unsafe_allow_html=True)
+                st.markdown('</div>', unsafe_allow_html=True)
+                
+                # زر الطباعة النهائي
+                st.markdown('<button onclick="window.print()" class="print-button-real no-print">🖨️ طباعة الفواتير المفرزة (A4 بالعرض)</button>', unsafe_allow_html=True)
