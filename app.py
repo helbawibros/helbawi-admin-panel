@@ -42,60 +42,62 @@ st.markdown("""
     }
 
         @media print {
-        /* 1. إخفاء كل شيء يخص الموقع والشاشة واللوغو والجداول الأصلية */
+        /* 1. إخفاء مطلق لكل عناصر الموقع والشاشة والـ Editor */
         [data-testid="stHeader"], [data-testid="stSidebar"], [data-testid="stToolbar"],
-        footer, header, .no-print, .stButton, [data-testid="stDataEditor"], 
-        .stSelectbox, img, div[id^="stMarkdownContainer"] > h2 {
+        footer, header, .no-print, .stButton, .stDataEditor, 
+        [data-testid="stVerticalBlock"] > div:not(.printable-content), 
+        img, h2, h1, h3 {
             display: none !important;
         }
         
-        /* 2. تنظيف الصفحة تماماً قبل وضع الفواتير */
+        /* 2. إظهار المحتوى المخصص للطباعة فقط وتثبيته فوق كل شيء */
         .printable-content { 
             display: block !important; 
             visibility: visible !important;
-            position: absolute !important;
+            position: fixed !important; /* تثبيت فوق كل "الأشباح" */
             top: 0 !important; 
             left: 0 !important; 
             width: 100% !important;
+            height: 100% !important;
             background-color: white !important;
-            z-index: 9999;
+            z-index: 9999999 !important;
         }
 
-        /* 3. إجبار الطابعة على العرض A4 Landscape */
+        /* 3. إعداد الصفحة بالعرض (Landscape) - هيدا سر النجاح */
         @page { 
             size: A4 landscape; 
             margin: 0 !important; 
         }
         
-        /* 4. توزيع النسختين (الميزان) */
+        /* 4. توزيع النسختين جنب بعض */
         .print-row {
             display: flex !important; 
             flex-direction: row !important;
             justify-content: space-around !important; 
             width: 100% !important;
-            padding-top: 10mm !important;
+            padding-top: 15mm !important;
+            gap: 10px !important;
         }
 
-        /* 5. تصميم الفاتورة - زيادة وضوح الخطوط */
         .invoice-box {
-            width: 46% !important;
+            width: 47% !important;
             border: 3px solid black !important; 
             padding: 10px !important;
+            background-color: white !important;
         }
 
         table { width: 100% !important; border-collapse: collapse !important; }
-        
         th, td { 
             border: 2px solid black !important; 
-            padding: 6px !important; 
-            font-size: 18px !important; /* تكبير الخط للوضوح */
+            padding: 8px !important; 
+            font-size: 18px !important; 
             font-weight: bold !important;
             color: black !important;
-            text-align: center !important;
         }
     }
     </style>
 """, unsafe_allow_html=True)
+
 
 
 
