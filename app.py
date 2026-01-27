@@ -8,43 +8,41 @@ from datetime import datetime
 import pytz 
 import time
 
-# --- 1. إعدادات الصفحة ---
+# --- 1. إعدادات الصفحة وحماية الذاكرة ---
 st.set_page_config(page_title="إدارة حلباوي - نسخة الميزان", layout="wide")
 beirut_tz = pytz.timezone('Asia/Beirut')
 
-# دالة فتح نافذة الطباعة (نسخة الطول Portrait)
+if 'admin_logged_in' not in st.session_state:
+    st.session_state.admin_logged_in = False
+if 'orders' not in st.session_state:
+    st.session_state.orders = []
+
+# دالة فتح نافذة الطباعة (نسخة الطول Portrait المسطرة)
 def open_print_window(html_content):
     js = f"""
     <script>
-    var printWin = window.open('', '', 'width=900,height=1000');
+    var printWin = window.open('', '', 'width=850,height=1000');
     printWin.document.write(`
         <html>
         <head>
             <style>
-                body {{ font-family: 'Arial'; direction: rtl; padding: 5mm; background: white; }}
-                .invoice-box {{ border: 3px solid black; padding: 15px; margin-bottom: 20px; box-sizing: border-box; }}
-                h2 {{ text-align: center; border-bottom: 3px solid black; padding-bottom: 10px; font-size: 24px; margin-top:0; }}
+                body {{ font-family: 'Arial'; direction: rtl; padding: 5mm; }}
+                .invoice-box {{ border: 3px solid black; padding: 15px; margin-bottom: 20px; page-break-inside: avoid; }}
+                h2 {{ text-align: center; border-bottom: 3px solid black; padding-bottom: 10px; margin-top:0; }}
                 table {{ width: 100%; border-collapse: collapse; margin-top: 10px; }}
-                th, td {{ border: 2px solid black; padding: 8px; text-align: center; font-size: 18px; font-weight: bold; }}
+                th, td {{ border: 2px solid black; padding: 8px; text-align: center; font-size: 19px; font-weight: bold; }}
                 .col-t {{ width: 10%; }} .col-qty {{ width: 20%; }} .col-name {{ width: 70%; text-align: right; }}
                 @media print {{ @page {{ size: A4 portrait; margin: 10mm; }} }}
             </style>
         </head>
-        <body>
-            ${html_content}
-            <script>setTimeout(function() {{ window.print(); window.close(); }}, 800);</script>
-        </body>
-        </html>
-    `);
+        <body>${html_content}
+        <script>setTimeout(function() {{ window.print(); window.close(); }}, 800);</script>
+        </body></html>`);
     printWin.document.close();
-    </script>
-    """
+    </script>"""
     st.components.v1.html(js, height=0)
 
-# --- 2. نظام الدخول وحماية الـ Session ---
-if 'admin_logged_in' not in st.session_state:
-    st.session_state.admin_logged_in = False
-
+# --- 2. نظام الدخول ---
 if not st.session_state.admin_logged_in:
     for name in ["Logo.JPG", "logo.jpg", "Logo.png"]:
         if os.path.exists(name): st.image(name, use_container_width=True); break
@@ -56,33 +54,33 @@ if not st.session_state.admin_logged_in:
             else: st.error("كلمة السر خطأ")
     st.stop()
 
-# --- 3. الاتصال بـ Google Spreadsheet ---
+# --- 3. الربط مع جوجل شيت (مع حماية من الـ APIError) ---
 @st.cache_resource
 def get_sh():
     try:
         info = json.loads(st.secrets["gcp_service_account"]["json_data"].strip(), strict=False)
         creds = Credentials.from_service_account_info(info, scopes=["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"])
+        # تأكد إن الـ Key أدناه هو نفسه اللي بالمتصفح عندك
         return gspread.authorize(creds).open_by_key("1-Abj-Kvbe02az8KYZfQL0eal2arKw_wgjVQdJX06IA0")
     except Exception as e:
-        st.error(f"⚠️ خطأ اتصال: {e}"); return None
+        st.error(f"⚠️ خطأ في الاتصال بجوجل: {e}"); return None
 
 sh = get_sh()
 
 if sh:
     delegates = [ws.title for ws in sh.worksheets() if ws.title not in ["طلبات", "الأسعار", "البيانات", "الزبائن", "Sheet1"]]
-    
-    # قسم الإشعارات
+    st.markdown("<h2 style='text-align:center;'>لوحة تحكم حلباوي</h2>", unsafe_allow_html=True)
+
     if st.button("🔔 فحص الإشعارات الجديدة", use_container_width=True):
         st.session_state.orders = []
         for rep in delegates:
             try:
                 data = sh.worksheet(rep).get_all_values()
-                if len(data) > 1 and 'الحالة' in data[0]:
-                    if any(r[data[0].index('الحالة')] == "بانتظار التصديق" for r in data[1:]):
-                        st.session_state.orders.append({"name": rep})
+                if len(data) > 1 and any(r[data[0].index('الحالة')] == "بانتظار التصديق" for r in data[1:]):
+                    st.session_state.orders.append({"name": rep})
             except: continue
 
-    if 'orders' in st.session_state and st.session_state.orders:
+    if st.session_state.orders:
         cols = st.columns(len(st.session_state.orders))
         for i, o in enumerate(st.session_state.orders):
             if cols[i].button(f"📦 طلب: {o['name']}", key=f"o_{o['name']}"):
@@ -102,21 +100,17 @@ if sh:
                 pending = df[df['الحالة'] == "بانتظار التصديق"].copy()
                 if not pending.empty:
                     pending['الوجهة'] = pending['اسم الزبون'].astype(str).replace(['nan', '', 'None'], 'جردة سيارة').str.strip()
-                    st.info(f"مراجعة طلب: {selected_rep}")
                     edited = st.data_editor(pending[['row_no', 'اسم الصنف', 'الكميه المطلوبه', 'الوجهة']], hide_index=True, use_container_width=True)
                     
                     c1, c2 = st.columns(2)
-                    # --- كبسة الطباعة (بالطول) ---
                     if c1.button("🖨️ طباعة للمراجعة", use_container_width=True):
                         p_now = datetime.now(beirut_tz).strftime('%Y-%m-%d | %I:%M %p')
                         h = ""
                         for tg in edited['الوجهة'].unique():
-                            t_df = edited[edited['الوجهة'] == tg]
-                            rows = "".join([f"<tr><td class='col-t'>{i+1}</td><td class='col-qty'>{r['الكميه المطلوبه']}</td><td class='col-name'>{r['اسم الصنف']}</td></tr>" for i, (_, r) in enumerate(t_df.iterrows())])
+                            rows = "".join([f"<tr><td class='col-t'>{i+1}</td><td class='col-qty'>{r['الكميه المطلوبه']}</td><td class='col-name'>{r['اسم الصنف']}</td></tr>" for i, (_, r) in enumerate(edited[edited['الوجهة'] == tg].iterrows())])
                             h += f'<div class="invoice-box"><h2>{tg}</h2><div style="display:flex; justify-content:space-between; font-weight:bold;"><span>المندوب: {selected_rep}</span><span>{p_now}</span></div><table><thead><tr><th class="col-t">ت</th><th class="col-qty">العدد</th><th class="col-name">اسم الصنف</th></tr></thead><tbody>{rows}</tbody></table></div>'
                         open_print_window(h)
 
-                    # --- كبسة التصديق النهائي ---
                     if c2.button("🚀 تصديق وإغلاق الطلب", type="primary", use_container_width=True):
                         idx = raw[0].index('الحالة') + 1
                         with st.spinner("جاري التحديث..."):
