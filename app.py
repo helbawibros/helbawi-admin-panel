@@ -12,41 +12,13 @@ import time
 st.set_page_config(page_title="إدارة حلباوي - نسخة الميزان", layout="wide")
 beirut_tz = pytz.timezone('Asia/Beirut')
 
-# دالة فتح نافذة الطباعة (نسخة Portrait - محصنة ضد الاختفاء)
-def open_print_window(html_content):
-    # نستخدم مفتاح فريد لضمان أن المكون يتم تحديثه وفتحه فوراً
-    unique_id = str(time.time()).replace('.', '')
-    js = f"""
-    <script>
-    var printWin = window.open('', '_blank', 'width=850,height=1000');
-    if (printWin) {{
-        printWin.document.write(`
-            <html>
-            <head>
-                <style>
-                    body {{ font-family: 'Arial'; direction: rtl; padding: 5mm; }}
-                    .invoice-box {{ border: 3px solid black; padding: 15px; margin-bottom: 20px; page-break-inside: avoid; }}
-                    h2 {{ text-align: center; border-bottom: 3px solid black; padding-bottom: 10px; margin-top:0; }}
-                    table {{ width: 100%; border-collapse: collapse; margin-top: 10px; }}
-                    th, td {{ border: 2px solid black; padding: 8px; text-align: center; font-size: 19px; font-weight: bold; }}
-                    .col-t {{ width: 10%; }} .col-qty {{ width: 20%; }} .col-name {{ width: 70%; text-align: right; }}
-                    @media print {{ @page {{ size: A4 portrait; margin: 10mm; }} }}
-                </style>
-            </head>
-            <body>{html_content}
-            <script>setTimeout(function() {{ window.print(); window.close(); }}, 800);</script>
-            </body></html>`);
-        printWin.document.close();
-    }} else {{
-        alert("⚠️ يرجى السماح بالنوافذ المنبثقة (Pop-ups) من إعدادات المتصفح ليفتح أمر الطباعة!");
-    }}
-    </script>"""
-    st.components.v1.html(js, height=0, key=unique_id)
-
-# --- 2. نظام الدخول والذاكرة ---
+# تهيئة الذاكرة لمنع الـ AttributeError
 if 'admin_logged_in' not in st.session_state: st.session_state.admin_logged_in = False
 if 'orders' not in st.session_state: st.session_state.orders = []
+if 'print_trigger' not in st.session_state: st.session_state.print_trigger = False
+if 'print_html' not in st.session_state: st.session_state.print_html = ""
 
+# --- 2. نظام الدخول ---
 if not st.session_state.admin_logged_in:
     for name in ["Logo.JPG", "logo.jpg", "Logo.png"]:
         if os.path.exists(name): st.image(name, use_container_width=True); break
@@ -58,7 +30,7 @@ if not st.session_state.admin_logged_in:
             else: st.error("كلمة السر خطأ")
     st.stop()
 
-# --- 3. الاتصال بـ Google ---
+# --- 3. الربط مع جوجل ---
 @st.cache_resource
 def get_sh():
     try:
@@ -69,9 +41,33 @@ def get_sh():
         st.error(f"⚠️ خطأ اتصال: {e}"); return None
 
 sh = get_sh()
+
 if sh:
+    # دالة الطباعة المحسنة (Portrait)
+    def trigger_print(html_content):
+        unique_key = f"print_{int(time.time())}"
+        js_code = f"""
+        <script>
+        var w = window.open('', '', 'width=900,height=1000');
+        w.document.write(`<html><head><style>
+            body {{ font-family: Arial; direction: rtl; padding: 10px; }}
+            .box {{ border: 3px solid black; padding: 15px; margin-bottom: 20px; page-break-inside: avoid; }}
+            h2 {{ text-align: center; border-bottom: 2px solid black; margin:0 0 10px 0; }}
+            table {{ width: 100%; border-collapse: collapse; }}
+            th, td {{ border: 2px solid black; padding: 8px; text-align: center; font-size: 20px; font-weight: bold; }}
+            .col-name {{ width: 70%; text-align: right; }}
+            @media print {{ @page {{ size: A4 portrait; margin: 10mm; }} }}
+        </style></head><body>{html_content}</body></html>`);
+        w.document.close();
+        setTimeout(function() {{ w.print(); w.close(); }}, 1000);
+        </script>
+        """
+        st.components.v1.html(js_code, height=0, key=unique_key)
+
     delegates = [ws.title for ws in sh.worksheets() if ws.title not in ["طلبات", "الأسعار", "البيانات", "الزبائن", "Sheet1"]]
     
+    st.markdown("<h2 style='text-align:center;'>لوحة تحكم حلباوي</h2>", unsafe_allow_html=True)
+
     if st.button("🔔 فحص الإشعارات الجديدة", use_container_width=True):
         st.session_state.orders = []
         for rep in delegates:
@@ -104,13 +100,19 @@ if sh:
                     edited = st.data_editor(pending[['row_no', 'اسم الصنف', 'الكميه المطلوبه', 'الوجهة']], hide_index=True, use_container_width=True)
                     
                     c1, c2 = st.columns(2)
+                    
                     if c1.button("🖨️ طباعة للمراجعة", use_container_width=True):
                         p_now = datetime.now(beirut_tz).strftime('%Y-%m-%d | %I:%M %p')
                         h = ""
                         for tg in edited['الوجهة'].unique():
-                            rows = "".join([f"<tr><td class='col-t'>{i+1}</td><td class='col-qty'>{r['الكميه المطلوبه']}</td><td class='col-name'>{r['اسم الصنف']}</td></tr>" for i, (_, r) in enumerate(edited[edited['الوجهة'] == tg].iterrows())])
-                            h += f'<div class="invoice-box"><h2>{tg}</h2><div style="display:flex; justify-content:space-between; font-weight:bold;"><span>المندوب: {selected_rep}</span><span>{p_now}</span></div><table><thead><tr><th class="col-t">ت</th><th class="col-qty">العدد</th><th class="col-name">اسم الصنف</th></tr></thead><tbody>{rows}</tbody></table></div>'
-                        open_print_window(h)
+                            rows = "".join([f"<tr><td>{i+1}</td><td>{r['الكميه المطلوبه']}</td><td class='col-name'>{r['اسم الصنف']}</td></tr>" for i, (_, r) in enumerate(edited[edited['الوجهة'] == tg].iterrows())])
+                            h += f'<div class="box"><h2>{tg}</h2><div style="display:flex; justify-content:space-between; font-weight:bold;"><span>المندوب: {selected_rep}</span><span>{p_now}</span></div><table><thead><tr><th>ت</th><th>العدد</th><th class="col-name">اسم الصنف</th></tr></thead><tbody>{rows}</tbody></table></div>'
+                        st.session_state.print_html = h
+                        st.session_state.print_trigger = True
+
+                    if st.session_state.print_trigger:
+                        trigger_print(st.session_state.print_html)
+                        st.session_state.print_trigger = False
 
                     if c2.button("🚀 تصديق وإغلاق الطلب", type="primary", use_container_width=True):
                         idx = raw[0].index('الحالة') + 1
