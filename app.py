@@ -14,9 +14,26 @@ beirut_tz = pytz.timezone('Asia/Beirut')
 
 st.markdown("""
     <style>
-    /* إخفاء محتوى الطباعة عن الشاشة العادية نهائياً لمنع ظهور الكود */
+    /* 1. إخفاء محتوى الطباعة عن الشاشة العادية */
     .printable-content { display: none; }
     
+    /* 2. صبغ كبسة (فحص الإشعارات) باللون الأحمر القوي */
+    div.stButton > button:first-child {
+        background-color: #d32f2f !important;
+        color: white !important;
+        border-radius: 10px !important;
+        height: 55px !important;
+        font-size: 20px !important;
+        font-weight: bold !important;
+        border: none !important;
+        box-shadow: 0px 4px 6px rgba(0,0,0,0.2) !important;
+    }
+    div.stButton > button:first-child:hover {
+        background-color: #b71c1c !important;
+        color: white !important;
+    }
+
+    /* 3. زر الطباعة الأخضر */
     .print-button-real {
         display: block; width: 100%; height: 60px; 
         background-color: #28a745; color: white !important; 
@@ -25,13 +42,12 @@ st.markdown("""
     }
 
     @media print {
-        /* إخفاء عناصر الموقع */
+        /* إخفاء كل شيء وقت الطباعة (بما فيها اللوغو والكبسة الحمراء) */
         [data-testid="stHeader"], [data-testid="stSidebar"], [data-testid="stToolbar"],
-        footer, header, .no-print, .stButton, [data-testid="stDataEditor"], .stSelectbox {
+        footer, header, .no-print, .stButton, [data-testid="stDataEditor"], .stSelectbox, img {
             display: none !important;
         }
         
-        /* إظهار المحتوى المخصص للطباعة فقط وبدقة */
         .printable-content { 
             display: block !important; 
             visibility: visible !important;
@@ -39,39 +55,27 @@ st.markdown("""
             top: 0 !important; left: 0 !important; width: 100% !important;
         }
 
-        @page { size: A4 landscape; margin: 8mm !important; }
+        @page { size: A4 landscape; margin: 5mm !important; }
         
         .print-row {
             display: flex !important; flex-direction: row !important;
             justify-content: space-between !important; width: 100% !important;
             direction: rtl !important; gap: 5mm !important;
-            page-break-inside: avoid !important;
-            margin-bottom: 10mm !important;
         }
 
         .invoice-box {
-            width: 48% !important; /* لضمان نسختين جنب بعض بالظبط */
-            border: 1px dashed black !important;
+            width: 48% !important;
+            border: 2px solid black !important; /* تقوية الإطار للطباعة */
             padding: 5px !important;
-            box-sizing: border-box !important;
         }
 
-        table { width: 10cm !important; border-collapse: collapse; margin: 5px auto; }
-        
-        /* المقاسات اللي طلبتها بالظبط بالسم */
-        .col-id { width: 2cm !important; text-align: center !important; }
-        .col-qty { width: 2cm !important; text-align: center !important; }
-        .col-name { width: 6cm !important; text-align: right !important; padding-right: 5px !important; }
-
+        table { width: 100% !important; border-collapse: collapse; }
         th, td { 
             border: 2px solid black !important; 
-            padding: 4px !important; 
             font-size: 16px !important; 
             font-weight: bold !important;
             color: black !important;
         }
-        h2 { font-size: 18px; margin: 0; text-align: center; }
-        .info-bar { display: flex; justify-content: space-between; font-size: 14px; margin-bottom: 2px; }
     }
     </style>
 """, unsafe_allow_html=True)
@@ -123,10 +127,16 @@ if client:
     spreadsheet = client.open_by_key("1-Abj-Kvbe02az8KYZfQL0eal2arKw_wgjVQdJX06IA0")
     delegates = [sh.title for sh in spreadsheet.worksheets() if sh.title not in ["طلبات", "الأسعار", "البيانات", "الزبائن", "Sheet1"]]
     
+    # --- التعديل الجوهري هون ---
     st.markdown('<div class="no-print">', unsafe_allow_html=True)
-    show_full_logo()
     
+    # هون بنقله: إذا كنت داخل (يعني admin_logged_in = True) اعرض النص فقط
+    if st.session_state.admin_logged_in:
+        st.markdown("<h2 style='text-align:center; color:#1a5f7a; margin-top:-30px;'>🏢 HELBAWI BROS</h2>", unsafe_allow_html=True)
+    # --------------------------
+
     if st.button("🔔 فحص الإشعارات الجديدة", use_container_width=True):
+         
         st.session_state.orders = []
         for rep in delegates:
             try:
