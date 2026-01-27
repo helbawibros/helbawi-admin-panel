@@ -42,59 +42,60 @@ st.markdown("""
     }
 
         @media print {
-        /* 1. إخفاء كل شيء نهائياً */
-        header, footer, .no-print, [data-testid="stHeader"], 
-        [data-testid="stSidebar"], [data-testid="stToolbar"],
-        .stButton, .stDataEditor, img, h1, h2, h3, .stSelectbox {
-            display: none !important;
-            height: 0 !important;
+        /* 1. إخفاء كل شي بالصفحة حرفياً ما عدا الفواتير */
+        body * {
+            visibility: hidden !important;
+        }
+        
+        /* 2. إظهار منطقة الفواتير ومحتوياتها فقط */
+        .printable-content, .printable-content * {
+            visibility: visible !important;
+        }
+
+        /* 3. تثبيت الفواتير في أعلى الصفحة تماماً */
+        .printable-content {
+            position: absolute !important;
+            left: 0 !important;
+            top: 0 !important;
+            width: 100% !important;
             margin: 0 !important;
             padding: 0 !important;
         }
 
-        /* 2. إظهار منطقة الطباعة بقوة */
-        .printable-content {
-            display: block !important;
-            width: 100% !important;
-            position: relative !important;
-            direction: rtl !important;
-        }
-
-        /* 3. إعداد الصفحة بالعرض */
+        /* 4. إعداد الورقة بالعرض (Landscape) */
         @page {
             size: A4 landscape;
-            margin: 5mm !important;
+            margin: 0 !important;
         }
 
-        /* 4. توزيع النسختين جنب بعض */
+        /* 5. توزيع المربعين (النسختين) ليعبوا الورقة */
         .print-row {
             display: flex !important;
             flex-direction: row !important;
-            justify-content: space-between !important;
+            justify-content: space-around !important;
             width: 100% !important;
-            gap: 5mm !important;
-            margin-top: 10mm !important;
+            margin-top: 10mm !important; /* مسافة بسيطة من فوق */
         }
 
         .invoice-box {
-            width: 48% !important;
+            width: 46% !important;
             border: 3px solid black !important;
-            padding: 10px !important;
+            padding: 15px !important;
             box-sizing: border-box !important;
+            background-color: white !important;
         }
 
+        /* 6. تكبير الخط والجداول للوضوح التام */
         table { width: 100% !important; border-collapse: collapse !important; }
         th, td { 
             border: 2px solid black !important; 
-            padding: 6px !important; 
-            font-size: 16px !important; 
+            padding: 8px !important; 
+            font-size: 18px !important; 
             font-weight: bold !important;
             color: black !important;
             text-align: center !important;
         }
     }
-    </style>
-""", unsafe_allow_html=True)
 
 
 
