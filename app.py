@@ -40,45 +40,59 @@ st.markdown("""
         margin-top: 20px; text-align: center; line-height: 60px; border: none;
     }
 
-    /* 4. هندسة الطباعة - إعدام الأشباح */
-    @media print {
-        /* إخفاء كل شيء بالصفحة حرفياً ما عدا الفواتير */
-        body > div:first-child, [data-testid="stHeader"], [data-testid="stSidebar"], 
-        .no-print, .stButton, .stDataEditor, img, h1, h2, h3, .stSelectbox {
+        @media print {
+        /* 1. إعدام نهائي لكل عناصر الموقع والشاشة واللوغو والجداول الأصلية */
+        html, body {
+            height: auto !important;
+            overflow: visible !important;
+        }
+        
+        /* إخفاء كل شيء في الصفحة (أمر قطعي) */
+        [data-testid="stHeader"], [data-testid="stSidebar"], [data-testid="stToolbar"],
+        header, footer, .no-print, .stButton, [data-testid="stDataEditor"], 
+        .stSelectbox, img, h1, h2, h3, div[id^="stMarkdownContainer"] {
             display: none !important;
             visibility: hidden !important;
         }
 
-        /* إظهار الفواتير فقط في أعلى الصفحة */
+        /* 2. إظهار منطقة الطباعة حصراً وسحبها للأعلى */
         .printable-content {
             display: block !important;
             visibility: visible !important;
             position: absolute !important;
-            left: 0 !important;
             top: 0 !important;
+            left: 0 !important;
             width: 100% !important;
-            background-color: white !important;
+            margin: 0 !important;
+            padding: 0 !important;
+            z-index: 999999 !important;
         }
 
         .printable-content * {
             visibility: visible !important;
         }
 
-        @page { size: A4 landscape; margin: 0 !important; }
-        
+        /* 3. إجبار المتصفح على Landscape */
+        @page {
+            size: A4 landscape;
+            margin: 0 !important;
+        }
+
+        /* 4. توزيع النسختين جنب بعض بدقة الميزان */
         .print-row {
             display: flex !important;
             flex-direction: row !important;
             justify-content: space-around !important;
             width: 100% !important;
-            margin-top: 10mm !important;
+            padding-top: 10mm !important;
         }
 
         .invoice-box {
-            width: 46% !important;
+            width: 47% !important;
             border: 3px solid black !important;
             padding: 10px !important;
             box-sizing: border-box !important;
+            background-color: white !important;
         }
 
         table { width: 100% !important; border-collapse: collapse !important; }
@@ -94,6 +108,9 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
+# تأكد من وجود المتغيرات لتفادي AttributeError (صورة 7)
+if 'admin_logged_in' not in st.session_state:
+    st.session_state.admin_logged_in = False
 
     
 # --- 3. الربط مع جوجل شيت ---
