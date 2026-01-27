@@ -8,67 +8,73 @@ from datetime import datetime
 import pytz 
 import time
 
-# --- 1. إعدادات الصفحة والـ CSS للطباعة الاحترافية ---
-st.set_page_config(page_title="إدارة حلباوي - النسخة النهائية المستقرة", layout="wide")
+# --- 1. إعدادات الصفحة ---
+st.set_page_config(page_title="إدارة حلباوي - النسخة الاحترافية", layout="wide")
 beirut_tz = pytz.timezone('Asia/Beirut')
 
-st.markdown("""
-    <style>
-    .print-button-real {
-        display: block; width: 100%; height: 60px; 
-        background-color: #28a745; color: white !important; 
-        border-radius: 10px; cursor: pointer; font-weight: bold; font-size: 22px; 
-        margin-top: 20px; text-align: center; line-height: 60px; text-decoration: none; border: none;
-    }
-    @media screen { .printable-content { display: none; } }
-    @media print {
-        [data-testid="stHeader"], [data-testid="stSidebar"], [data-testid="stToolbar"],
-        footer, header, .no-print, .stButton, [data-testid="stDataEditor"], .stSelectbox, .stAlert {
-            display: none !important;
-        }
-        .printable-content {
-            display: block !important; visibility: visible !important;
-            position: absolute !important; top: 0 !important; left: 0 !important;
-            width: 100% !important; margin: 0 !important; padding: 0 !important;
-        }
-        .stApp { background: white !important; }
-        @page { size: A4 landscape; margin: 0 !important; }
-        .print-row {
-            display: flex !important; flex-direction: row !important;
-            justify-content: space-between !important; width: 100% !important;
-            page-break-inside: avoid !important; margin-bottom: 20px !important; direction: rtl !important;
-        }
-        .invoice-box {
-            width: 48% !important; border: 2px dashed black !important;
-            padding: 10px !important; box-sizing: border-box !important;
-        }
-        table { width: 100%; border-collapse: collapse; margin-top: 10px; }
-        th, td { border: 2px solid black; padding: 5px; text-align: center; font-size: 18px; font-weight: bold; color: black !important; }
-    }
-    </style>
-""", unsafe_allow_html=True)
+# دالة فتح نافذة الطباعة (التزكاية الذكية)
+def open_print_window(html_content):
+    js = f"""
+    <script>
+    var printWin = window.open('', '', 'width=1100,height=850');
+    printWin.document.write(`
+        <html>
+        <head>
+            <title>طباعة حلباوي</title>
+            <style>
+                body {{ font-family: 'Arial', sans-serif; direction: rtl; padding: 10mm; background: white; }}
+                .print-row {{ display: flex; justify-content: space-between; gap: 10mm; margin-bottom: 15mm; page-break-inside: avoid; }}
+                .invoice-box {{ width: 48%; border: 3px solid black; padding: 15px; box-sizing: border-box; }}
+                h2 {{ text-align: center; border-bottom: 3px solid black; padding-bottom: 10px; margin-top: 0; font-size: 26px; }}
+                table {{ width: 100%; border-collapse: collapse; margin-top: 10px; }}
+                th, td {{ border: 2px solid black; padding: 8px; text-align: center; font-size: 19px; font-weight: bold; color: black; }}
+                /* حل مشكلة الترتيب: الصنف يأخذ المساحة الأكبر والعدد واضح */
+                .col-t {{ width: 10%; }} 
+                .col-qty {{ width: 20%; }} 
+                .col-name {{ width: 70%; text-align: right; }}
+                @media print {{ @page {{ size: A4 landscape; margin: 5mm; }} }}
+            </style>
+        </head>
+        <body>
+            ${html_content}
+            <script>
+                setTimeout(function() {{ window.print(); window.close(); }}, 750);
+            <\\/script>
+        </body>
+        </html>
+    `);
+    printWin.document.close();
+    </script>
+    """
+    st.components.v1.html(js, height=0)
 
-# --- 2. الدخول واللوغو ---
-def show_full_logo():
+# --- 2. نظام الدخول ---
+if 'admin_logged_in' not in st.session_state:
+    st.session_state.admin_logged_in = False
+
+def show_login():
     found = False
     for name in ["Logo.JPG", "logo.jpg", "Logo.png"]:
         if os.path.exists(name):
             st.image(name, use_container_width=True)
             found = True; break
-    if not found: st.markdown("<h1 style='text-align:center;' class='no-print'>PRIMUM QUALITY</h1>", unsafe_allow_html=True)
-
-if 'admin_logged_in' not in st.session_state: st.session_state.admin_logged_in = False
-if not st.session_state.admin_logged_in:
-    show_full_logo()
+    if not found: st.title("PRIMUM QUALITY")
+    
     col2 = st.columns([1, 2, 1])[1]
     with col2:
         pwd = st.text_input("كلمة السر", type="password")
         if st.button("دخول", use_container_width=True):
             if pwd == "Hlb_Admin_2024":
-                st.session_state.admin_logged_in = True; st.rerun()
+                st.session_state.admin_logged_in = True
+                st.rerun()
+            else:
+                st.error("كلمة السر خطأ")
+
+if not st.session_state.admin_logged_in:
+    show_login()
     st.stop()
 
-# --- 3. الربط الذكي ---
+# --- 3. الكود الأساسي (يظهر فقط بعد الدخول) ---
 @st.cache_resource
 def get_client():
     try:
@@ -83,9 +89,9 @@ if client:
     spreadsheet = client.open_by_key("1-Abj-Kvbe02az8KYZfQL0eal2arKw_wgjVQdJX06IA0")
     delegates = [sh.title for sh in spreadsheet.worksheets() if sh.title not in ["طلبات", "الأسعار", "البيانات", "الزبائن", "Sheet1"]]
     
-    st.markdown('<div class="no-print">', unsafe_allow_html=True)
-    show_full_logo()
+    st.markdown("<h2 style='text-align:center;'>لوحة تحكم حلباوي</h2>", unsafe_allow_html=True)
     
+    # فحص الإشعارات
     if st.button("🔔 فحص الإشعارات الجديدة", use_container_width=True):
         st.session_state.orders = []
         for rep in delegates:
@@ -93,22 +99,20 @@ if client:
                 ws = spreadsheet.worksheet(rep)
                 data = ws.get_all_values()
                 if len(data) > 1:
-                    df_temp = pd.DataFrame(data[1:], columns=data[0])
-                    df_temp.columns = df_temp.columns.str.strip()
-                    if 'الحالة' in df_temp.columns:
-                        p = df_temp[df_temp['الحالة'] == "بانتظار التصديق"]
-                        if not p.empty:
-                            st.session_state.orders.append({"name": rep, "time": p.iloc[0].get('التاريخ و الوقت', '---')})
+                    df_t = pd.DataFrame(data[1:], columns=data[0])
+                    if 'الحالة' in df_t.columns and any(df_t['الحالة'] == "بانتظار التصديق"):
+                        st.session_state.orders.append({"name": rep})
             except: continue
 
     if 'orders' in st.session_state and st.session_state.orders:
         for o in st.session_state.orders:
-            if st.button(f"📦 طلب من: {o['name']} | 🕒 أرسل: {o['time']}", key=f"btn_{o['name']}", use_container_width=True):
-                st.session_state.active_rep = o['name']; st.rerun()
-    
+            if st.button(f"📦 طلب جديد من: {o['name']}", key=f"btn_{o['name']}", use_container_width=True):
+                st.session_state.active_rep = o['name']
+                st.rerun()
+
     active = st.session_state.get('active_rep', "-- اختر مندوب --")
-    selected_rep = st.selectbox("المندوب المختار:", ["-- اختر مندوب --"] + delegates, index=(delegates.index(active)+1 if active in delegates else 0))
-    st.markdown('</div>', unsafe_allow_html=True)
+    selected_rep = st.selectbox("المندوب المختار:", ["-- اختر مندوب --"] + delegates, 
+                                index=(delegates.index(active)+1 if active in delegates else 0))
 
     if selected_rep != "-- اختر مندوب --":
         ws = spreadsheet.worksheet(selected_rep)
@@ -121,48 +125,41 @@ if client:
                 pending = df[df['الحالة'] == "بانتظار التصديق"].copy()
                 
                 if not pending.empty:
-                    pending['الوجهة'] = pending['اسم الزبون'].astype(str).replace(['nan', '', 'None'], 'جردة سيارة').str.strip() if 'اسم الزبون' in pending.columns else "جردة سيارة"
-
-                    st.markdown('<div class="no-print">', unsafe_allow_html=True)
+                    pending['الوجهة'] = pending['اسم الزبون'].astype(str).replace(['nan', '', 'None'], 'جردة سيارة').str.strip()
+                    
+                    st.info(f"تعديل طلبات المندوب: {selected_rep}")
                     edited = st.data_editor(pending[['row_no', 'اسم الصنف', 'الكميه المطلوبه', 'الوجهة']], hide_index=True, use_container_width=True)
                     
-                    # --- منطق التصديق المحمي من الأخطاء ---
-                    if st.button("🚀 تصديق وإرسال النهائي", type="primary", use_container_width=True):
+                    # --- كبسة الطباعة والتصديق الذكية ---
+                    if st.button("🚀 تصديق، طباعة وإرسال النهائي", type="primary", use_container_width=True):
+                        # 1. تحضير محتوى الطباعة
+                        print_now = datetime.now(beirut_tz).strftime('%Y-%m-%d | %I:%M %p')
+                        all_html = ""
+                        for target in edited['الوجهة'].unique():
+                            t_df = edited[edited['الوجهة'] == target]
+                            rows = "".join([f"<tr><td class='col-t'>{i+1}</td><td class='col-qty'>{r['الكميه المطلوبه']}</td><td class='col-name'>{r['اسم الصنف']}</td></tr>" for i, (_, r) in enumerate(t_df.iterrows())])
+                            invoice = f"""
+                            <div class="invoice-box">
+                                <h2>{target}</h2>
+                                <div style='display:flex; justify-content:space-between; font-weight:bold;'>
+                                    <span>المندوب: {selected_rep}</span><span>{print_now}</span>
+                                </div>
+                                <table><thead><tr><th class='col-t'>ت</th><th class='col-qty'>العدد</th><th class='col-name'>اسم الصنف</th></tr></thead><tbody>{rows}</tbody></table>
+                            </div>"""
+                            all_html += f"<div class='print-row'>{invoice}{invoice}</div>"
+                        
+                        # 2. فتح نافذة الطباعة
+                        open_print_window(all_html)
+                        
+                        # 3. تحديث جوجل شيت
                         idx_status = raw_data[0].index('الحالة') + 1
-                        success_count = 0
-                        progress_bar = st.progress(0)
-                        total = len(edited)
-                        
-                        for i, (_, r) in enumerate(edited.iterrows()):
-                            try:
-                                ws.update_cell(int(r['row_no']), idx_status, "تم التصديق")
-                                success_count += 1
-                                progress_bar.progress((i + 1) / total)
-                                time.sleep(0.2) # تأخير بسيط لمنع حظر جوجل
-                            except:
-                                st.error(f"فشل تصديق السطر {r['row_no']}")
-                        
-                        if success_count > 0:
-                            st.success(f"تم تصديق {success_count} صنف بنجاح!")
-                            time.sleep(1)
-                            st.rerun()
-                    st.markdown('</div>', unsafe_allow_html=True)
-
-                    # --- منطقة الطباعة ---
-                    st.markdown('<div class="printable-content">', unsafe_allow_html=True)
-                    print_now = datetime.now(beirut_tz).strftime('%Y-%m-%d | %I:%M %p')
-                    for target in edited['الوجهة'].unique():
-                        target_df = edited[edited['الوجهة'] == target]
-                        display_title = f"طلب: {target}" if target != "جردة سيارة" else f"جردة: {selected_rep}"
-                        rows_html = "".join([f"<tr><td>{i+1}</td><td>{r['الكميه المطلوبه']}</td><td style='text-align:right;'>{r['اسم الصنف']}</td></tr>" for i, (_, r) in enumerate(target_df.iterrows())])
-                        invoice = f"""
-                        <div class="invoice-box">
-                            <h2 style="text-align:center; margin:0;">{display_title}</h2>
-                            <div style="display:flex; justify-content:space-between; font-weight:bold; direction:rtl; margin-top:5px;">
-                                <span>المندوب: {selected_rep}</span><span>{print_now}</span>
-                            </div>
-                            <table><thead><tr><th>ت</th><th>العدد</th><th>اسم الصنف</th></tr></thead><tbody>{rows_html}</tbody></table>
-                        </div>"""
-                        st.markdown(f'<div class="print-row">{invoice}{invoice}</div>', unsafe_allow_html=True)
-                    st.markdown('</div>', unsafe_allow_html=True)
-                    st.markdown('<button onclick="window.print()" class="print-button-real no-print">🖨️ طباعة الفواتير المفرزة</button>', unsafe_allow_html=True)
+                        with st.spinner("جاري التحديث..."):
+                            for _, r in edited.iterrows():
+                                try:
+                                    ws.update_cell(int(r['row_no']), idx_status, "تم التصديق")
+                                    time.sleep(0.3)
+                                except: pass
+                        st.success("✅ تم بنجاح")
+                        time.sleep(1)
+                        st.session_state.orders = []
+                        st.rerun()
