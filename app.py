@@ -118,7 +118,7 @@ if sh:
                 df['row_no'] = range(2, len(df) + 2)
                 pending = df[df['الحالة'] == "بانتظار التصديق"].copy()
                 if not pending.empty:
-                    pending['الوجهة'] = pending['اسم الزبون'].astype(str).replace(['nan', '', 'None'], 'طلب سيارة').str.strip()
+                    pending['الوجهة'] = pending['اسم الزبون'].astype(str).replace(['nan', '', 'None'], 'جردة سيارة').str.strip()
                     st.success(f"📂 عرض طلبات المندوب: {selected_rep}")
                     edited = st.data_editor(pending[['row_no', 'اسم الصنف', 'الكميه المطلوبه', 'الوجهة']], hide_index=True, use_container_width=True)
                     
