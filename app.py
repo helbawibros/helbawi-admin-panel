@@ -42,13 +42,14 @@ st.markdown("""
     }
 
         @media print {
-        /* 1. إخفاء كل عناصر الموقع واللوغو والكبسات والشاشات */
+        /* 1. إخفاء كل شيء يخص الموقع والشاشة واللوغو والجداول الأصلية */
         [data-testid="stHeader"], [data-testid="stSidebar"], [data-testid="stToolbar"],
-        footer, header, .no-print, .stButton, [data-testid="stDataEditor"], .stSelectbox, img {
+        footer, header, .no-print, .stButton, [data-testid="stDataEditor"], 
+        .stSelectbox, img, div[id^="stMarkdownContainer"] > h2 {
             display: none !important;
         }
         
-        /* 2. إظهار محتوى الفواتير فقط وبدقة عالية */
+        /* 2. تنظيف الصفحة تماماً قبل وضع الفواتير */
         .printable-content { 
             display: block !important; 
             visibility: visible !important;
@@ -57,60 +58,45 @@ st.markdown("""
             left: 0 !important; 
             width: 100% !important;
             background-color: white !important;
+            z-index: 9999;
         }
 
-        /* 3. إعداد الصفحة بالعرض A4 Landscape مع هوامش دقيقة */
+        /* 3. إجبار الطابعة على العرض A4 Landscape */
         @page { 
             size: A4 landscape; 
-            margin: 5mm !important; 
+            margin: 0 !important; 
         }
         
-        /* 4. توزيع النسختين جنب بعض (الميزان) */
+        /* 4. توزيع النسختين (الميزان) */
         .print-row {
             display: flex !important; 
             flex-direction: row !important;
-            justify-content: space-between !important; 
+            justify-content: space-around !important; 
             width: 100% !important;
-            direction: rtl !important; 
-            gap: 5mm !important;
-            page-break-inside: avoid !important;
-            margin-bottom: 10mm !important;
+            padding-top: 10mm !important;
         }
 
-        /* 5. تصميم صندوق الفاتورة الواحدة */
+        /* 5. تصميم الفاتورة - زيادة وضوح الخطوط */
         .invoice-box {
-            width: 48% !important;
-            border: 2px solid black !important; /* خط أسود غامق للطابعة */
-            padding: 8px !important;
-            box-sizing: border-box !important;
+            width: 46% !important;
+            border: 3px solid black !important; 
+            padding: 10px !important;
         }
 
-        /* 6. تنسيق الجدول ليكون واضح جداً في الطباعة */
-        table { 
-            width: 100% !important; 
-            border-collapse: collapse !important; 
-            margin: 5px auto !important; 
-        }
+        table { width: 100% !important; border-collapse: collapse !important; }
         
         th, td { 
             border: 2px solid black !important; 
             padding: 6px !important; 
-            font-size: 16px !important; 
+            font-size: 18px !important; /* تكبير الخط للوضوح */
             font-weight: bold !important;
             color: black !important;
             text-align: center !important;
         }
-
-        .col-name { 
-            text-align: right !important; 
-            padding-right: 8px !important; 
-        }
-
-        h2 { font-size: 20px !important; margin-top: 0 !important; text-align: center !important; }
-        .info-bar { display: flex; justify-content: space-between; font-size: 14px; margin-bottom: 5px; }
     }
     </style>
 """, unsafe_allow_html=True)
+
 
 
 # --- 2. الدخول واللوغو ---
