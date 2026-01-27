@@ -181,15 +181,27 @@ if client:
                     # تعديل الكميات قبل التصديق
                     edited = st.data_editor(pending[['row_no', 'اسم الصنف', 'الكميه المطلوبه', 'الوجهة']], hide_index=True, use_container_width=True)
                     
-                    if st.button("🚀 تصديق وإرسال النهائي", type="primary", use_container_width=True):
-                        idx_status = raw_data[0].index('الحالة') + 1
-                        for _, r in edited.iterrows():
-                            try:
-                                ws.update_cell(int(r['row_no']), idx_status, "تم التصديق")
-                                time.sleep(0.2)
-                            except: pass
-                        st.success("تم التصديق!"); time.sleep(0.5); st.rerun()
-                    st.markdown('</div>', unsafe_allow_html=True)
+                                        if st.button("🚀 تصديق وإرسال النهائي", type="primary", use_container_width=True):
+                        with st.spinner("جاري تحديث البيانات في جوجل شيت..."):
+                            idx_status = raw_data[0].index('الحالة') + 1
+                            success_count = 0
+                            
+                            for _, r in edited.iterrows():
+                                try:
+                                    # تحديث الحالة إلى "تم التصديق" لكل سطر تم اختياره
+                                    ws.update_cell(int(r['row_no']), idx_status, "تم التصديق")
+                                    success_count += 1
+                                    time.sleep(0.3) # تأخير بسيط لتجنب حظر جوجل (API Limit)
+                                except Exception as e:
+                                    st.error(f"خطأ في السطر {r['row_no']}: {e}")
+                            
+                            if success_count > 0:
+                                st.success(f"✅ تم تصديق {success_count} صنف بنجاح!")
+                                time.sleep(1)
+                                # مسح الذاكرة المؤقتة وإعادة التشغيل لتحديث القائمة
+                                st.session_state.orders = [] 
+                                st.rerun()
+
 
                     # --- هندسة الطباعة (النسختين جنب بعض) ---
                     print_now = datetime.now(beirut_tz).strftime('%Y-%m-%d | %I:%M %p')
