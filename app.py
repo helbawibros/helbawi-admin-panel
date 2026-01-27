@@ -41,61 +41,70 @@ st.markdown("""
         margin-top: 20px; text-align: center; line-height: 60px; border: none;
     }
 
-        @media print {
-        /* 1. إخفاء كل شي بالصفحة حرفياً ما عدا الفواتير */
-        body * {
-            visibility: hidden !important;
-        }
-        
-        /* 2. إظهار منطقة الفواتير ومحتوياتها فقط */
-        .printable-content, .printable-content * {
-            visibility: visible !important;
-        }
+        st.markdown("""
+    <style>
+    /* 1. إخفاء محتوى الطباعة عن الشاشة */
+    .printable-content { display: none; }
+    
+    /* 2. الإشعارات باللون الأحمر القوي */
+    div.stButton > button:first-child {
+        background-color: #d32f2f !important;
+        color: white !important;
+        border-radius: 10px !important;
+        height: 55px !important;
+        font-size: 20px !important;
+        font-weight: bold !important;
+        border: none !important;
+    }
 
-        /* 3. تثبيت الفواتير في أعلى الصفحة تماماً */
+    /* 3. زر الطباعة الأخضر */
+    .print-button-real {
+        display: block; width: 100%; height: 60px; 
+        background-color: #28a745; color: white !important; 
+        border-radius: 10px; cursor: pointer; font-weight: bold; font-size: 22px; 
+        margin-top: 20px; text-align: center; line-height: 60px; border: none;
+    }
+
+    @media print {
+        /* إخفاء كلي لكل شي ما عدا الفواتير */
+        body * { visibility: hidden !important; }
+        .printable-content, .printable-content * { visibility: visible !important; }
+
         .printable-content {
             position: absolute !important;
-            left: 0 !important;
-            top: 0 !important;
+            left: 0 !important; top: 0 !important;
             width: 100% !important;
-            margin: 0 !important;
-            padding: 0 !important;
         }
 
-        /* 4. إعداد الورقة بالعرض (Landscape) */
-        @page {
-            size: A4 landscape;
-            margin: 0 !important;
-        }
-
-        /* 5. توزيع المربعين (النسختين) ليعبوا الورقة */
+        @page { size: A4 landscape; margin: 0 !important; }
+        
         .print-row {
             display: flex !important;
             flex-direction: row !important;
             justify-content: space-around !important;
             width: 100% !important;
-            margin-top: 10mm !important; /* مسافة بسيطة من فوق */
+            margin-top: 15mm !important;
         }
 
         .invoice-box {
             width: 46% !important;
             border: 3px solid black !important;
-            padding: 15px !important;
+            padding: 10px !important;
             box-sizing: border-box !important;
-            background-color: white !important;
         }
 
-        /* 6. تكبير الخط والجداول للوضوح التام */
         table { width: 100% !important; border-collapse: collapse !important; }
         th, td { 
             border: 2px solid black !important; 
-            padding: 8px !important; 
+            padding: 6px !important; 
             font-size: 18px !important; 
             font-weight: bold !important;
             color: black !important;
             text-align: center !important;
         }
     }
+    </style>
+""", unsafe_allow_html=True)
 
 
 
