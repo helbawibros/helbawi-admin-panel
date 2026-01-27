@@ -181,7 +181,7 @@ if client:
                     # تعديل الكميات قبل التصديق
                     edited = st.data_editor(pending[['row_no', 'اسم الصنف', 'الكميه المطلوبه', 'الوجهة']], hide_index=True, use_container_width=True)
                     
-                                        if st.button("🚀 تصديق وإرسال النهائي", type="primary", use_container_width=True):
+                    if st.button("🚀 تصديق وإرسال النهائي", type="primary", use_container_width=True):
                         with st.spinner("جاري تحديث البيانات في جوجل شيت..."):
                             idx_status = raw_data[0].index('الحالة') + 1
                             success_count = 0
