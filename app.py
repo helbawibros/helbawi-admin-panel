@@ -161,7 +161,7 @@ if client:
     # اختيار المندوب يدوياً
     selected_rep = st.selectbox("المندوب المختار:", ["-- اختر مندوب --"] + delegates, 
                                 index=(delegates.index(st.session_state.get('active_rep', ""))+1 
-                                       if st.session_state.get('active_rep', "") in delegates else 0))
+    if st.session_state.get('active_rep', "") in delegates else 0))
     st.markdown('</div>', unsafe_allow_html=True) # نهاية منطقة الـ no-print
 
     if selected_rep != "-- اختر مندوب --":
