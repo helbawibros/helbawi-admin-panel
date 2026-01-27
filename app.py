@@ -8,41 +8,45 @@ from datetime import datetime
 import pytz 
 import time
 
-# --- 1. إعدادات الصفحة وحماية الذاكرة ---
+# --- 1. إعدادات الصفحة ---
 st.set_page_config(page_title="إدارة حلباوي - نسخة الميزان", layout="wide")
 beirut_tz = pytz.timezone('Asia/Beirut')
 
-if 'admin_logged_in' not in st.session_state:
-    st.session_state.admin_logged_in = False
-if 'orders' not in st.session_state:
-    st.session_state.orders = []
-
-# دالة فتح نافذة الطباعة (نسخة الطول Portrait المسطرة)
+# دالة فتح نافذة الطباعة (نسخة Portrait - محصنة ضد الاختفاء)
 def open_print_window(html_content):
+    # نستخدم مفتاح فريد لضمان أن المكون يتم تحديثه وفتحه فوراً
+    unique_id = str(time.time()).replace('.', '')
     js = f"""
     <script>
-    var printWin = window.open('', '', 'width=850,height=1000');
-    printWin.document.write(`
-        <html>
-        <head>
-            <style>
-                body {{ font-family: 'Arial'; direction: rtl; padding: 5mm; }}
-                .invoice-box {{ border: 3px solid black; padding: 15px; margin-bottom: 20px; page-break-inside: avoid; }}
-                h2 {{ text-align: center; border-bottom: 3px solid black; padding-bottom: 10px; margin-top:0; }}
-                table {{ width: 100%; border-collapse: collapse; margin-top: 10px; }}
-                th, td {{ border: 2px solid black; padding: 8px; text-align: center; font-size: 19px; font-weight: bold; }}
-                .col-t {{ width: 10%; }} .col-qty {{ width: 20%; }} .col-name {{ width: 70%; text-align: right; }}
-                @media print {{ @page {{ size: A4 portrait; margin: 10mm; }} }}
-            </style>
-        </head>
-        <body>${html_content}
-        <script>setTimeout(function() {{ window.print(); window.close(); }}, 800);</script>
-        </body></html>`);
-    printWin.document.close();
+    var printWin = window.open('', '_blank', 'width=850,height=1000');
+    if (printWin) {{
+        printWin.document.write(`
+            <html>
+            <head>
+                <style>
+                    body {{ font-family: 'Arial'; direction: rtl; padding: 5mm; }}
+                    .invoice-box {{ border: 3px solid black; padding: 15px; margin-bottom: 20px; page-break-inside: avoid; }}
+                    h2 {{ text-align: center; border-bottom: 3px solid black; padding-bottom: 10px; margin-top:0; }}
+                    table {{ width: 100%; border-collapse: collapse; margin-top: 10px; }}
+                    th, td {{ border: 2px solid black; padding: 8px; text-align: center; font-size: 19px; font-weight: bold; }}
+                    .col-t {{ width: 10%; }} .col-qty {{ width: 20%; }} .col-name {{ width: 70%; text-align: right; }}
+                    @media print {{ @page {{ size: A4 portrait; margin: 10mm; }} }}
+                </style>
+            </head>
+            <body>{html_content}
+            <script>setTimeout(function() {{ window.print(); window.close(); }}, 800);</script>
+            </body></html>`);
+        printWin.document.close();
+    }} else {{
+        alert("⚠️ يرجى السماح بالنوافذ المنبثقة (Pop-ups) من إعدادات المتصفح ليفتح أمر الطباعة!");
+    }}
     </script>"""
-    st.components.v1.html(js, height=0)
+    st.components.v1.html(js, height=0, key=unique_id)
 
-# --- 2. نظام الدخول ---
+# --- 2. نظام الدخول والذاكرة ---
+if 'admin_logged_in' not in st.session_state: st.session_state.admin_logged_in = False
+if 'orders' not in st.session_state: st.session_state.orders = []
+
 if not st.session_state.admin_logged_in:
     for name in ["Logo.JPG", "logo.jpg", "Logo.png"]:
         if os.path.exists(name): st.image(name, use_container_width=True); break
@@ -54,23 +58,20 @@ if not st.session_state.admin_logged_in:
             else: st.error("كلمة السر خطأ")
     st.stop()
 
-# --- 3. الربط مع جوجل شيت (مع حماية من الـ APIError) ---
+# --- 3. الاتصال بـ Google ---
 @st.cache_resource
 def get_sh():
     try:
         info = json.loads(st.secrets["gcp_service_account"]["json_data"].strip(), strict=False)
         creds = Credentials.from_service_account_info(info, scopes=["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"])
-        # تأكد إن الـ Key أدناه هو نفسه اللي بالمتصفح عندك
         return gspread.authorize(creds).open_by_key("1-Abj-Kvbe02az8KYZfQL0eal2arKw_wgjVQdJX06IA0")
     except Exception as e:
-        st.error(f"⚠️ خطأ في الاتصال بجوجل: {e}"); return None
+        st.error(f"⚠️ خطأ اتصال: {e}"); return None
 
 sh = get_sh()
-
 if sh:
     delegates = [ws.title for ws in sh.worksheets() if ws.title not in ["طلبات", "الأسعار", "البيانات", "الزبائن", "Sheet1"]]
-    st.markdown("<h2 style='text-align:center;'>لوحة تحكم حلباوي</h2>", unsafe_allow_html=True)
-
+    
     if st.button("🔔 فحص الإشعارات الجديدة", use_container_width=True):
         st.session_state.orders = []
         for rep in delegates:
@@ -83,7 +84,7 @@ if sh:
     if st.session_state.orders:
         cols = st.columns(len(st.session_state.orders))
         for i, o in enumerate(st.session_state.orders):
-            if cols[i].button(f"📦 طلب: {o['name']}", key=f"o_{o['name']}"):
+            if cols[i].button(f"📦 {o['name']}", key=f"o_{o['name']}"):
                 st.session_state.active_rep = o['name']; st.rerun()
 
     active = st.session_state.get('active_rep', "-- اختر مندوب --")
