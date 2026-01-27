@@ -42,61 +42,60 @@ st.markdown("""
     }
 
         @media print {
-        /* 1. إخفاء مطلق لكل عناصر الموقع والشاشة والـ Editor */
-        [data-testid="stHeader"], [data-testid="stSidebar"], [data-testid="stToolbar"],
-        footer, header, .no-print, .stButton, .stDataEditor, 
-        [data-testid="stVerticalBlock"] > div:not(.printable-content), 
-        img, h2, h1, h3 {
+        /* 1. إخفاء كل شيء نهائياً */
+        header, footer, .no-print, [data-testid="stHeader"], 
+        [data-testid="stSidebar"], [data-testid="stToolbar"],
+        .stButton, .stDataEditor, img, h1, h2, h3, .stSelectbox {
             display: none !important;
-        }
-        
-        /* 2. إظهار المحتوى المخصص للطباعة فقط وتثبيته فوق كل شيء */
-        .printable-content { 
-            display: block !important; 
-            visibility: visible !important;
-            position: fixed !important; /* تثبيت فوق كل "الأشباح" */
-            top: 0 !important; 
-            left: 0 !important; 
-            width: 100% !important;
-            height: 100% !important;
-            background-color: white !important;
-            z-index: 9999999 !important;
+            height: 0 !important;
+            margin: 0 !important;
+            padding: 0 !important;
         }
 
-        /* 3. إعداد الصفحة بالعرض (Landscape) - هيدا سر النجاح */
-        @page { 
-            size: A4 landscape; 
-            margin: 0 !important; 
+        /* 2. إظهار منطقة الطباعة بقوة */
+        .printable-content {
+            display: block !important;
+            width: 100% !important;
+            position: relative !important;
+            direction: rtl !important;
         }
-        
+
+        /* 3. إعداد الصفحة بالعرض */
+        @page {
+            size: A4 landscape;
+            margin: 5mm !important;
+        }
+
         /* 4. توزيع النسختين جنب بعض */
         .print-row {
-            display: flex !important; 
+            display: flex !important;
             flex-direction: row !important;
-            justify-content: space-around !important; 
+            justify-content: space-between !important;
             width: 100% !important;
-            padding-top: 15mm !important;
-            gap: 10px !important;
+            gap: 5mm !important;
+            margin-top: 10mm !important;
         }
 
         .invoice-box {
-            width: 47% !important;
-            border: 3px solid black !important; 
+            width: 48% !important;
+            border: 3px solid black !important;
             padding: 10px !important;
-            background-color: white !important;
+            box-sizing: border-box !important;
         }
 
         table { width: 100% !important; border-collapse: collapse !important; }
         th, td { 
             border: 2px solid black !important; 
-            padding: 8px !important; 
-            font-size: 18px !important; 
+            padding: 6px !important; 
+            font-size: 16px !important; 
             font-weight: bold !important;
             color: black !important;
+            text-align: center !important;
         }
     }
     </style>
 """, unsafe_allow_html=True)
+
 
 
 
