@@ -76,28 +76,51 @@ if sh:
                     edited = st.data_editor(pending[['row_no', 'اسم الصنف', 'الكميه المطلوبه', 'الوجهة']], hide_index=True, use_container_width=True)
                     
                     # تحضير كود الطباعة
+                                        # تحضير كود الطباعة (نسختين يمين وشمال)
                     p_now = datetime.now(beirut_tz).strftime('%Y-%m-%d | %I:%M %p')
                     h_content = ""
                     for tg in edited['الوجهة'].unique():
                         rows = "".join([f"<tr><td>{i+1}</td><td>{r['الكميه المطلوبه']}</td><td style='text-align:right;'>{r['اسم الصنف']}</td></tr>" for i, (_, r) in enumerate(edited[edited['الوجهة'] == tg].iterrows())])
-                        h_content += f'<div style="border:3px solid black; padding:15px; margin-bottom:20px; page-break-inside:avoid;"><h2>{tg}</h2><div style="display:flex; justify-content:space-between; font-weight:bold;"><span>المندوب: {selected_rep}</span><span>{p_now}</span></div><table style="width:100%; border-collapse:collapse; margin-top:10px;"><thead style="background:#eee;"><tr><th>ت</th><th>العدد</th><th style="width:70%;">اسم الصنف</th></tr></thead><tbody>{rows}</tbody></table><style>th,td{{border:2px solid black; padding:8px; text-align:center; font-size:20px; font-weight:bold;}}</style></div>'
+                        
+                        # قالب الفاتورة الواحدة
+                        invoice_box = f"""
+                        <div style="width: 48%; border: 3px solid black; padding: 10px; box-sizing: border-box;">
+                            <h2 style="text-align:center; border-bottom:2px solid black; margin:0 0 10px 0; font-size:22px;">{tg}</h2>
+                            <div style="display:flex; justify-content:space-between; font-weight:bold; font-size:14px;">
+                                <span>المندوب: {selected_rep}</span><span>{p_now}</span>
+                            </div>
+                            <table style="width:100%; border-collapse:collapse; margin-top:10px;">
+                                <thead><tr><th>ت</th><th>العدد</th><th style="width:65%;">اسم الصنف</th></tr></thead>
+                                <tbody>{rows}</tbody>
+                            </table>
+                        </div>"""
 
-                    # --- الزر السحري (HTML) ---
+                        # دمج نسختين في سطر واحد (Flexbox)
+                        h_content += f'<div style="display:flex; justify-content:space-between; margin-bottom:30px; page-break-inside:avoid;">{invoice_box}{invoice_box}</div>'
+
+                    # --- الزر السحري (المعدل للنسختين) ---
                     print_button_html = f"""
                     <script>
                     function doPrint() {{
-                        var w = window.open('', '', 'width=900,height=1000');
-                        w.document.write(`<html><head><title>طباعة</title></head><body dir="rtl"> {h_content} <script>setTimeout(function() {{ window.print(); window.close(); }}, 800);<\\/script></body></html>`);
+                        var w = window.open('', '', 'width=1100,height=1000');
+                        w.document.write(`<html><head><title>طباعة نسختين</title>
+                        <style>
+                            body {{ font-family: Arial; direction: rtl; padding: 5mm; }}
+                            th, td {{ border: 2px solid black; padding: 5px; text-align: center; font-size: 17px; font-weight: bold; }}
+                            @media print {{ @page {{ size: A4 portrait; margin: 5mm; }} }}
+                        </style>
+                        </head><body> {h_content} <script>setTimeout(function() {{ window.print(); window.close(); }}, 800);<\\/script></body></html>`);
                         w.document.close();
                     }}
                     </script>
-                    <button onclick="doPrint()" style="width:100%; height:50px; background-color:#28a745; color:white; border:none; border-radius:10px; font-weight:bold; font-size:20px; cursor:pointer;">
-                        🖨️ اضغط هنا لفتح صفحة الطباعة
+                    <button onclick="doPrint()" style="width:100%; height:55px; background-color:#28a745; color:white; border:none; border-radius:10px; font-weight:bold; font-size:20px; cursor:pointer; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
+                        🖨️ مراجعة وطباعة (نسختين يمين وشمال)
                     </button>
                     """
                     
                     st.markdown("---")
-                    st.components.v1.html(print_button_html, height=60)
+                    st.components.v1.html(print_button_html, height=70)
+
                     
                     if st.button("🚀 تصديق وإغلاق الطلب نهائياً", type="primary", use_container_width=True):
                         idx = raw[0].index('الحالة') + 1
