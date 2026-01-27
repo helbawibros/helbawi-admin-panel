@@ -8,16 +8,20 @@ from datetime import datetime
 import pytz 
 import time
 
-# --- 1. إعدادات الصفحة والـ CSS الاحترافي (نسخة الميزان الذهبي) ---
-st.set_page_config(page_title="إدارة حلباوي - نسخة المقاسات الدقيقة", layout="wide")
+# --- 1. إعدادات الصفحة والـ CSS الاحترافي (نسخة إنهاء الأشباح) ---
+st.set_page_config(page_title="إدارة حلباوي - النسخة النهائية", layout="wide")
 beirut_tz = pytz.timezone('Asia/Beirut')
+
+# تهيئة المتغيرات لضمان عدم ظهور AttributeError
+if 'admin_logged_in' not in st.session_state:
+    st.session_state.admin_logged_in = False
 
 st.markdown("""
     <style>
     /* 1. إخفاء محتوى الطباعة عن الشاشة العادية */
     .printable-content { display: none; }
     
-    /* 2. تصميم كبسة (فحص الإشعارات) باللون الأحمر القوي */
+    /* 2. تصميم كبسة (فحص الإشعارات) باللون الأحمر */
     div.stButton > button:first-child {
         background-color: #d32f2f !important;
         color: white !important;
@@ -26,14 +30,9 @@ st.markdown("""
         font-size: 20px !important;
         font-weight: bold !important;
         border: none !important;
-        box-shadow: 0px 4px 6px rgba(0,0,0,0.2) !important;
-    }
-    div.stButton > button:first-child:hover {
-        background-color: #b71c1c !important;
-        color: white !important;
     }
 
-    /* 3. زر الطباعة الأخضر الكبير */
+    /* 3. زر الطباعة الأخضر */
     .print-button-real {
         display: block; width: 100%; height: 60px; 
         background-color: #28a745; color: white !important; 
@@ -41,42 +40,40 @@ st.markdown("""
         margin-top: 20px; text-align: center; line-height: 60px; border: none;
     }
 
-    /* 4. هندسة الطباعة - الضربة القاضية للأشباح */
+    /* 4. هندسة الطباعة - إعدام الأشباح */
     @media print {
-        /* إخفاء كل شيء في الصفحة (أمر عسكري) */
-        body * { visibility: hidden !important; }
-        
-        /* إظهار فقط منطقة الفواتير */
-        .printable-content, .printable-content * { 
-            visibility: visible !important; 
+        /* إخفاء كل شيء بالصفحة حرفياً ما عدا الفواتير */
+        body > div:first-child, [data-testid="stHeader"], [data-testid="stSidebar"], 
+        .no-print, .stButton, .stDataEditor, img, h1, h2, h3, .stSelectbox {
+            display: none !important;
+            visibility: hidden !important;
         }
 
-        /* سحب الفواتير لأعلى نقطة في الورقة */
+        /* إظهار الفواتير فقط في أعلى الصفحة */
         .printable-content {
+            display: block !important;
+            visibility: visible !important;
             position: absolute !important;
-            left: 0 !important; 
+            left: 0 !important;
             top: 0 !important;
             width: 100% !important;
             background-color: white !important;
         }
 
-        /* إجبار المتصفح على وضعية العرض */
-        @page { 
-            size: A4 landscape; 
-            margin: 0 !important; 
+        .printable-content * {
+            visibility: visible !important;
         }
+
+        @page { size: A4 landscape; margin: 0 !important; }
         
-        /* توزيع المربعين جنب بعض بدقة */
         .print-row {
             display: flex !important;
             flex-direction: row !important;
             justify-content: space-around !important;
             width: 100% !important;
             margin-top: 10mm !important;
-            gap: 10px !important;
         }
 
-        /* تصميم صندوق الفاتورة الواحدة */
         .invoice-box {
             width: 46% !important;
             border: 3px solid black !important;
@@ -84,19 +81,15 @@ st.markdown("""
             box-sizing: border-box !important;
         }
 
-        /* تنسيق الجدول داخل الفاتورة */
         table { width: 100% !important; border-collapse: collapse !important; }
         th, td { 
             border: 2px solid black !important; 
             padding: 6px !important; 
-            font-size: 17px !important; 
+            font-size: 18px !important; 
             font-weight: bold !important;
             color: black !important;
             text-align: center !important;
         }
-        
-        .info-bar { display: flex; justify-content: space-between; font-size: 14px; margin-bottom: 5px; }
-        h2 { text-align: center; margin-bottom: 5px; font-size: 22px; border-bottom: 1px solid black; }
     }
     </style>
 """, unsafe_allow_html=True)
