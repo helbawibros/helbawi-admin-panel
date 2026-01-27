@@ -41,69 +41,62 @@ st.markdown("""
     }
 
         @media print {
-        /* 1. إعدام نهائي لكل عناصر الموقع والشاشة واللوغو والجداول الأصلية */
-        html, body {
-            height: auto !important;
-            overflow: visible !important;
-        }
-        
-        /* إخفاء كل شيء في الصفحة (أمر قطعي) */
-        [data-testid="stHeader"], [data-testid="stSidebar"], [data-testid="stToolbar"],
-        header, footer, .no-print, .stButton, [data-testid="stDataEditor"], 
-        .stSelectbox, img, h1, h2, h3, div[id^="stMarkdownContainer"] {
-            display: none !important;
+        /* 1. إخفاء كل شيء في الصفحة بدون استثناء */
+        html, body, div, section, header, footer, button, img {
             visibility: hidden !important;
-        }
-
-        /* 2. إظهار منطقة الطباعة حصراً وسحبها للأعلى */
-        .printable-content {
-            display: block !important;
-            visibility: visible !important;
-            position: absolute !important;
-            top: 0 !important;
-            left: 0 !important;
-            width: 100% !important;
             margin: 0 !important;
             padding: 0 !important;
-            z-index: 999999 !important;
         }
 
-        .printable-content * {
+        /* 2. إظهار منطقة الفواتير ومحتوياتها فقط بقوة z-index */
+        .printable-content, .printable-content * {
             visibility: visible !important;
+            display: block !important;
         }
 
-        /* 3. إجبار المتصفح على Landscape */
+        /* 3. تثبيت الفواتير في أعلى الصفحة وإلغاء أي إزاحة */
+        .printable-content {
+            position: absolute !important;
+            left: 0 !important;
+            top: 0 !important;
+            width: 100% !important;
+            z-index: 999999 !important;
+            background-color: white !important;
+        }
+
+        /* 4. إعداد الورقة بالعرض Landscape */
         @page {
             size: A4 landscape;
             margin: 0 !important;
         }
 
-        /* 4. توزيع النسختين جنب بعض بدقة الميزان */
+        /* 5. توزيع المربعين جنب بعض */
         .print-row {
             display: flex !important;
             flex-direction: row !important;
             justify-content: space-around !important;
             width: 100% !important;
-            padding-top: 10mm !important;
+            padding-top: 15mm !important; /* مسافة بسيطة من حافة الورقة */
         }
 
         .invoice-box {
-            width: 47% !important;
+            width: 46% !important;
             border: 3px solid black !important;
-            padding: 10px !important;
+            padding: 15px !important;
             box-sizing: border-box !important;
-            background-color: white !important;
         }
 
+        /* 6. تنسيق الجدول ليكون واضح جداً */
         table { width: 100% !important; border-collapse: collapse !important; }
         th, td { 
             border: 2px solid black !important; 
-            padding: 6px !important; 
+            padding: 8px !important; 
             font-size: 18px !important; 
             font-weight: bold !important;
             color: black !important;
             text-align: center !important;
         }
+        h2 { border-bottom: 2px solid black; margin-bottom: 10px; }
     }
     </style>
 """, unsafe_allow_html=True)
