@@ -150,7 +150,7 @@ if client:
         for o in st.session_state.orders:
             # كبسات حمراء للطلبات الجديدة
                                 # --- تعديل قسم التصديق والطباعة معاً ---
-                    if st.button("🚀 تصديق، طباعة وإرسال النهائي", type="primary", use_container_width=True):
+            if st.button("🚀 تصديق، طباعة وإرسال النهائي", type="primary", use_container_width=True):
                         # 1. أولاً: تحضير محتوى الطباعة (النافذة الجديدة)
                         print_now = datetime.now(beirut_tz).strftime('%Y-%m-%d | %I:%M %p')
                         all_invoices_html = ""
