@@ -41,44 +41,77 @@ st.markdown("""
         margin-top: 20px; text-align: center; line-height: 60px; border: none;
     }
 
-    @media print {
-        /* إخفاء كل شيء وقت الطباعة (بما فيها اللوغو والكبسة الحمراء) */
+        @media print {
+        /* 1. إخفاء كل عناصر الموقع واللوغو والكبسات والشاشات */
         [data-testid="stHeader"], [data-testid="stSidebar"], [data-testid="stToolbar"],
         footer, header, .no-print, .stButton, [data-testid="stDataEditor"], .stSelectbox, img {
             display: none !important;
         }
         
+        /* 2. إظهار محتوى الفواتير فقط وبدقة عالية */
         .printable-content { 
             display: block !important; 
             visibility: visible !important;
             position: absolute !important;
-            top: 0 !important; left: 0 !important; width: 100% !important;
+            top: 0 !important; 
+            left: 0 !important; 
+            width: 100% !important;
+            background-color: white !important;
         }
 
-        @page { size: A4 landscape; margin: 5mm !important; }
+        /* 3. إعداد الصفحة بالعرض A4 Landscape مع هوامش دقيقة */
+        @page { 
+            size: A4 landscape; 
+            margin: 5mm !important; 
+        }
         
+        /* 4. توزيع النسختين جنب بعض (الميزان) */
         .print-row {
-            display: flex !important; flex-direction: row !important;
-            justify-content: space-between !important; width: 100% !important;
-            direction: rtl !important; gap: 5mm !important;
+            display: flex !important; 
+            flex-direction: row !important;
+            justify-content: space-between !important; 
+            width: 100% !important;
+            direction: rtl !important; 
+            gap: 5mm !important;
+            page-break-inside: avoid !important;
+            margin-bottom: 10mm !important;
         }
 
+        /* 5. تصميم صندوق الفاتورة الواحدة */
         .invoice-box {
             width: 48% !important;
-            border: 2px solid black !important; /* تقوية الإطار للطباعة */
-            padding: 5px !important;
+            border: 2px solid black !important; /* خط أسود غامق للطابعة */
+            padding: 8px !important;
+            box-sizing: border-box !important;
         }
 
-        table { width: 100% !important; border-collapse: collapse; }
+        /* 6. تنسيق الجدول ليكون واضح جداً في الطباعة */
+        table { 
+            width: 100% !important; 
+            border-collapse: collapse !important; 
+            margin: 5px auto !important; 
+        }
+        
         th, td { 
             border: 2px solid black !important; 
+            padding: 6px !important; 
             font-size: 16px !important; 
             font-weight: bold !important;
             color: black !important;
+            text-align: center !important;
         }
+
+        .col-name { 
+            text-align: right !important; 
+            padding-right: 8px !important; 
+        }
+
+        h2 { font-size: 20px !important; margin-top: 0 !important; text-align: center !important; }
+        .info-bar { display: flex; justify-content: space-between; font-size: 14px; margin-bottom: 5px; }
     }
     </style>
 """, unsafe_allow_html=True)
+
 
 # --- 2. الدخول واللوغو ---
 def show_full_logo():
