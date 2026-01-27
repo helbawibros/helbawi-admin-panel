@@ -14,35 +14,6 @@ beirut_tz = pytz.timezone('Asia/Beirut')
 
 st.markdown("""
     <style>
-    /* 1. إخفاء محتوى الطباعة عن الشاشة العادية */
-    .printable-content { display: none; }
-    
-    /* 2. صبغ كبسة (فحص الإشعارات) باللون الأحمر القوي */
-    div.stButton > button:first-child {
-        background-color: #d32f2f !important;
-        color: white !important;
-        border-radius: 10px !important;
-        height: 55px !important;
-        font-size: 20px !important;
-        font-weight: bold !important;
-        border: none !important;
-        box-shadow: 0px 4px 6px rgba(0,0,0,0.2) !important;
-    }
-    div.stButton > button:first-child:hover {
-        background-color: #b71c1c !important;
-        color: white !important;
-    }
-
-    /* 3. زر الطباعة الأخضر */
-    .print-button-real {
-        display: block; width: 100%; height: 60px; 
-        background-color: #28a745; color: white !important; 
-        border-radius: 10px; cursor: pointer; font-weight: bold; font-size: 22px; 
-        margin-top: 20px; text-align: center; line-height: 60px; border: none;
-    }
-
-    st.markdown("""
-    <style>
     /* 1. إخفاء محتوى الطباعة عن الشاشة */
     .printable-content { display: none; }
     
@@ -107,41 +78,7 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 
-
-
-
-# --- 2. الدخول واللوغو ---
-def show_full_logo():
-    # قائمة بأسماء الملفات المحتملة مع مراعاة الفراغ اللي عندك
-    possible_names = ["Logo .JPG", "Logo.JPG", "logo.jpg", "Logo .png", "Logo.png"]
-    found = False
-    for name in possible_names:
-        if os.path.exists(name):
-            try:
-                with open(name, "rb") as f:
-                    image_data = f.read()
-                st.image(image_data, use_container_width=True)
-                found = True
-                break
-            except:
-                continue
     
-    if not found:
-        # إذا ما لقى الصورة بيعرض النص الاحتياطي
-        st.markdown("<h1 style='text-align:center; color:#d32f2f;'>PRIMUM QUALITY</h1>", unsafe_allow_html=True)
-
-
-if 'admin_logged_in' not in st.session_state: st.session_state.admin_logged_in = False
-if not st.session_state.admin_logged_in:
-    show_full_logo()
-    col = st.columns([1, 2, 1])[1]
-    with col:
-        pwd = st.text_input("كلمة السر", type="password")
-        if st.button("دخول", use_container_width=True):
-            if pwd == "Hlb_Admin_2024":
-                st.session_state.admin_logged_in = True; st.rerun()
-    st.stop()
-
 # --- 3. الربط مع جوجل شيت ---
 @st.cache_resource
 def get_client():
