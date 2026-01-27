@@ -149,52 +149,57 @@ if client:
     if 'orders' in st.session_state and st.session_state.orders:
         for o in st.session_state.orders:
             # كبسات حمراء للطلبات الجديدة
-            if st.button(f"📦 طلب من: {o['name']} | 🕒 أرسل: {o['time']}", key=f"btn_{o['name']}", use_container_width=True):
-                st.session_state.active_rep = o['name']; st.rerun()
-    
-    # اختيار المندوب يدوياً
-    selected_rep = st.selectbox("المندوب المختار:", ["-- اختر مندوب --"] + delegates, 
-                                index=(delegates.index(st.session_state.get('active_rep', ""))+1 
-    if st.session_state.get('active_rep', "") in delegates else 0))
-    st.markdown('</div>', unsafe_allow_html=True) # نهاية منطقة الـ no-print
+                                # --- تعديل قسم التصديق والطباعة معاً ---
+                    if st.button("🚀 تصديق، طباعة وإرسال النهائي", type="primary", use_container_width=True):
+                        # 1. أولاً: تحضير محتوى الطباعة (النافذة الجديدة)
+                        print_now = datetime.now(beirut_tz).strftime('%Y-%m-%d | %I:%M %p')
+                        all_invoices_html = ""
+                        
+                        for target in edited['الوجهة'].unique():
+                            t_df = edited[edited['الوجهة'] == target]
+                            rows_html = "".join([
+                                f"<tr><td class='col-t'>{i+1}</td><td class='col-qty'>{r['الكميه المطلوبه']}</td><td class='col-name'>{r['اسم الصنف']}</td></tr>" 
+                                for i, (_, r) in enumerate(t_df.iterrows())
+                            ])
+                            
+                            # قالب الفاتورة النظيفة
+                            inv = f"""
+                            <div class="invoice-box">
+                                <h2>HELBAWI BROS</h2>
+                                <div style='display:flex; justify-content:space-between; font-weight:bold;'>
+                                    <span>المندوب: {selected_rep}</span>
+                                    <span>الوجهة: {target}</span>
+                                </div>
+                                <div style='text-align:center; font-size:14px; margin:5px 0;'>{print_now}</div>
+                                <table>
+                                    <thead><tr><th class='col-t'>ت</th><th class='col-qty'>العدد</th><th class='col-name'>اسم الصنف</th></tr></thead>
+                                    <tbody>{rows_html}</tbody>
+                                </table>
+                            </div>"""
+                            # نسختين جنب بعض
+                            all_invoices_html += f"<div class='print-row'>{inv} {inv}</div><div style='page-break-after:always;'></div>"
 
-    if selected_rep != "-- اختر مندوب --":
-        ws = spreadsheet.worksheet(selected_rep)
-        raw_data = ws.get_all_values()
-        if len(raw_data) > 1:
-            df = pd.DataFrame(raw_data[1:], columns=raw_data[0])
-            df.columns = df.columns.str.strip()
-            if 'الحالة' in df.columns:
-                df['row_no'] = range(2, len(df) + 2)
-                pending = df[df['الحالة'] == "بانتظار التصديق"].copy()
-                
-                if not pending.empty:
-                    pending['الوجهة'] = pending['اسم الزبون'].astype(str).replace(['nan', '', 'None'], 'جردة سيارة').str.strip()
-                    
-                    st.markdown('<div class="no-print">', unsafe_allow_html=True)
-                    # تعديل الكميات قبل التصديق
-                    edited = st.data_editor(pending[['row_no', 'اسم الصنف', 'الكميه المطلوبه', 'الوجهة']], hide_index=True, use_container_width=True)
-                    
-                    if st.button("🚀 تصديق وإرسال النهائي", type="primary", use_container_width=True):
-                        with st.spinner("جاري تحديث البيانات في جوجل شيت..."):
+                        # 2. إطلاق نافذة الطباعة (التزكاية)
+                        open_print_window(all_invoices_html)
+                        
+                        # 3. تحديث جوجل شيت (بعد الطباعة)
+                        with st.spinner("جاري تصديق البيانات في جوجل شيت..."):
                             idx_status = raw_data[0].index('الحالة') + 1
                             success_count = 0
-                            
                             for _, r in edited.iterrows():
                                 try:
-                                    # تحديث الحالة إلى "تم التصديق" لكل سطر تم اختياره
                                     ws.update_cell(int(r['row_no']), idx_status, "تم التصديق")
                                     success_count += 1
-                                    time.sleep(0.3) # تأخير بسيط لتجنب حظر جوجل (API Limit)
+                                    time.sleep(0.3)
                                 except Exception as e:
                                     st.error(f"خطأ في السطر {r['row_no']}: {e}")
                             
                             if success_count > 0:
-                                st.success(f"✅ تم تصديق {success_count} صنف بنجاح!")
-                                time.sleep(1)
-                                # مسح الذاكرة المؤقتة وإعادة التشغيل لتحديث القائمة
+                                st.success(f"✅ تم الطباعة والتصديق بنجاح!")
+                                time.sleep(2) # نترك وقت للمستخدم يشوف الرسالة
                                 st.session_state.orders = [] 
                                 st.rerun()
+
 
 
                     # --- هندسة الطباعة (النسختين جنب بعض) ---
