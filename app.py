@@ -141,13 +141,18 @@ if client:
                             st.session_state.orders.append({"name": rep, "time": p.iloc[0].get('التاريخ و الوقت', '---')})
             except: continue
 
+        # استكمالاً للقسم السابق: عرض المندوبين والطلبات
     if 'orders' in st.session_state and st.session_state.orders:
         for o in st.session_state.orders:
+            # كبسات حمراء للطلبات الجديدة
             if st.button(f"📦 طلب من: {o['name']} | 🕒 أرسل: {o['time']}", key=f"btn_{o['name']}", use_container_width=True):
                 st.session_state.active_rep = o['name']; st.rerun()
     
-    selected_rep = st.selectbox("المندوب المختار:", ["-- اختر مندوب --"] + delegates, index=(delegates.index(st.session_state.get('active_rep', ""))+1 if st.session_state.get('active_rep', "") in delegates else 0))
-    st.markdown('</div>', unsafe_allow_html=True)
+    # اختيار المندوب يدوياً
+    selected_rep = st.selectbox("المندوب المختار:", ["-- اختر مندوب --"] + delegates, 
+                                index=(delegates.index(st.session_state.get('active_rep', ""))+1 
+                                       if st.session_state.get('active_rep', "") in delegates else 0))
+    st.markdown('</div>', unsafe_allow_html=True) # نهاية منطقة الـ no-print
 
     if selected_rep != "-- اختر مندوب --":
         ws = spreadsheet.worksheet(selected_rep)
@@ -163,6 +168,7 @@ if client:
                     pending['الوجهة'] = pending['اسم الزبون'].astype(str).replace(['nan', '', 'None'], 'جردة سيارة').str.strip()
                     
                     st.markdown('<div class="no-print">', unsafe_allow_html=True)
+                    # تعديل الكميات قبل التصديق
                     edited = st.data_editor(pending[['row_no', 'اسم الصنف', 'الكميه المطلوبه', 'الوجهة']], hide_index=True, use_container_width=True)
                     
                     if st.button("🚀 تصديق وإرسال النهائي", type="primary", use_container_width=True):
@@ -175,24 +181,29 @@ if client:
                         st.success("تم التصديق!"); time.sleep(0.5); st.rerun()
                     st.markdown('</div>', unsafe_allow_html=True)
 
-                    # --- هندسة الطباعة (مخفية عن الشاشة وتظهر فقط بالطباعة) ---
+                    # --- هندسة الطباعة (النسختين جنب بعض) ---
                     print_now = datetime.now(beirut_tz).strftime('%Y-%m-%d | %I:%M %p')
                     all_invoices_html = ""
                     for target in edited['الوجهة'].unique():
                         t_df = edited[edited['الوجهة'] == target]
+                        # بناء الأسطر مع الترقيم اللي عملناه i+1
                         rows = "".join([f"<tr><td class='col-id'>{i+1}</td><td class='col-qty'>{r['الكميه المطلوبه']}</td><td class='col-name'>{r['اسم الصنف']}</td></tr>" for i, (_, r) in enumerate(t_df.iterrows())])
                         
+                        # تصميم الفاتورة (النسخة الواحدة)
                         inv = f"""
                         <div class="invoice-box">
-                            <h2>{"طلب: " + target if target != "جردة سيارة" else "جردة: " + selected_rep}</h2>
+                            <h2 style='text-align:center; border-bottom:1px solid black;'>HELBAWI BROS</h2>
+                            <h3 style='text-align:center; margin:5px 0;'>{"طلب: " + target if target != "جردة سيارة" else "جردة: " + selected_rep}</h3>
                             <div class="info-bar"><span>المندوب: {selected_rep}</span><span>{print_now}</span></div>
                             <table>
                                 <thead><tr><th class="col-id">ت</th><th class="col-qty">العدد</th><th class="col-name">اسم الصنف</th></tr></thead>
                                 <tbody>{rows}</tbody>
                             </table>
                         </div>"""
+                        # وضع النسختين جنب بعض في سطر واحد للطباعة
                         all_invoices_html += f'<div class="print-row">{inv}{inv}</div>'
                     
-                    # هذا الجزء هو اللي بيطبع النسخ جنب بعض
+                    # عرض المحتوى المخفي المخصص للطباعة فقط
                     st.markdown(f'<div class="printable-content">{all_invoices_html}</div>', unsafe_allow_html=True)
-                    st.markdown('<button onclick="window.print()" class="print-button-real no-print">🖨️ طباعة الفواتير (ctrl-p)</button>', unsafe_allow_html=True)
+                    # زر الطباعة الذي يظهر على الشاشة فقط
+                    st.markdown('<button onclick="window.print()" class="print-button-real no-print">🖨️ طباعة الفواتير (A4 Landscape)</button>', unsafe_allow_html=True)
