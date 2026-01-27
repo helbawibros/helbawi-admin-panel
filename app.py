@@ -41,7 +41,7 @@ st.markdown("""
         margin-top: 20px; text-align: center; line-height: 60px; border: none;
     }
 
-        st.markdown("""
+    st.markdown("""
     <style>
     /* 1. إخفاء محتوى الطباعة عن الشاشة */
     .printable-content { display: none; }
