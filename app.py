@@ -38,14 +38,12 @@ st.markdown("""
 if 'admin_logged_in' not in st.session_state: st.session_state.admin_logged_in = False
 if 'orders' not in st.session_state: st.session_state.orders = []
 
-# --- دالة الاتصال بجوجل (تعريفها قبل الاستخدام) ---
+# --- دالة الاتصال بجوجل (تعريف واحد وكافي) ---
 @st.cache_resource
 def get_sh():
     try:
-        # تأكد من أن secrets مضبوطة في Streamlit Cloud
         info = json.loads(st.secrets["gcp_service_account"]["json_data"].strip(), strict=False)
         creds = Credentials.from_service_account_info(info, scopes=["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"])
-        # استبدل المعرف باللي عندك
         return gspread.authorize(creds).open_by_key("1-Abj-Kvbe02az8KYZfQL0eal2arKw_wgjVQdJX06IA0")
     except Exception as e:
         st.error(f"⚠️ خطأ اتصال بجوجل: {e}")
@@ -75,68 +73,44 @@ if not st.session_state.admin_logged_in:
                 st.error("كلمة السر خطأ")
     st.stop()
 
-# --- 3. عرض الرادار واللمبات (نسخة سريعة ولا تؤثر على الطلبات) ---
-# --- رادار المندوبين المتطور (سريع ولا يسبب أخطاء) ---
-# --- رادار المندوبين (النسخة المضيئة) ---
-st.markdown('<div style="text-align:center; font-size:28px; font-weight:bold; color:#B8860B; margin-bottom:10px;">Helbawi Bros</div>', unsafe_allow_html=True)
+# --- 3. عرض الرادار واللمبات (النسخة السريعة) ---
+st.markdown('<div class="company-title">Helbawi Bros</div>', unsafe_allow_html=True)
 
 try:
-    # 1. جلب البيانات (استخدام الرابط السريع لمنع الـ API Error)
     SHEET_ID = "1-Abj-Kvbe02az8KYZfQL0eal2arKw_wgjVQdJX06IA0"
     url = f"https://docs.google.com/spreadsheets/d/{SHEET_ID}/gviz/tq?tqx=out:csv&sheet=Status"
     df_status = pd.read_csv(url)
     
-    beirut_tz = pytz.timezone('Asia/Beirut')
     now = datetime.now(beirut_tz)
-    
-    # 2. بناء شكل اللمبات بالعرض
     lumps_html = '<div style="display: flex; justify-content: center; gap: 15px; margin-bottom: 20px;">'
     
     for index, row in df_status.head(8).iterrows():
         is_online = False
         try:
             last_seen_str = str(row.iloc[1]).strip()
-            # فحص إذا الخلية فيها تاريخ
             if last_seen_str and last_seen_str != "nan":
                 last_seen = datetime.strptime(last_seen_str, "%Y-%m-%d %H:%M:%S")
                 last_seen = beirut_tz.localize(last_seen)
-                # إذا المندوب ظهر بآخر 10 دقائق بكون أخضر
+                # المندوب أونلاين إذا ظهر بآخر 10 دقائق
                 if (now - last_seen).total_seconds() / 60 < 10:
                     is_online = True
         except: pass
         
-        # 🟢 للأونلاين و 🔴 للأوفلاين (استخدام الإيموجي مباشرة أضمن)
         icon = "🟢" if is_online else "🔴"
-        lumps_html += f'<span title="{row.iloc[0]}" style="font-size: 30px;">{icon}</span>'
+        lumps_html += f'<span title="{row.iloc[0]}" style="font-size: 30px; cursor: help;">{icon}</span>'
     
     lumps_html += '</div>'
     st.markdown(lumps_html, unsafe_allow_html=True)
     st.divider()
-except Exception as e:
-    st.write("📡 جاري تحديث الرادار...")
+except:
+    st.info("📡 جاري تحديث حالة الرادار...")
 
-
-# --- 4. نظام الطلبات (هون بيرجع يشتغل طبيعي) ---
-# كودك الأساسي لجلب الطلبات وفحص الإشعارات بيكمل هون...
-
-
-
-# --- نهاية كود الرادار ---
-
-@st.cache_resource
-def get_sh():
-   
-    try:
-        info = json.loads(st.secrets["gcp_service_account"]["json_data"].strip(), strict=False)
-        creds = Credentials.from_service_account_info(info, scopes=["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"])
-        return gspread.authorize(creds).open_by_key("1-Abj-Kvbe02az8KYZfQL0eal2arKw_wgjVQdJX06IA0")
-    except Exception as e:
-        st.error(f"⚠️ خطأ اتصال بجوجل: {e}"); return None
-
+# --- 4. نظام الطلبات وفحص الإشعارات ---
 sh = get_sh()
 
 if sh:
-    delegates = [ws.title for ws in sh.worksheets() if ws.title not in ["طلبات", "الأسعار", "البيانات", "الزبائن", "Sheet1"]]
+    # جلب أسماء المندوبين (الشيتات) مع استثناء الشيتات الإدارية
+    delegates = [ws.title for ws in sh.worksheets() if ws.title not in ["طلبات", "الأسعار", "البيانات", "الزبائن", "Sheet1", "Status"]]
     
     # زر الفحص الأحمر
     if st.button("🔔 فحص الإشعارات الجديدة (الطلبات المنتظرة)", use_container_width=True, type="secondary"):
