@@ -75,40 +75,45 @@ if not st.session_state.admin_logged_in:
                 st.error("كلمة السر خطأ")
     st.stop()
 
-# --- 3. الصفحة الثانية (بعد الدخول) ---
-# --- 4. تشغيل رادار المندوبين الذكي (نسخة الـ CSV السريعة) ---
+# --- 3. عرض الرادار واللمبات (نسخة سريعة ولا تؤثر على الطلبات) ---
 st.markdown('<div class="company-title">Helbawi Bros</div>', unsafe_allow_html=True)
 
 try:
-    # استخدام رابط الـ CSV لتجنب الـ API Error وسرعة القراءة
+    # 1. رابط الـ CSV السريع (يمنع الـ API Error)
     SHEET_ID = "1-Abj-Kvbe02az8KYZfQL0eal2arKw_wgjVQdJX06IA0"
-    # تأكد أن اسم الورقة في الجوجل شيت هو "Status" بالظبط
     url = f"https://docs.google.com/spreadsheets/d/{SHEET_ID}/gviz/tq?tqx=out:csv&sheet=Status"
     
+    # قراءة البيانات بدون استخدام مكتبة gspread (لتوفير الكوتا)
     df_status = pd.read_csv(url)
     now = datetime.now(beirut_tz)
     
-    # عرض اللمبات
-    cols = st.columns(8)
+    # 2. عرض اللمبات بالعرض (حتى على الموبايل)
+    # نستخدم HTML و CSS لضمان بقائهم في سطر واحد
+    lumps_html = '<div style="display: flex; justify-content: center; gap: 10px; margin-bottom: 20px;">'
+    
     for index, row in df_status.head(8).iterrows():
         is_online = False
         try:
-            # تنظيف البيانات وقراءتها
-            last_seen_str = str(row.iloc[1]).strip() # العمود الثاني (آخر ظهور)
+            last_seen_str = str(row.iloc[1]).strip()
             last_seen = datetime.strptime(last_seen_str, "%Y-%m-%d %H:%M:%S")
             last_seen = beirut_tz.localize(last_seen)
-            diff = (now - last_seen).total_seconds() / 60
-            if diff < 10: is_online = True
+            if (now - last_seen).total_seconds() / 60 < 10:
+                is_online = True
         except: pass
-
-        with cols[index]:
-            color = "🟢" if is_online else "🔴"
-            # عرض اللمبة مع اسم المندوب (العمود الأول) كـ Tooltip
-            st.markdown(f'<p style="text-align:center; font-size:20px; margin:0;" title="{row.iloc[0]}">{color}</p>', unsafe_allow_html=True)
+        
+        color = "🟢" if is_online else "🔴"
+        lumps_html += f'<span title="{row.iloc[0]}" style="font-size: 20px;">{color}</span>'
+    
+    lumps_html += '</div>'
+    st.markdown(lumps_html, unsafe_allow_html=True)
     st.divider()
 
 except Exception as e:
-    st.write("📡") # أيقونة الستلايت تظهر فقط إذا انقطع النت تماماً
+    # إذا صار أي خطأ بالرادار، بكمل البرنامج عادي عشان ما يعطل الطلبات
+    st.write("📡") 
+
+# --- 4. نظام الطلبات (هون بيرجع يشتغل طبيعي) ---
+# كودك الأساسي لجلب الطلبات وفحص الإشعارات بيكمل هون...
 
 
 
