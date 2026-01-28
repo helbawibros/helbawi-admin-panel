@@ -64,45 +64,45 @@ if not st.session_state.admin_logged_in:
 # عرض اسم الشركة بخط فخم
 st.markdown('<div class="company-title">Helbawi Bros</div>', unsafe_allow_html=True)
 
-# --- بداية كود رادار المندوبين الـ 8 ---
-try:
-    # 1. الدخول إلى ورقة الحالة (Status)
-    status_sheet = sh.worksheet("Status")
-    data = status_sheet.get_all_values()
-    df_status = pd.DataFrame(data[1:], columns=data[0]) # تحويلها لجدول
-    
-    # 2. تحديد توقيت بيروت والوقت الحالي
-    beirut_tz = pytz.timezone('Asia/Beirut')
-    now = datetime.now(beirut_tz)
-    
-    # 3. إنشاء 8 أعمدة للمبات
-    st.write("") # فراغ بسيط تحت العنوان
-    cols = st.columns(8)
-    
-    # 4. دوران على أول 8 مندوبين وعرض حالاتهم
-    for index, row in df_status.head(8).iterrows():
-        name = row['اسم المندوب']
-        last_seen_str = str(row['آخر ظهور'])
-        
-        is_online = False
-        try:
-            # تحويل النص لتاريخ ومقارنته بالوقت الحالي
-            last_seen = datetime.strptime(last_seen_str, "%Y-%m-%d %H:%M:%S")
-            last_seen = beirut_tz.localize(last_seen)
-            diff = (now - last_seen).total_seconds() / 60
-            if diff < 10: # إذا شغال بآخر 10 دقائق
-                is_online = True
-        except:
-            is_online = False
+# 1. أولاً منعرّف الـ sh (موجود عندك أصلاً)
+sh = get_sh()
 
-        # 5. رسم اللمبة في عمودها الخاص (مع اسم المندوب كـ Tooltip)
-        with cols[index]:
-            color = "🟢" if is_online else "🔴"
-            st.markdown(f'<p style="text-align:center; font-size:25px; cursor:pointer;" title="{name}">{color}</p>', unsafe_allow_html=True)
-    
-    st.write("") # فراغ بسيط تحت الرادار
-except Exception as e:
-    st.write("📡") # أيقونة صغيرة في حال كان الشيت فارغاً أو جاري التحديث
+# 2. هلق منشغل الرادار بعد ما صار الـ sh جاهز
+if sh:
+    try:
+        # قراءة ورقة الحالة
+        status_sheet = sh.worksheet("Status")
+        data = status_sheet.get_all_values()
+        
+        # التأكد إنو الورقة مش فاضية
+        if len(data) > 1:
+            df_status = pd.DataFrame(data[1:], columns=data[0])
+            beirut_tz = pytz.timezone('Asia/Beirut')
+            now = datetime.now(beirut_tz)
+            
+            # إنشاء 8 أعمدة
+            st.write("") 
+            cols = st.columns(8)
+            
+            for index, row in df_status.head(8).iterrows():
+                is_online = False
+                try:
+                    last_seen_str = str(row['آخر ظهور']).strip()
+                    if last_seen_str:
+                        last_seen = datetime.strptime(last_seen_str, "%Y-%m-%d %H:%M:%S")
+                        last_seen = beirut_tz.localize(last_seen)
+                        diff = (now - last_seen).total_seconds() / 60
+                        if diff < 10: is_online = True
+                except: pass
+
+                with cols[index]:
+                    color = "🟢" if is_online else "🔴"
+                    # وضع اسم المندوب كـ Tooltip عند تمرير الماوس
+                    st.markdown(f'<p style="text-align:center; font-size:20px; margin:0;" title="{row["اسم المندوب"]}">{color}</p>', unsafe_allow_html=True)
+            st.write("") 
+    except Exception as e:
+        st.write("📡") # بضل الستلايت طالع إذا في مشكلة بالقراءة
+
 
 # --- نهاية كود الرادار ---
 
