@@ -77,46 +77,44 @@ if not st.session_state.admin_logged_in:
 
 # --- 3. عرض الرادار واللمبات (نسخة سريعة ولا تؤثر على الطلبات) ---
 # --- رادار المندوبين المتطور (سريع ولا يسبب أخطاء) ---
-st.markdown('<div class="company-title">Helbawi Bros</div>', unsafe_allow_html=True)
+# --- رادار المندوبين (النسخة المضيئة) ---
+st.markdown('<div style="text-align:center; font-size:28px; font-weight:bold; color:#B8860B; margin-bottom:10px;">Helbawi Bros</div>', unsafe_allow_html=True)
 
-@st.cache_data(ttl=60) # تحديث البيانات كل دقيقة تلقائياً لتوفير الطلبات
-def get_status_data():
-    try:
-        # رابط الـ CSV المباشر (أسرع بمليون مرة من gspread)
-        SHEET_ID = "1-Abj-Kvbe02az8KYZfQL0eal2arKw_wgjVQdJX06IA0"
-        url = f"https://docs.google.com/spreadsheets/d/{SHEET_ID}/gviz/tq?tqx=out:csv&sheet=Status"
-        return pd.read_csv(url)
-    except:
-        return None
-
-df_status = get_status_data()
-
-if df_status is not None:
+try:
+    # 1. جلب البيانات (استخدام الرابط السريع لمنع الـ API Error)
+    SHEET_ID = "1-Abj-Kvbe02az8KYZfQL0eal2arKw_wgjVQdJX06IA0"
+    url = f"https://docs.google.com/spreadsheets/d/{SHEET_ID}/gviz/tq?tqx=out:csv&sheet=Status"
+    df_status = pd.read_csv(url)
+    
     beirut_tz = pytz.timezone('Asia/Beirut')
     now = datetime.now(beirut_tz)
     
-    # تنسيق اللمبات بالعرض (Flexbox)
-    lumps_html = '<div style="display: flex; justify-content: center; gap: 10px; margin-bottom: 20px;">'
+    # 2. بناء شكل اللمبات بالعرض
+    lumps_html = '<div style="display: flex; justify-content: center; gap: 15px; margin-bottom: 20px;">'
     
     for index, row in df_status.head(8).iterrows():
         is_online = False
         try:
-            # قراءة الوقت من العمود الثاني
             last_seen_str = str(row.iloc[1]).strip()
+            # فحص إذا الخلية فيها تاريخ
             if last_seen_str and last_seen_str != "nan":
                 last_seen = datetime.strptime(last_seen_str, "%Y-%m-%d %H:%M:%S")
                 last_seen = beirut_tz.localize(last_seen)
+                # إذا المندوب ظهر بآخر 10 دقائق بكون أخضر
                 if (now - last_seen).total_seconds() / 60 < 10:
                     is_online = True
         except: pass
         
-        color = "🟢" if is_online else "🔴"
-        lumps_html += f'<span title="{row.iloc[0]}" style="font-size: 24px; cursor: pointer;">{color}</span>'
+        # 🟢 للأونلاين و 🔴 للأوفلاين (استخدام الإيموجي مباشرة أضمن)
+        icon = "🟢" if is_online else "🔴"
+        lumps_html += f'<span title="{row.iloc[0]}" style="font-size: 30px;">{icon}</span>'
     
     lumps_html += '</div>'
     st.markdown(lumps_html, unsafe_allow_html=True)
     st.divider()
- 
+except Exception as e:
+    st.write("📡 جاري تحديث الرادار...")
+
 
 # --- 4. نظام الطلبات (هون بيرجع يشتغل طبيعي) ---
 # كودك الأساسي لجلب الطلبات وفحص الإشعارات بيكمل هون...
