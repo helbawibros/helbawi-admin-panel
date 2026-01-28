@@ -76,49 +76,40 @@ if not st.session_state.admin_logged_in:
     st.stop()
 
 # --- 3. الصفحة الثانية (بعد الدخول) ---
+# --- 4. تشغيل رادار المندوبين الذكي (نسخة الـ CSV السريعة) ---
 st.markdown('<div class="company-title">Helbawi Bros</div>', unsafe_allow_html=True)
 
-# استدعاء الاتصال
-sh = get_sh()
+try:
+    # استخدام رابط الـ CSV لتجنب الـ API Error وسرعة القراءة
+    SHEET_ID = "1-Abj-Kvbe02az8KYZfQL0eal2arKw_wgjVQdJX06IA0"
+    # تأكد أن اسم الورقة في الجوجل شيت هو "Status" بالظبط
+    url = f"https://docs.google.com/spreadsheets/d/{SHEET_ID}/gviz/tq?tqx=out:csv&sheet=Status"
+    
+    df_status = pd.read_csv(url)
+    now = datetime.now(beirut_tz)
+    
+    # عرض اللمبات
+    cols = st.columns(8)
+    for index, row in df_status.head(8).iterrows():
+        is_online = False
+        try:
+            # تنظيف البيانات وقراءتها
+            last_seen_str = str(row.iloc[1]).strip() # العمود الثاني (آخر ظهور)
+            last_seen = datetime.strptime(last_seen_str, "%Y-%m-%d %H:%M:%S")
+            last_seen = beirut_tz.localize(last_seen)
+            diff = (now - last_seen).total_seconds() / 60
+            if diff < 10: is_online = True
+        except: pass
 
-# --- 4. تشغيل رادار المندوبين (اللمبات الـ 8) ---
-if sh:
-    try:
-        status_sheet = sh.worksheet("Status")
-        data = status_sheet.get_all_values()
-        
-        if len(data) > 1:
-            # تحويل البيانات لجدول مع تسمية الأعمدة
-            df_status = pd.DataFrame(data[1:], columns=data[0])
-            now = datetime.now(beirut_tz)
-            
-            # إنشاء 8 أعمدة للمبات
-            cols = st.columns(8)
-            
-            for index, row in df_status.head(8).iterrows():
-                is_online = False
-                try:
-                    last_seen_str = str(row['آخر ظهور']).strip()
-                    if last_seen_str:
-                        last_seen = datetime.strptime(last_seen_str, "%Y-%m-%d %H:%M:%S")
-                        last_seen = beirut_tz.localize(last_seen)
-                        diff = (now - last_seen).total_seconds() / 60
-                        # إذا فتح التطبيق بآخر 10 دقائق يكون أخضر
-                        if diff < 10: 
-                            is_online = True
-                except: 
-                    pass
+        with cols[index]:
+            color = "🟢" if is_online else "🔴"
+            # عرض اللمبة مع اسم المندوب (العمود الأول) كـ Tooltip
+            st.markdown(f'<p style="text-align:center; font-size:20px; margin:0;" title="{row.iloc[0]}">{color}</p>', unsafe_allow_html=True)
+    st.divider()
 
-                with cols[index]:
-                    color = "🟢" if is_online else "🔴"
-                    # Tooltip لعرض اسم المندوب عند تمرير الماوس
-                    st.markdown(f'<p style="text-align:center; font-size:20px; margin:0; cursor:default;" title="{row["اسم المندوب"]}">{color}</p>', unsafe_allow_html=True)
-        st.divider() # سطر فاصل تحت الرادار
-    except Exception as e:
-        st.write("📡 جاري تحديث بيانات المندوبين...")
+except Exception as e:
+    st.write("📡") # أيقونة الستلايت تظهر فقط إذا انقطع النت تماماً
 
-# --- كمل باقي كود الإدارة هون (الأزرار، الجداول، إلخ) ---
-st.write("مرحباً بك في لوحة التحكم...")
 
 
 # --- نهاية كود الرادار ---
