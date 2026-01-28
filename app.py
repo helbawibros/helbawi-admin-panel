@@ -38,9 +38,21 @@ st.markdown("""
 if 'admin_logged_in' not in st.session_state: st.session_state.admin_logged_in = False
 if 'orders' not in st.session_state: st.session_state.orders = []
 
-# دالة ذكية لإيجاد اللوغو حتى لو في فراغ بالاسم
+# --- دالة الاتصال بجوجل (تعريفها قبل الاستخدام) ---
+@st.cache_resource
+def get_sh():
+    try:
+        # تأكد من أن secrets مضبوطة في Streamlit Cloud
+        info = json.loads(st.secrets["gcp_service_account"]["json_data"].strip(), strict=False)
+        creds = Credentials.from_service_account_info(info, scopes=["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"])
+        # استبدل المعرف باللي عندك
+        return gspread.authorize(creds).open_by_key("1-Abj-Kvbe02az8KYZfQL0eal2arKw_wgjVQdJX06IA0")
+    except Exception as e:
+        st.error(f"⚠️ خطأ اتصال بجوجل: {e}")
+        return None
+
+# دالة ذكية لإيجاد اللوغو
 def show_logo(use_width=True):
-    # مصفوفة بأسماء الملفات المحتملة بناءً على الصورة اللي بعتها
     possible_names = ["Logo .JPG", "Logo.JPG", "logo.jpg", "Logo .png", "Logo.png"]
     for name in possible_names:
         if os.path.exists(name):
@@ -56,32 +68,31 @@ if not st.session_state.admin_logged_in:
         st.markdown("<h2 style='text-align:center;'>تسجيل الدخول</h2>", unsafe_allow_html=True)
         pwd = st.text_input("كلمة السر الخاصة بالإدارة", type="password")
         if st.button("دخول النظام", use_container_width=True):
-            if pwd == "Hlb_Admin_2024": st.session_state.admin_logged_in = True; st.rerun()
-            else: st.error("كلمة السر خطأ")
+            if pwd == "Hlb_Admin_2024": 
+                st.session_state.admin_logged_in = True
+                st.rerun()
+            else: 
+                st.error("كلمة السر خطأ")
     st.stop()
 
 # --- 3. الصفحة الثانية (بعد الدخول) ---
-# عرض اسم الشركة بخط فخم
 st.markdown('<div class="company-title">Helbawi Bros</div>', unsafe_allow_html=True)
 
-# 1. أولاً منعرّف الـ sh (موجود عندك أصلاً)
+# استدعاء الاتصال
 sh = get_sh()
 
-# 2. هلق منشغل الرادار بعد ما صار الـ sh جاهز
+# --- 4. تشغيل رادار المندوبين (اللمبات الـ 8) ---
 if sh:
     try:
-        # قراءة ورقة الحالة
         status_sheet = sh.worksheet("Status")
         data = status_sheet.get_all_values()
         
-        # التأكد إنو الورقة مش فاضية
         if len(data) > 1:
+            # تحويل البيانات لجدول مع تسمية الأعمدة
             df_status = pd.DataFrame(data[1:], columns=data[0])
-            beirut_tz = pytz.timezone('Asia/Beirut')
             now = datetime.now(beirut_tz)
             
-            # إنشاء 8 أعمدة
-            st.write("") 
+            # إنشاء 8 أعمدة للمبات
             cols = st.columns(8)
             
             for index, row in df_status.head(8).iterrows():
@@ -92,16 +103,22 @@ if sh:
                         last_seen = datetime.strptime(last_seen_str, "%Y-%m-%d %H:%M:%S")
                         last_seen = beirut_tz.localize(last_seen)
                         diff = (now - last_seen).total_seconds() / 60
-                        if diff < 10: is_online = True
-                except: pass
+                        # إذا فتح التطبيق بآخر 10 دقائق يكون أخضر
+                        if diff < 10: 
+                            is_online = True
+                except: 
+                    pass
 
                 with cols[index]:
                     color = "🟢" if is_online else "🔴"
-                    # وضع اسم المندوب كـ Tooltip عند تمرير الماوس
-                    st.markdown(f'<p style="text-align:center; font-size:20px; margin:0;" title="{row["اسم المندوب"]}">{color}</p>', unsafe_allow_html=True)
-            st.write("") 
+                    # Tooltip لعرض اسم المندوب عند تمرير الماوس
+                    st.markdown(f'<p style="text-align:center; font-size:20px; margin:0; cursor:default;" title="{row["اسم المندوب"]}">{color}</p>', unsafe_allow_html=True)
+        st.divider() # سطر فاصل تحت الرادار
     except Exception as e:
-        st.write("📡") # بضل الستلايت طالع إذا في مشكلة بالقراءة
+        st.write("📡 جاري تحديث بيانات المندوبين...")
+
+# --- كمل باقي كود الإدارة هون (الأزرار، الجداول، إلخ) ---
+st.write("مرحباً بك في لوحة التحكم...")
 
 
 # --- نهاية كود الرادار ---
