@@ -74,6 +74,7 @@ if not st.session_state.admin_logged_in:
     st.stop()
 
 # --- 3. عرض الرادار واللمبات (النسخة السريعة) ---
+# --- رادار المندوبين (النسخة المتسامحة مع تأخير الشيت) ---
 st.markdown('<div class="company-title">Helbawi Bros</div>', unsafe_allow_html=True)
 
 try:
@@ -82,26 +83,31 @@ try:
     df_status = pd.read_csv(url)
     
     now = datetime.now(beirut_tz)
-    lumps_html = '<div style="display: flex; justify-content: center; gap: 15px; margin-bottom: 20px;">'
+    lumps_html = '<div style="display: flex; justify-content: center; gap: 10px; margin-bottom: 20px;">'
     
     for index, row in df_status.head(8).iterrows():
         is_online = False
         try:
             last_seen_str = str(row.iloc[1]).strip()
             if last_seen_str and last_seen_str != "nan":
-                last_seen = datetime.strptime(last_seen_str, "%Y-%m-%d %H:%M:%S")
+                # محاولة قراءة التاريخ بأكثر من صيغة (عشان نضمن يلقط الوقت صح)
+                for fmt in ("%Y-%m-%d %H:%M:%S", "%d-%m-%Y %H:%M:%S"):
+                    try:
+                        last_seen = datetime.strptime(last_seen_str, fmt)
+                        break
+                    except: continue
+                
                 last_seen = beirut_tz.localize(last_seen)
-                # المندوب أونلاين إذا ظهر بآخر 10 دقائق
-                if (now - last_seen).total_seconds() / 60 < 10:
+                # رفعنا مدة السماح لـ 30 دقيقة عشان موضوع الـ 5 دقائق اللي حكيت عنه
+                if (now - last_seen).total_seconds() / 60 < 30:
                     is_online = True
         except: pass
         
-        icon = "🟢" if is_online else "🔴"
-        lumps_html += f'<span title="{row.iloc[0]}" style="font-size: 30px; cursor: help;">{icon}</span>'
+        icon = "🔴" if not is_online else "🟢"
+        lumps_html += f'<span title="{row.iloc[0]}" style="font-size: 26px; cursor: help;">{icon}</span>'
     
     lumps_html += '</div>'
     st.markdown(lumps_html, unsafe_allow_html=True)
-    st.divider()
 except:
     st.info("📡 جاري تحديث حالة الرادار...")
 
