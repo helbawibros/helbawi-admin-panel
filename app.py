@@ -182,7 +182,8 @@ if sh:
                     """
                     st.components.v1.html(print_html, height=80)
                     
-                    if st.button("🚀 تصديق وإغلاق الطلب نهائياً", type="primary", use_container_width=True):
+    
+    if st.button("🚀 تصديق وإغلاق الطلب نهائياً", type="primary", use_container_width=True):
     idx_status = raw[0].index('الحالة') + 1
     # تأكد من اسم عمود الصنف وعمود العدد
     idx_item = raw[0].index('الصنف') + 1 
