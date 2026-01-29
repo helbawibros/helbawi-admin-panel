@@ -182,31 +182,41 @@ if sh:
                     """
                     st.components.v1.html(print_html, height=80)
                     
-    
     if st.button("🚀 تصديق وإغلاق الطلب نهائياً", type="primary", use_container_width=True):
-    idx_status = raw[0].index('الحالة') + 1
-    # تأكد من اسم عمود الصنف وعمود العدد
-    idx_item = raw[0].index('الصنف') + 1 
-    try: idx_qty = raw[0].index('العدد') + 1
-    except: idx_qty = raw[0].index('الكمية') + 1
+    # 1. جلب أرقام الأعمدة ديناميكياً لتجنب الأخطاء
+    header = raw[0]
+    idx_status = header.index('الحالة') + 1
+    idx_item = header.index('اسم الصنف') + 1 # تأكد من الاسم بالظبط بالشيت
+    
+    # محاولة جلب عمود الكمية (سواء اسمه العدد أو الكمية المطلوبة)
+    try: 
+        idx_qty = header.index('الكمية المطلوبه') + 1
+    except: 
+        idx_qty = header.index('العدد') + 1
 
-    with st.spinner("جاري معالجة الطلب..."):
+    with st.spinner("جاري معالجة التعديلات وتصديق الطلب..."):
         for _, r in edited.iterrows():
             try:
-                # 1. فحص إذا الصنف تم مسحه (صار فاضي)
-                item_name = str(r.iloc[idx_item-1]).strip()
+                row_index = int(r['row_no'])
+                current_item_name = str(r.iloc[idx_item-1]).strip()
                 
-                if item_name == "" or item_name == "None" or item_name == "nan":
-                    # إذا الصنف ممسوح، منغير حالته لـ "ملغى" عشان المندوب ما يشوفه
-                    ws.update_cell(int(r['row_no']), idx_status, "ملغى")
+                # أ. فحص إذا تم مسح الصنف (لإلغائه)
+                if current_item_name in ["", "None", "nan", "0"]:
+                    ws.update_cell(row_index, idx_status, "ملغى")
+                
                 else:
-                    # 2. إذا الصنف موجود، منحدث الكمية والحالة
-                    ws.update_cell(int(r['row_no']), idx_qty, r.iloc[idx_qty-1])
-                    ws.update_cell(int(r['row_no']), idx_status, "تم التصديق")
+                    # ب. تحديث الكمية المعدلة
+                    new_qty = r.iloc[idx_qty-1]
+                    ws.update_cell(row_index, idx_qty, new_qty)
+                    
+                    # ج. تحديث الحالة لتصبح مصدقة
+                    ws.update_cell(row_index, idx_status, "تم التصديق")
                 
-                time.sleep(0.3)
+                time.sleep(0.2) # سرعة معقولة لتجنب حظر جوجل
             except Exception as e:
-                st.error(f"خطأ في السطر {r['row_no']}: {e}")
-                
-    st.success("✅ تم تحديث الطلب (تصديق الموجود وإلغاء الممسوح)!")
-    time.sleep(1); st.session_state.orders = []; st.rerun()
+                st.error(f"عطل في السطر {r.get('row_no', 'غير معروف')}: {e}")
+
+    st.success("✅ تم التعديل والتصديق بنجاح!")
+    time.sleep(1)
+    st.session_state.orders = []
+    st.rerun()
