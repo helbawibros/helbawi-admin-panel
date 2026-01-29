@@ -183,9 +183,29 @@ if sh:
                     st.components.v1.html(print_html, height=80)
                     
                     if st.button("🚀 تصديق وإغلاق الطلب نهائياً", type="primary", use_container_width=True):
-                        idx = raw[0].index('الحالة') + 1
-                        with st.spinner("جاري تصديق الطلب في جوجل شيت..."):
-                            for _, r in edited.iterrows():
-                                try: ws.update_cell(int(r['row_no']), idx, "تم التصديق"); time.sleep(0.3)
-                                except: pass
-                        st.success("✅ تم التصديق بنجاح!"); time.sleep(1); st.session_state.orders = []; st.rerun()
+    idx_status = raw[0].index('الحالة') + 1
+    # تأكد من اسم عمود الصنف وعمود العدد
+    idx_item = raw[0].index('الصنف') + 1 
+    try: idx_qty = raw[0].index('العدد') + 1
+    except: idx_qty = raw[0].index('الكمية') + 1
+
+    with st.spinner("جاري معالجة الطلب..."):
+        for _, r in edited.iterrows():
+            try:
+                # 1. فحص إذا الصنف تم مسحه (صار فاضي)
+                item_name = str(r.iloc[idx_item-1]).strip()
+                
+                if item_name == "" or item_name == "None" or item_name == "nan":
+                    # إذا الصنف ممسوح، منغير حالته لـ "ملغى" عشان المندوب ما يشوفه
+                    ws.update_cell(int(r['row_no']), idx_status, "ملغى")
+                else:
+                    # 2. إذا الصنف موجود، منحدث الكمية والحالة
+                    ws.update_cell(int(r['row_no']), idx_qty, r.iloc[idx_qty-1])
+                    ws.update_cell(int(r['row_no']), idx_status, "تم التصديق")
+                
+                time.sleep(0.3)
+            except Exception as e:
+                st.error(f"خطأ في السطر {r['row_no']}: {e}")
+                
+    st.success("✅ تم تحديث الطلب (تصديق الموجود وإلغاء الممسوح)!")
+    time.sleep(1); st.session_state.orders = []; st.rerun()
