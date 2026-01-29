@@ -184,5 +184,13 @@ if sh:
                                 except Exception as e:
                                     continue # تخطي أي سطر فيه مشكلة
                                     
-                        st.success("✅ تم التعديل: المتبقي (تم التصديق) والممحو (ملغى)")
-                        time.sleep(1); st.session_state.orders = []; st.rerun()
+                                                st.success("✅ تم التصديق وتحديث الطلب!")
+                        
+                        # --- السحر هون: تنظيف القائمة وتحديثها فوراً ---
+                        st.session_state.orders = [o for o in st.session_state.orders if o['name'] != selected_rep]
+                        if 'active_rep' in st.session_state:
+                            del st.session_state.active_rep
+                            
+                        time.sleep(1)
+                        st.rerun() # إعادة تشغيل الصفحة لتمحي الكبسة الخضراء
+
