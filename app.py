@@ -8,27 +8,37 @@ from datetime import datetime
 import pytz 
 import time
 
-# --- 1. إعدادات الصفحة ---
-st.set_page_config(page_title="إدارة حلباوي - نسخة الميزان", layout="wide")
+# --- 1. إعدادات الصفحة والستايل ---
+st.set_page_config(page_title="إدارة حلباوي - النسخة الاحترافية", layout="wide")
 beirut_tz = pytz.timezone('Asia/Beirut')
+
+st.markdown("""
+    <style>
+    /* كبسة فحص الإشعارات الحمراء المضواية */
+    div.stButton > button:first-child[kind="secondary"] {
+        background-color: #ff4b4b; color: white; border: none;
+        box-shadow: 0 0 15px rgba(255, 75, 75, 0.6); font-weight: bold; height: 50px;
+    }
+    /* كبسات المندوبين الخضراء الكبيرة */
+    div[data-testid="column"] button {
+        background-color: #28a745 !important; color: white !important;
+        height: 100px !important; border: 2px solid #1e7e34 !important;
+        font-size: 20px !important; white-space: pre-wrap !important;
+    }
+    /* تنسيق اسم الشركة */
+    .company-title {
+        font-family: 'Arial Black', sans-serif;
+        color: #D4AF37; text-align: center; font-size: 50px;
+        text-shadow: 2px 2px 4px #000000; margin-bottom: 20px;
+    }
+    </style>
+""", unsafe_allow_html=True)
 
 # تهيئة الذاكرة
 if 'admin_logged_in' not in st.session_state: st.session_state.admin_logged_in = False
 if 'orders' not in st.session_state: st.session_state.orders = []
 
-# --- 2. نظام الدخول ---
-if not st.session_state.admin_logged_in:
-    for name in ["Logo.JPG", "logo.jpg", "Logo.png"]:
-        if os.path.exists(name): st.image(name, use_container_width=True); break
-    col_l = st.columns([1, 2, 1])[1]
-    with col_l:
-        pwd = st.text_input("كلمة السر", type="password")
-        if st.button("دخول", use_container_width=True):
-            if pwd == "Hlb_Admin_2024": st.session_state.admin_logged_in = True; st.rerun()
-            else: st.error("كلمة السر خطأ")
-    st.stop()
-
-# --- 3. الربط مع جوجل ---
+# --- دالة الاتصال بجوجل (تعريف واحد وكافي) ---
 @st.cache_resource
 def get_sh():
     try:
@@ -36,22 +46,89 @@ def get_sh():
         creds = Credentials.from_service_account_info(info, scopes=["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"])
         return gspread.authorize(creds).open_by_key("1-Abj-Kvbe02az8KYZfQL0eal2arKw_wgjVQdJX06IA0")
     except Exception as e:
-        st.error(f"⚠️ خطأ اتصال: {e}"); return None
+        st.error(f"⚠️ خطأ اتصال بجوجل: {e}")
+        return None
 
+# دالة ذكية لإيجاد اللوغو
+def show_logo(use_width=True):
+    possible_names = ["Logo .JPG", "Logo.JPG", "logo.jpg", "Logo .png", "Logo.png"]
+    for name in possible_names:
+        if os.path.exists(name):
+            st.image(name, use_container_width=use_width)
+            return True
+    return False
+
+# --- 2. نظام الدخول ---
+if not st.session_state.admin_logged_in:
+    show_logo(use_width=True)
+    col_l = st.columns([1, 2, 1])[1]
+    with col_l:
+        st.markdown("<h2 style='text-align:center;'>تسجيل الدخول</h2>", unsafe_allow_html=True)
+        pwd = st.text_input("كلمة السر الخاصة بالإدارة", type="password")
+        if st.button("دخول النظام", use_container_width=True):
+            if pwd == "Hlb_Admin_2024": 
+                st.session_state.admin_logged_in = True
+                st.rerun()
+            else: 
+                st.error("كلمة السر خطأ")
+    st.stop()
+
+# --- 3. عرض الرادار واللمبات (النسخة السريعة) ---
+st.markdown('<div class="company-title">Helbawi Bros</div>', unsafe_allow_html=True)
+
+try:
+    SHEET_ID = "1-Abj-Kvbe02az8KYZfQL0eal2arKw_wgjVQdJX06IA0"
+    url = f"https://docs.google.com/spreadsheets/d/{SHEET_ID}/gviz/tq?tqx=out:csv&sheet=Status"
+    df_status = pd.read_csv(url)
+    
+    now = datetime.now(beirut_tz)
+    lumps_html = '<div style="display: flex; justify-content: center; gap: 15px; margin-bottom: 20px;">'
+    
+    for index, row in df_status.head(8).iterrows():
+        is_online = False
+        try:
+            last_seen_str = str(row.iloc[1]).strip()
+            if last_seen_str and last_seen_str != "nan":
+                last_seen = datetime.strptime(last_seen_str, "%Y-%m-%d %H:%M:%S")
+                last_seen = beirut_tz.localize(last_seen)
+                # المندوب أونلاين إذا ظهر بآخر 10 دقائق
+                if (now - last_seen).total_seconds() / 60 < 10:
+                    is_online = True
+        except: pass
+        
+        icon = "🟢" if is_online else "🔴"
+        lumps_html += f'<span title="{row.iloc[0]}" style="font-size: 30px; cursor: help;">{icon}</span>'
+    
+    lumps_html += '</div>'
+    st.markdown(lumps_html, unsafe_allow_html=True)
+    st.divider()
+except:
+    st.info("📡 جاري تحديث حالة الرادار...")
+
+# --- 4. نظام الطلبات وفحص الإشعارات ---
 sh = get_sh()
 
 if sh:
-    delegates = [ws.title for ws in sh.worksheets() if ws.title not in ["طلبات", "الأسعار", "البيانات", "الزبائن", "Sheet1"]]
-    st.markdown("<h2 style='text-align:center;'>لوحة تحكم حلباوي</h2>", unsafe_allow_html=True)
-
-    if st.button("🔔 فحص الإشعارات الجديدة", use_container_width=True):
+    # جلب أسماء المندوبين (الشيتات) مع استثناء الشيتات الإدارية
+    delegates = [ws.title for ws in sh.worksheets() if ws.title not in ["طلبات", "الأسعار", "البيانات", "الزبائن", "Sheet1", "Status"]]
+    
+    # زر الفحص الأحمر
+    if st.button("🔔 فحص الإشعارات الجديدة (الطلبات المنتظرة)", use_container_width=True, type="secondary"):
         st.session_state.orders = []
-        for rep in delegates:
-            try:
-                data = sh.worksheet(rep).get_all_values()
-                if len(data) > 1 and any(r[data[0].index('الحالة')] == "بانتظار التصديق" for r in data[1:]):
-                    st.session_state.orders.append({"name": rep})
-            except: continue
+        with st.spinner("جاري فحص ملفات المندوبين..."):
+            for rep in delegates:
+                try:
+                    data = sh.worksheet(rep).get_all_values()
+                    if len(data) > 1:
+                        header = data[0]
+                        idx_status = header.index('الحالة')
+                        idx_time = header.index('التاريخ و الوقت') if 'التاريخ و الوقت' in header else -1
+                        for row in data[1:]:
+                            if row[idx_status] == "بانتظار التصديق":
+                                st.session_state.orders.append({"name": rep, "time": row[idx_time] if idx_time != -1 else "---"})
+                                break
+                except: continue
+
 
     if st.session_state.orders:
         cols = st.columns(len(st.session_state.orders))
