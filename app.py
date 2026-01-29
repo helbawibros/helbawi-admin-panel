@@ -111,14 +111,49 @@ if sh:
                     edited = st.data_editor(pending[['row_no', 'اسم الصنف', 'الكميه المطلوبه', 'الوجهة']], hide_index=True, use_container_width=True)
                     
                     # كود الطباعة
+                                        # تحضير كود الطباعة (نسختين جنب بعض)
                     p_now = datetime.now(beirut_tz).strftime('%Y-%m-%d | %I:%M %p')
                     h_content = ""
                     for tg in edited['الوجهة'].unique():
                         rows = "".join([f"<tr><td>{i+1}</td><td>{r['الكميه المطلوبه']}</td><td style='text-align:right;'>{r['اسم الصنف']}</td></tr>" for i, (_, r) in enumerate(edited[edited['الوجهة'] == tg].iterrows())])
-                        h_content += f'<div style="border:3px solid black; padding:15px; margin-bottom:20px; page-break-inside:avoid;"><h2>{tg}</h2><div style="display:flex; justify-content:space-between; font-weight:bold;"><span>المندوب: {selected_rep}</span><span>{p_now}</span></div><table style="width:100%; border-collapse:collapse; margin-top:10px;"><thead style="background:#eee;"><tr><th>ت</th><th>العدد</th><th style="width:70%;">اسم الصنف</th></tr></thead><tbody>{rows}</tbody></table><style>th,td{{border:2px solid black; padding:8px; text-align:center; font-size:20px; font-weight:bold;}}</style></div>'
+                        
+                        # تصميم الجدول الواحد
+                        single_table = f"""
+                        <div style="width: 48%; border: 2px solid black; padding: 10px; box-sizing: border-box;">
+                            <h2 style="margin:0; text-align:center;">{tg}</h2>
+                            <div style="display:flex; justify-content:space-between; font-size:14px; font-weight:bold; margin-top:5px;">
+                                <span>المندوب: {selected_rep}</span>
+                                <span>{p_now}</span>
+                            </div>
+                            <table style="width:100%; border-collapse:collapse; margin-top:10px;">
+                                <thead style="background:#eee;">
+                                    <tr><th>ت</th><th>العدد</th><th style="width:70%;">اسم الصنف</th></tr>
+                                </thead>
+                                <tbody>{rows}</tbody>
+                            </table>
+                        </div>
+                        """
+                        
+                        # وضع نسختين جنب بعض في حاوية واحدة
+                        h_content += f'<div style="display:flex; justify-content:space-between; margin-bottom:30px; page-break-inside:avoid;">{single_table}{single_table}</div>'
 
-                    print_html = f"""<script>function doPrint() {{ var w = window.open('', '', 'width=900,height=1000'); w.document.write(`<html><head><title>طباعة</title></head><body dir="rtl"> {h_content} <script>setTimeout(function() {{ window.print(); window.close(); }}, 800);<\\/script></body></html>`); w.document.close(); }}</script><button onclick="doPrint()" style="width:100%; height:50px; background-color:#28a745; color:white; border:none; border-radius:10px; font-weight:bold; font-size:20px; cursor:pointer;">🖨️ اضغط هنا لفتح صفحة الطباعة</button>"""
+                    # ستايل الجدول العام
+                    final_style = "<style>table, th, td { border: 1px solid black; border-collapse: collapse; padding: 5px; text-align: center; font-size: 16px; font-weight: bold; }</style>"
+
+                    print_html = f"""
+                    <script>
+                    function doPrint() {{ 
+                        var w = window.open('', '', 'width=1000,height=1000'); 
+                        w.document.write(`<html><head><title>طباعة طلبات</title>{final_style}</head><body dir="rtl"> {h_content} <script>setTimeout(function() {{ window.print(); window.close(); }}, 800);<\\/script></body></html>`); 
+                        w.document.close(); 
+                    }}
+                    </script>
+                    <button onclick="doPrint()" style="width:100%; height:50px; background-color:#28a745; color:white; border:none; border-radius:10px; font-weight:bold; font-size:20px; cursor:pointer;">
+                        🖨️ اضغط هنا لفتح صفحة الطباعة (نسختين)
+                    </button>
+                    """
                     st.components.v1.html(print_html, height=60)
+
                     
                     # --- التعديل الذكي على التصديق ---
                     if st.button("🚀 تصديق وإغلاق الطلب نهائياً", type="primary", use_container_width=True):
