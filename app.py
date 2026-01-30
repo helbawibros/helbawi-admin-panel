@@ -7,6 +7,7 @@ import os
 from datetime import datetime
 import pytz 
 import time
+import urllib.parse
 
 # --- 1. إعدادات الصفحة والستايل ---
 st.set_page_config(page_title="إدارة حلباوي", layout="wide")
@@ -64,7 +65,7 @@ st.divider()
 sh = get_sh()
 
 if sh:
-    delegates = [ws.title for ws in sh.worksheets() if ws.title not in ["طلبات", "الأسعار", "البيانات", "الزبائن", "Sheet1", "Status"]]
+    delegates = [ws.title for ws in sh.worksheets() if ws.title not in ["طلبات", "الأسعار", "البيانات", "الزبائن", "Sheet1", "Status", "رقم الطلب"]]
     
     if st.button("🔔 فحص الإشعارات الجديدة (الطلبات المنتظرة)", use_container_width=True, type="secondary"):
         st.session_state.orders = []
@@ -78,17 +79,14 @@ if sh:
                         idx_time = header.index('التاريخ و الوقت') if 'التاريخ و الوقت' in header else -1
                         for row in data[1:]:
                             if row[idx_status] == "بانتظار التصديق":
-                                # تخزين الوقت بتنسيق أجمل
                                 order_time = row[idx_time] if idx_time != -1 else "---"
                                 st.session_state.orders.append({"name": rep, "time": order_time})
                                 break
                 except: continue
 
-    # عرض كبسات المندوبين مع وقت الطلب
     if st.session_state.orders:
         cols = st.columns(len(st.session_state.orders))
         for i, o in enumerate(st.session_state.orders):
-            # الكبسة بتبين اسم المندوب وتحته وقت الطلب
             if cols[i].button(f"📦 {o['name']}\n🕒 {o['time']}", key=f"o_{o['name']}"):
                 st.session_state.active_rep = o['name']
                 st.rerun()
@@ -100,46 +98,64 @@ if sh:
         ws = sh.worksheet(selected_rep)
         raw = ws.get_all_values()
         if len(raw) > 1:
-            df = pd.DataFrame(raw[1:], columns=raw[0])
+            header = raw[0]
+            df = pd.DataFrame(raw[1:], columns=header)
             df.columns = df.columns.str.strip()
+            
+            # --- 🌟 تحديث تسمية الأعمدة لتشمل "رقم الطلب" ---
+            if len(df.columns) >= 6:
+                df.columns.values[5] = "رقم الطلب"
+            
             if 'الحالة' in df.columns:
                 df['row_no'] = range(2, len(df) + 2)
                 pending = df[df['الحالة'] == "بانتظار التصديق"].copy()
+                
                 if not pending.empty:
+                    # معالجة اسم الوجهة
                     pending['الوجهة'] = pending['اسم الزبون'].astype(str).replace(['nan', '', 'None'], 'جردة سيارة').str.strip()
-                    # الجدول المعدل
-                    edited = st.data_editor(pending[['row_no', 'اسم الصنف', 'الكميه المطلوبه', 'الوجهة']], hide_index=True, use_container_width=True)
                     
-                    # كود الطباعة
-                                        # تحضير كود الطباعة (نسختين جنب بعض)
+                    # 🌟 عرض الجدول مع رقم الطلب للإدارة
+                    cols_to_show = ['row_no', 'رقم الطلب', 'اسم الصنف', 'الكميه المطلوبه', 'الوجهة']
+                    display_df = pending[[c for c in cols_to_show if c in pending.columns]]
+                    edited = st.data_editor(display_df, hide_index=True, use_container_width=True)
+                    
+                    # --- 🌟 تحضير الطباعة بتنسيق "سلامة العيون" ---
                     p_now = datetime.now(beirut_tz).strftime('%Y-%m-%d | %I:%M %p')
                     h_content = ""
+                    
                     for tg in edited['الوجهة'].unique():
-                        rows = "".join([f"<tr><td>{i+1}</td><td>{r['الكميه المطلوبه']}</td><td style='text-align:right;'>{r['اسم الصنف']}</td></tr>" for i, (_, r) in enumerate(edited[edited['الوجهة'] == tg].iterrows())])
+                        # جلب رقم الطلب الخاص بهذه الوجهة
+                        curr_rows = edited[edited['الوجهة'] == tg]
+                        o_id = curr_rows['رقم الطلب'].iloc[0] if 'رقم الطلب' in curr_rows.columns else "---"
                         
-                        # تصميم الجدول الواحد
+                        rows_html = "".join([f"<tr><td>{i+1}</td><td style='font-size:22px;'>{r['الكميه المطلوبه']}</td><td style='text-align:right; padding-right:10px;'>{r['اسم الصنف']}</td></tr>" for i, (_, r) in enumerate(curr_rows.iterrows())])
+                        
+                        # تصميم المربع (يمين: رقم الطلب | وسط: الوجهة | يسار: الوقت والعدد)
                         single_table = f"""
-                        <div style="width: 48%; border: 2px solid black; padding: 10px; box-sizing: border-box;">
-                            <h2 style="margin:0; text-align:center;">{tg}</h2>
-                            <div style="display:flex; justify-content:space-between; font-size:14px; font-weight:bold; margin-top:5px;">
-                                <span>المندوب: {selected_rep}</span>
-                                <span>{p_now}</span>
+                        <div style="width: 48%; border: 2px solid black; padding: 10px; box-sizing: border-box; background-color: white; color: black; min-height: 400px;">
+                            <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 3px solid black; padding-bottom: 5px; margin-bottom: 10px;">
+                                <div style="text-align: right; font-size: 20px; font-weight: bold; width: 33%;">🔢 طلب: {o_id}</div>
+                                <div style="text-align: center; font-size: 24px; font-weight: bold; width: 34%;">{tg}</div>
+                                <div style="text-align: left; font-size: 14px; width: 33%;">{p_now}</div>
                             </div>
-                            <table style="width:100%; border-collapse:collapse; margin-top:10px;">
+                            <div style="text-align: right; font-size: 16px; margin-bottom: 5px;">👤 المندوب: <b>{selected_rep}</b></div>
+                            <table style="width:100%; border-collapse:collapse;">
                                 <thead style="background:#eee;">
-                                    <tr><th>ت</th><th>العدد</th><th style="width:70%;">اسم الصنف</th></tr>
+                                    <tr>
+                                        <th style="width:10%; border:1px solid black;">ت</th>
+                                        <th style="width:20%; border:1px solid black;">العدد</th>
+                                        <th style="width:70%; border:1px solid black; text-align:right; padding-right:10px;">اسم الصنف</th>
+                                    </tr>
                                 </thead>
-                                <tbody>{rows}</tbody>
+                                <tbody>{rows_html}</tbody>
                             </table>
+                            <div style="margin-top: 15px; text-align: left; font-weight: bold; font-size: 16px;">إجمالي الأصناف: {len(curr_rows)}</div>
                         </div>
                         """
-                        
-                        # وضع نسختين جنب بعض في حاوية واحدة
                         h_content += f'<div style="display:flex; justify-content:space-between; margin-bottom:30px; page-break-inside:avoid;">{single_table}{single_table}</div>'
 
-                    # ستايل الجدول العام
-                    final_style = "<style>table, th, td { border: 1px solid black; border-collapse: collapse; padding: 5px; text-align: center; font-size: 16px; font-weight: bold; }</style>"
-
+                    final_style = "<style>table, th, td { border: 1px solid black; border-collapse: collapse; padding: 8px; text-align: center; font-size: 18px; font-weight: bold; } @media print { .no-print { display: none; } }</style>"
+                    
                     print_html = f"""
                     <script>
                     function doPrint() {{ 
@@ -148,47 +164,33 @@ if sh:
                         w.document.close(); 
                     }}
                     </script>
-                    <button onclick="doPrint()" style="width:100%; height:50px; background-color:#28a745; color:white; border:none; border-radius:10px; font-weight:bold; font-size:20px; cursor:pointer;">
-                        🖨️ اضغط هنا لفتح صفحة الطباعة (نسختين)
+                    <button onclick="doPrint()" style="width:100%; height:60px; background-color:#28a745; color:white; border:none; border-radius:10px; font-weight:bold; font-size:22px; cursor:pointer; box-shadow: 0 4px 8px rgba(0,0,0,0.2);">
+                        🖨️ فتح صفحة الطباعة (توزيع يمين/يسار)
                     </button>
                     """
-                    st.components.v1.html(print_html, height=60)
+                    st.components.v1.html(print_html, height=80)
 
-                    
-                    # --- التعديل الذكي على التصديق ---
-                                        # --- زر التصديق الذكي والمعدل (حل مشكلة المحي) ---
-                                        # --- زر التصديق الذكي والمعدل ---
+                    # --- زر التصديق النهائي ---
                     if st.button("🚀 تصديق وإغلاق الطلب نهائياً", type="primary", use_container_width=True):
-                        header = raw[0]
                         idx_status = header.index('الحالة') + 1
-                        idx_item = header.index('اسم الصنف') + 1
-                        try: 
-                            idx_qty = header.index('الكميه المطلوبه') + 1
-                        except: 
-                            idx_qty = header.index('العدد') + 1
+                        try: idx_qty = header.index('الكميه المطلوبه') + 1
+                        except: idx_qty = header.index('العدد') + 1
                         
                         with st.spinner("جاري التحديث..."):
                             for _, r in edited.iterrows():
                                 try:
                                     row_idx = int(r['row_no'])
-                                    item_name = str(r['اسم الصنف']).strip()
                                     item_qty = str(r['الكميه المطلوبه']).strip()
-
-                                    # إذا انمسح الاسم أو الكمية صارت 0، الحالة بتصير "ملغى"
-                                    if item_name in ["", "None", "nan"] or item_qty in ["", "0", "None", "nan"]:
+                                    if item_qty in ["", "0", "None", "nan"]:
                                         ws.update_cell(row_idx, idx_status, "ملغى")
                                     else:
-                                        # تحديث الكمية المعدلة والحالة
                                         ws.update_cell(row_idx, idx_qty, r['الكميه المطلوبه'])
                                         ws.update_cell(row_idx, idx_status, "تم التصديق")
                                     time.sleep(0.3)
-                                except: 
-                                    continue
+                                except: continue
                         
-                        st.success("✅ تم التصديق وتحديث الطلب!")
-                        # تنظيف قائمة الطلبات ليختفي اسم المندوب فوراً
+                        st.success("✅ تم التصديق وتحديث الطلبات!")
                         st.session_state.orders = [o for o in st.session_state.orders if o['name'] != selected_rep]
-                        if 'active_rep' in st.session_state:
-                            del st.session_state.active_rep
+                        if 'active_rep' in st.session_state: del st.session_state.active_rep
                         time.sleep(1)
                         st.rerun()
