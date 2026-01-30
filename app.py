@@ -117,6 +117,7 @@ if sh:
                     edited = st.data_editor(display_df, hide_index=True, use_container_width=True)
                     
                     # --- تحضير الطباعة بالتنسيق الجديد (ت - اسم الصنف - العدد) ---
+                                        # --- تحضير الطباعة بتنسيق ملموم (ت - اسم الصنف - العدد) ---
                     p_now = datetime.now(beirut_tz).strftime('%Y-%m-%d | %I:%M %p')
                     h_content = ""
                     
@@ -124,33 +125,41 @@ if sh:
                         curr_rows = edited[edited['الوجهة'] == tg]
                         o_id = curr_rows['رقم الطلب'].iloc[0] if 'رقم الطلب' in curr_rows.columns else "---"
                         
-                        # التعديل هنا: تبديل خلايا الجدول ليكون الاسم بالوسط والعدد على اليسار
-                        rows_html = "".join([f"<tr><td>{i+1}</td><td style='text-align:right; padding-right:10px;'>{r['اسم الصنف']}</td><td style='font-size:22px;'>{r['الكميه المطلوبه']}</td></tr>" for i, (_, r) in enumerate(curr_rows.iterrows())])
+                        # التعديل هنا: صغرنا الخطوط وشلنا الحشوة (padding) الزيادة
+                        rows_html = "".join([f"<tr><td style='width:30px;'>{i+1}</td><td style='text-align:right; padding-right:5px; font-size:14px;'>{r['اسم الصنف']}</td><td style='font-size:16px; font-weight:bold; width:50px;'>{r['الكميه المطلوبه']}</td></tr>" for i, (_, r) in enumerate(curr_rows.iterrows())])
                         
                         single_table = f"""
-                        <div style="width: 48%; border: 2px solid black; padding: 10px; box-sizing: border-box; background-color: white; color: black; min-height: 400px;">
-                            <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 3px solid black; padding-bottom: 5px; margin-bottom: 10px;">
-                                <div style="text-align: right; font-size: 20px; font-weight: bold; width: 33%;">🔢 طلب: {o_id}</div>
-                                <div style="text-align: center; font-size: 24px; font-weight: bold; width: 34%;">{tg}</div>
-                                <div style="text-align: left; font-size: 14px; width: 33%;">{p_now}</div>
+                        <div style="width: 49%; border: 1.5px solid black; padding: 5px; box-sizing: border-box; background-color: white; color: black;">
+                            <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid black; padding-bottom: 3px; margin-bottom: 5px;">
+                                <div style="text-align: right; font-size: 14px; font-weight: bold; width: 33%;">🔢 طلب: {o_id}</div>
+                                <div style="text-align: center; font-size: 16px; font-weight: bold; width: 34%;">{tg}</div>
+                                <div style="text-align: left; font-size: 11px; width: 33%;">{p_now}</div>
                             </div>
-                            <div style="text-align: right; font-size: 16px; margin-bottom: 5px;">👤 المندوب: <b>{selected_rep}</b></div>
-                            <table style="width:100%; border-collapse:collapse;">
+                            <div style="text-align: right; font-size: 12px; margin-bottom: 3px;">👤 المندوب: {selected_rep}</div>
+                            <table style="width:100%; border-collapse:collapse; table-layout: fixed;">
                                 <thead style="background:#eee;">
                                     <tr>
-                                        <th style="width:10%; border:1px solid black;">ت</th>
-                                        <th style="width:70%; border:1px solid black; text-align:right; padding-right:10px;">اسم الصنف</th>
-                                        <th style="width:20%; border:1px solid black;">العدد</th>
+                                        <th style="width:35px; border:1px solid black; font-size:12px;">ت</th>
+                                        <th style="border:1px solid black; text-align:right; padding-right:5px; font-size:12px;">اسم الصنف</th>
+                                        <th style="width:55px; border:1px solid black; font-size:12px;">العدد</th>
                                     </tr>
                                 </thead>
                                 <tbody>{rows_html}</tbody>
                             </table>
-                            <div style="margin-top: 15px; text-align: left; font-weight: bold; font-size: 16px;">إجمالي الأصناف: {len(curr_rows)}</div>
+                            <div style="margin-top: 5px; text-align: left; font-weight: bold; font-size: 12px;">إجمالي الأصناف: {len(curr_rows)}</div>
                         </div>
                         """
-                        h_content += f'<div style="display:flex; justify-content:space-between; margin-bottom:30px; page-break-inside:avoid;">{single_table}{single_table}</div>'
+                        h_content += f'<div style="display:flex; justify-content:space-between; margin-bottom:15px; page-break-inside:avoid;">{single_table}{single_table}</div>'
 
-                    final_style = "<style>table, th, td { border: 1px solid black; border-collapse: collapse; padding: 8px; text-align: center; font-size: 18px; font-weight: bold; } @media print { .no-print { display: none; } }</style>"
+                    # الستايل العام المصغر
+                    final_style = """
+                    <style>
+                        table, th, td { border: 1px solid black; border-collapse: collapse; padding: 3px; text-align: center; }
+                        body { font-family: Arial, sans-serif; margin: 0; padding: 10px; }
+                        @media print { .no-print { display: none; } }
+                    </style>
+                    """
+
                     
                     print_html = f"""
                     <script>
