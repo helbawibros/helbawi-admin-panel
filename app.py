@@ -102,7 +102,6 @@ if sh:
             df = pd.DataFrame(raw[1:], columns=header)
             df.columns = df.columns.str.strip()
             
-            # --- 🌟 تحديث تسمية الأعمدة لتشمل "رقم الطلب" ---
             if len(df.columns) >= 6:
                 df.columns.values[5] = "رقم الطلب"
             
@@ -111,26 +110,23 @@ if sh:
                 pending = df[df['الحالة'] == "بانتظار التصديق"].copy()
                 
                 if not pending.empty:
-                    # معالجة اسم الوجهة
                     pending['الوجهة'] = pending['اسم الزبون'].astype(str).replace(['nan', '', 'None'], 'جردة سيارة').str.strip()
                     
-                    # 🌟 عرض الجدول مع رقم الطلب للإدارة
                     cols_to_show = ['row_no', 'رقم الطلب', 'اسم الصنف', 'الكميه المطلوبه', 'الوجهة']
                     display_df = pending[[c for c in cols_to_show if c in pending.columns]]
                     edited = st.data_editor(display_df, hide_index=True, use_container_width=True)
                     
-                    # --- 🌟 تحضير الطباعة بتنسيق "سلامة العيون" ---
+                    # --- تحضير الطباعة بالتنسيق الجديد (ت - اسم الصنف - العدد) ---
                     p_now = datetime.now(beirut_tz).strftime('%Y-%m-%d | %I:%M %p')
                     h_content = ""
                     
                     for tg in edited['الوجهة'].unique():
-                        # جلب رقم الطلب الخاص بهذه الوجهة
                         curr_rows = edited[edited['الوجهة'] == tg]
                         o_id = curr_rows['رقم الطلب'].iloc[0] if 'رقم الطلب' in curr_rows.columns else "---"
                         
-                        rows_html = "".join([f"<tr><td>{i+1}</td><td style='font-size:22px;'>{r['الكميه المطلوبه']}</td><td style='text-align:right; padding-right:10px;'>{r['اسم الصنف']}</td></tr>" for i, (_, r) in enumerate(curr_rows.iterrows())])
+                        # التعديل هنا: تبديل خلايا الجدول ليكون الاسم بالوسط والعدد على اليسار
+                        rows_html = "".join([f"<tr><td>{i+1}</td><td style='text-align:right; padding-right:10px;'>{r['اسم الصنف']}</td><td style='font-size:22px;'>{r['الكميه المطلوبه']}</td></tr>" for i, (_, r) in enumerate(curr_rows.iterrows())])
                         
-                        # تصميم المربع (يمين: رقم الطلب | وسط: الوجهة | يسار: الوقت والعدد)
                         single_table = f"""
                         <div style="width: 48%; border: 2px solid black; padding: 10px; box-sizing: border-box; background-color: white; color: black; min-height: 400px;">
                             <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 3px solid black; padding-bottom: 5px; margin-bottom: 10px;">
@@ -143,8 +139,8 @@ if sh:
                                 <thead style="background:#eee;">
                                     <tr>
                                         <th style="width:10%; border:1px solid black;">ت</th>
-                                        <th style="width:20%; border:1px solid black;">العدد</th>
                                         <th style="width:70%; border:1px solid black; text-align:right; padding-right:10px;">اسم الصنف</th>
+                                        <th style="width:20%; border:1px solid black;">العدد</th>
                                     </tr>
                                 </thead>
                                 <tbody>{rows_html}</tbody>
@@ -165,12 +161,11 @@ if sh:
                     }}
                     </script>
                     <button onclick="doPrint()" style="width:100%; height:60px; background-color:#28a745; color:white; border:none; border-radius:10px; font-weight:bold; font-size:22px; cursor:pointer; box-shadow: 0 4px 8px rgba(0,0,0,0.2);">
-                        🖨️ فتح صفحة الطباعة (توزيع يمين/يسار)
+                        🖨️ فتح صفحة الطباعة (الاسم بالوسط)
                     </button>
                     """
                     st.components.v1.html(print_html, height=80)
 
-                    # --- زر التصديق النهائي ---
                     if st.button("🚀 تصديق وإغلاق الطلب نهائياً", type="primary", use_container_width=True):
                         idx_status = header.index('الحالة') + 1
                         try: idx_qty = header.index('الكميه المطلوبه') + 1
