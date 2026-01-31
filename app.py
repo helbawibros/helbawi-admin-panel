@@ -38,7 +38,7 @@ if 'orders' not in st.session_state: st.session_state.orders = []
 @st.cache_resource
 def get_sh():
     try:
-        # لاحظ الفراغات (Indentation) هون ضرورية جداً
+        # الربط مع الملف الجديد
         info = json.loads(st.secrets["gcp_service_account"]["json_data"].strip(), strict=False)
         creds = Credentials.from_service_account_info(info, scopes=["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"])
         return gspread.authorize(creds).open_by_key("1flePWR4hlSMjVToZfkselaf0M95fcFMtcn_G-KCK3yQ")
@@ -46,9 +46,7 @@ def get_sh():
         st.error(f"⚠️ خطأ اتصال بجوجل: {e}")
         return None
 
-
-
-# --- 2. نظام الدخول ---
+# --- 2. نظام الدخول (هون بيبدأ القسم اللي سألت عنه) ---
 if not st.session_state.admin_logged_in:
     col_l = st.columns([1, 2, 1])[1]
     with col_l:
@@ -63,6 +61,7 @@ if not st.session_state.admin_logged_in:
 
 st.markdown('<div class="company-title">Helbawi Bros</div>', unsafe_allow_html=True)
 st.divider()
+
 
 # --- 3. نظام الطلبات وفحص الإشعارات ---
 sh = get_sh()
