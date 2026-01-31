@@ -38,15 +38,17 @@ if 'orders' not in st.session_state: st.session_state.orders = []
 @st.cache_resource
 def get_sh():
     try:
-    info = json.loads(st.secrets["gcp_service_account"]["json_data"].strip(), strict=False)
-    creds = Credentials.from_service_account_info(info, scopes=["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"])
-    
-    # استبدال الـ ID القديم بالجديد هون:
-    return gspread.authorize(creds).open_by_key("1flePWR4hlSMjVToZfkselaf0M95fcFMtcn_G-KCK3yQ")
+        # تأكد إن الأسطر اللي تحت try مبلشة بـ 4 فراغات (Tab)
+        info = json.loads(st.secrets["gcp_service_account"]["json_data"].strip(), strict=False)
+        creds = Credentials.from_service_account_info(info, scopes=["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"])
+        
+        # هيدا الـ ID الجديد لملف Helbawi
+        return gspread.authorize(creds).open_by_key("1flePWR4hlSMjVToZfkselaf0M95fcFMtcn_G-KCK3yQ")
 
-except Exception as e:
-    st.error(f"⚠️ خطأ اتصال بجوجل: {e}")
-    return None
+    except Exception as e:
+        st.error(f"⚠️ خطأ اتصال بجوجل: {e}")
+        return None
+
 
 
 # --- 2. نظام الدخول ---
@@ -70,6 +72,7 @@ sh = get_sh()
 
 if sh:
     delegates = [ws.title for ws in sh.worksheets() if ws.title not in ["طلبات", "الأسعار", "البيانات", "الزبائن", "Sheet1", "Status", "رقم الطلب"]]
+
     
     if st.button("🔔 فحص الإشعارات الجديدة (الطلبات المنتظرة)", use_container_width=True, type="secondary"):
         st.session_state.orders = []
