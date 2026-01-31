@@ -38,12 +38,16 @@ if 'orders' not in st.session_state: st.session_state.orders = []
 @st.cache_resource
 def get_sh():
     try:
-        info = json.loads(st.secrets["gcp_service_account"]["json_data"].strip(), strict=False)
-        creds = Credentials.from_service_account_info(info, scopes=["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"])
-        return gspread.authorize(creds).open_by_key("1-Abj-Kvbe02az8KYZfQL0eal2arKw_wgjVQdJX06IA0")
-    except Exception as e:
-        st.error(f"⚠️ خطأ اتصال بجوجل: {e}")
-        return None
+    info = json.loads(st.secrets["gcp_service_account"]["json_data"].strip(), strict=False)
+    creds = Credentials.from_service_account_info(info, scopes=["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"])
+    
+    # استبدال الـ ID القديم بالجديد هون:
+    return gspread.authorize(creds).open_by_key("1flePWR4hlSMjVToZfkselaf0M95fcFMtcn_G-KCK3yQ")
+
+except Exception as e:
+    st.error(f"⚠️ خطأ اتصال بجوجل: {e}")
+    return None
+
 
 # --- 2. نظام الدخول ---
 if not st.session_state.admin_logged_in:
