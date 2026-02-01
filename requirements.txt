@@ -2,7 +2,7 @@ streamlit
 pandas
 gspread
 google-auth
-fpdf2
+fpdf
 arabic-reshaper
 python-bidi
 pytz
