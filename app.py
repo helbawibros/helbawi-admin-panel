@@ -66,8 +66,25 @@ st.divider()
 # --- 3. نظام الطلبات وفحص الإشعارات ---
 sh = get_sh()
 
+# --- 1. تعريف وظيفة الجلب مع التخزين المؤقت (حطها قبل الـ if sh) ---
+@st.cache_data(ttl=600)  # بيحفظ البيانات 10 دقائق عشان ما يضل يسأل جوجل
+def fetch_delegates(_sh):
+    try:
+        # بنادي جوجل مرة واحدة بس
+        all_worksheets = _sh.worksheets()
+        excluded_list = ["طلبات", "الأسعار", "البيانات", "الزبائن", "Sheet1", "Status", "رقم الطلب", "بيانات المندوبين", "المبيعات"]
+        return [ws.title for ws in all_worksheets if ws.title not in excluded_list]
+    except Exception as e:
+        return []
+
+# --- 2. السطر 70 الجديد والمطور ---
 if sh:
-    delegates = [ws.title for ws in sh.worksheets() if ws.title not in ["طلبات", "الأسعار", "البيانات", "الزبائن", "Sheet1", "Status", "رقم الطلب"]]
+    delegates = fetch_delegates(sh)
+    if not delegates:
+        # إذا جوجل أعطى خطأ أو تأخر، جرب مرة تانية بعد ثانيتين
+        time.sleep(2)
+        st.cache_data.clear() # بيمسح الكاش القديم ليحاول من جديد
+        delegates = fetch_delegates(sh)
 
     
     if st.button("🔔 فحص الإشعارات الجديدة (الطلبات المنتظرة)", use_container_width=True, type="secondary"):
