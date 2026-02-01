@@ -10,8 +10,8 @@ import time
 import urllib.parse
 from fpdf import FPDF
 
-# --- 1. إعدادات الصفحة والستايل ---
-st.set_page_config(page_title="إدارة حلباوي - المتكامل", layout="wide")
+# --- 1. الإعدادات والستايل (من كودك المفضل) ---
+st.set_page_config(page_title="إدارة حلباوي - النظام المتكامل", layout="wide")
 beirut_tz = pytz.timezone('Asia/Beirut')
 
 st.markdown("""
@@ -25,7 +25,6 @@ st.markdown("""
         border-radius: 10px; padding: 10px; margin-bottom: 5px;
         text-align: center; border: 2px solid #1e7e34;
     }
-    .time-label { font-size: 12px; color: #ffcc00; display: block; }
     .company-title {
         font-family: 'Arial Black', sans-serif;
         color: #D4AF37; text-align: center; font-size: 50px;
@@ -34,7 +33,7 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-# --- 2. الوظائف الأساسية ---
+# --- 2. محركات النظام (PDF + جلب بيانات) ---
 @st.cache_resource
 def get_sh():
     try:
@@ -90,7 +89,7 @@ def generate_invoice_pdf(rep_name, customer_name, items_list, inv_no, price_dict
     pdf.cell(160, 10, f"Grand Total: ${g_total:.2f}", 0, 1, 'R')
     return pdf.output(dest='S').encode('latin-1'), g_total
 
-# --- 3. الدخول الرئيسي ---
+# --- 3. تسجيل الدخول ---
 if 'admin_logged_in' not in st.session_state: st.session_state.admin_logged_in = False
 if not st.session_state.admin_logged_in:
     col_l = st.columns([1, 2, 1])[1]
@@ -111,38 +110,37 @@ sh = get_sh()
 def fetch_delegates(_sh):
     try:
         ws_list = _sh.worksheets()
-        excluded = ["طلبات", "الأسعار", "البيانات", "الزبائن", "Status", "رقم الطلب", "المبيعات"]
+        excluded = ["طلبات", "الأسعار", "البيانات", "الزبائن", "Status", "رقم الطلب", "المبيعات", "Sheet1"]
         return [ws.title for ws in ws_list if ws.title not in excluded]
     except: return []
 
 if sh:
     delegates = fetch_delegates(sh)
-    if 'orders' not in st.session_state: st.session_state.orders = []
+    if 'orders_data' not in st.session_state: st.session_state.orders_data = []
     
     if st.button("🔔 فحص الإشعارات الجديدة", use_container_width=True, type="secondary"):
-        st.session_state.orders = []
+        st.session_state.orders_data = []
         for rep in delegates:
             try:
                 data = sh.worksheet(rep).get_all_values()
                 if len(data) > 1:
                     header = data[0]
                     idx_status = header.index('الحالة')
-                    idx_time = header.index('الوقت') if 'الوقت' in header else -1
+                    idx_time = header.index('الوقت') if 'الوقت' in header else (header.index('التاريخ') if 'التاريخ' in header else -1)
+                    
                     for row in data[1:]:
                         if row[idx_status] == "بانتظار التصديق":
-                            order_time = row[idx_time] if idx_time != -1 else "غير محدد"
-                            st.session_state.orders.append({"name": rep, "time": order_time})
+                            t_val = row[idx_time] if idx_time != -1 else "🕒 غير مسجل"
+                            st.session_state.orders_data.append({"name": rep, "time": t_val})
                             break
             except: continue
 
-    # عرض أزرار المندوبين مع الوقت
-    if st.session_state.orders:
-        cols = st.columns(len(st.session_state.orders))
-        for i, o in enumerate(st.session_state.orders):
+    # عرض أزرار المندوبين (كما في كودك المفضل)
+    if st.session_state.orders_data:
+        cols = st.columns(len(st.session_state.orders_data))
+        for i, o in enumerate(st.session_state.orders_data):
             with cols[i]:
-                # الزر يظهر الاسم والوقت بوضوح
-                btn_label = f"📦 {o['name']}\n🕒 {o['time']}"
-                if st.button(btn_label, key=f"btn_{o['name']}_{i}"):
+                if st.button(f"📦 {o['name']}\n{o['time']}", key=f"rep_btn_{o['name']}_{i}"):
                     st.session_state.active_rep = o['name']
 
     active = st.session_state.get('active_rep', "-- اختر مندوب --")
@@ -158,13 +156,11 @@ if sh:
             pending = df[df['الحالة'] == "بانتظار التصديق"].copy()
             
             if not pending.empty:
-                # عرض تفاصيل الوقت في الجدول كمان
-                st.info(f"📅 طلبات المندوب {selected_rep} (آخر تحديث: {pending['الوقت'].iloc[0] if 'الوقت' in pending.columns else '---'})")
-                
+                st.info(f"📋 طلبات {selected_rep} | أرسل في: {pending['الوقت'].iloc[0] if 'الوقت' in pending.columns else '---'}")
                 pending['الوجهة'] = pending['اسم الزبون'].fillna('جردة سيارة').str.strip()
-                edited = st.data_editor(pending[['row_no', 'رقم الطلب', 'الوقت', 'اسم الصنف', 'الكميه المطلوبه', 'الوجهة']], hide_index=True, use_container_width=True)
+                edited = st.data_editor(pending[['row_no', 'رقم الطلب', 'اسم الصنف', 'الكميه المطلوبه', 'الوجهة']], hide_index=True, use_container_width=True)
                 
-                # --- [ كود الطباعة HTML المزدوج ] ---
+                # --- كود الطباعة HTML المزدوج ---
                 p_now = datetime.now(beirut_tz).strftime('%Y-%m-%d | %I:%M %p')
                 h_content = ""
                 for tg in edited['الوجهة'].unique():
@@ -176,13 +172,13 @@ if sh:
 
                 st.components.v1.html(f"<script>function doPrint() {{ var w = window.open('', '', 'width=1000,height=1000'); w.document.write(`<html><head><style>table, th, td {{ border: 1px solid black; border-collapse: collapse; padding: 3px; text-align: center; }}</style></head><body dir='rtl'>{h_content}<script>setTimeout(function() {{ window.print(); window.close(); }}, 800);<\\/script></body></html>`); w.document.close(); }}</script><button onclick='doPrint()' style='width:100%; height:60px; background-color:#28a745; color:white; border-radius:10px; font-size:22px;'>🖨️ فتح صفحة الطباعة</button>", height=80)
 
-                # --- كبسة التصديق الصاروخية ---
+                # --- التحديث بالجملة (Batch) + PDF ---
                 if st.button("🚀 تصديق الطلب وإصدار الفواتير PDF", type="primary", use_container_width=True):
                     prices, phones = get_system_data(sh)
                     idx_status = header.index('الحالة') + 1
-                    idx_qty = (header.index('الكميه المطلوبه') + 1)
+                    idx_qty = header.index('الكميه المطلوبه') + 1
                     
-                    with st.spinner("🚀 جاري التحديث البرقي..."):
+                    with st.spinner("🚀 جاري معالجة الطلبات بسرعة القصوى..."):
                         updates = []
                         for _, r in edited.iterrows():
                             row_idx = int(r['row_no'])
@@ -194,16 +190,16 @@ if sh:
 
                         for tg in edited['الوجهة'].unique():
                             if tg == "جردة سيارة": continue
-                            cust_items = edited[edited['الوجهة'] == tg].to_dict('records')
-                            pdf_bytes, g_total = generate_invoice_pdf(selected_rep, tg, cust_items, cust_items[0].get('رقم الطلب', '---'), prices)
-                            st.download_button(f"📥 تحميل فاتورة: {tg}", data=pdf_bytes, file_name=f"Invoice_{tg}.pdf")
+                            items = edited[edited['الوجهة'] == tg].to_dict('records')
+                            pdf_b, g_total = generate_invoice_pdf(selected_rep, tg, items, items[0].get('رقم الطلب', '---'), prices)
+                            st.download_button(f"📥 تحميل فاتورة: {tg}", data=pdf_b, file_name=f"Invoice_{tg}.pdf")
                             
                             phone = phones.get(selected_rep, "")
-                            wa_msg = f"تحية طيبة، مرفق فاتورة الزبون {tg}. المجموع: ${g_total:.2f}"
-                            wa_url = f"https://web.whatsapp.com/send?phone={phone}&text={urllib.parse.quote(wa_msg)}"
+                            wa_url = f"https://web.whatsapp.com/send?phone={phone}&text={urllib.parse.quote(f'تحية طيبة، مرفق فاتورة {tg}. المجموع: ${g_total:.2f}')}"
                             st.markdown(f'<a href="{wa_url}" target="_blank"><button style="width:100%; background-color:#25D366; color:white; border:none; padding:10px; border-radius:5px; margin-bottom:10px;">💬 إرسال واتساب لـ {selected_rep}</button></a>', unsafe_allow_html=True)
 
-                    st.success("✅ تم التصديق!")
-                    st.session_state.orders = [o for o in st.session_state.orders if o['name'] != selected_rep]
+                    st.success("✅ تم تصديق الطلبية بالكامل!")
+                    st.session_state.orders_data = [o for o in st.session_state.orders_data if o['name'] != selected_rep]
                     if 'active_rep' in st.session_state: del st.session_state.active_rep
+                    time.sleep(1)
                     st.rerun()
