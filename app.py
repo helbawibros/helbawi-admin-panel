@@ -12,7 +12,7 @@ from fpdf import FPDF
 import base64
 
 # --- 1. إعدادات الصفحة والستايل ---
-st.set_page_config(page_title="إدارة حلباوي - النظام المتكامل", layout="wide")
+st.set_page_config(page_title="إدارة حلباوي - المتكامل", layout="wide")
 beirut_tz = pytz.timezone('Asia/Beirut')
 
 st.markdown("""
@@ -34,9 +34,7 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-if 'admin_logged_in' not in st.session_state: st.session_state.admin_logged_in = False
-if 'orders' not in st.session_state: st.session_state.orders = []
-
+# --- 2. الوظائف (PDF والأسعار) ---
 @st.cache_resource
 def get_sh():
     try:
@@ -53,13 +51,11 @@ def get_system_data(_sh):
         p_sheet = _sh.worksheet("الأسعار")
         p_data = p_sheet.get_all_values()
         prices = {row[0].strip(): float(row[1]) for row in p_data[1:] if len(row) > 1 and row[1]}
-        
         d_sheet = _sh.worksheet("البيانات")
         d_data = d_sheet.get_all_values()
         phones = {row[0].strip(): row[1].strip() for row in d_data[1:] if len(row) > 1}
         return prices, phones
-    except:
-        return {}, {}
+    except: return {}, {}
 
 def generate_invoice_pdf(rep_name, customer_name, items_list, inv_no, price_dict):
     pdf = FPDF()
@@ -96,7 +92,8 @@ def generate_invoice_pdf(rep_name, customer_name, items_list, inv_no, price_dict
     pdf.cell(160, 10, f"Grand Total: ${g_total:.2f}", 0, 1, 'R')
     return pdf.output(dest='S').encode('latin-1'), g_total
 
-# --- 2. نظام الدخول ---
+# --- 3. نظام الدخول ---
+if 'admin_logged_in' not in st.session_state: st.session_state.admin_logged_in = False
 if not st.session_state.admin_logged_in:
     col_l = st.columns([1, 2, 1])[1]
     with col_l:
@@ -159,31 +156,46 @@ if sh:
                 pending['الوجهة'] = pending['اسم الزبون'].fillna('جردة سيارة').str.strip()
                 edited = st.data_editor(pending[['row_no', 'رقم الطلب', 'اسم الصنف', 'الكميه المطلوبه', 'الوجهة']], hide_index=True, use_container_width=True)
                 
-                if st.button("🚀 تصديق الطلب وإصدار الفواتير", type="primary", use_container_width=True):
+                # --- [ كود الطباعة HTML الحلو اللي طلبت رجعته ] ---
+                p_now = datetime.now(beirut_tz).strftime('%Y-%m-%d | %I:%M %p')
+                h_content = ""
+                for tg in edited['الوجهة'].unique():
+                    curr_rows = edited[edited['الوجهة'] == tg]
+                    o_id = curr_rows['رقم الطلب'].iloc[0] if 'رقم الطلب' in curr_rows.columns else "---"
+                    rows_html = "".join([f"<tr><td style='width:30px;'>{i+1}</td><td style='text-align:right; padding-right:5px;'>{r['اسم الصنف']}</td><td style='font-weight:bold;'>{r['الكميه المطلوبه']}</td></tr>" for i, (_, r) in enumerate(curr_rows.iterrows())])
+                    single_table = f"""<div style="width: 49%; border: 1.5px solid black; padding: 5px; background-color: white; color: black;"><div style="display: flex; justify-content: space-between; border-bottom: 2px solid black;"><div>🔢 طلب: {o_id}</div><div style="font-weight:bold; font-size:16px;">{tg}</div><div>{p_now}</div></div><table style="width:100%; border-collapse:collapse;"><thead><tr style="background:#eee;"><th>ت</th><th>اسم الصنف</th><th>العدد</th></tr></thead><tbody>{rows_html}</tbody></table></div>"""
+                    h_content += f'<div style="display:flex; justify-content:space-between; margin-bottom:15px; page-break-inside:avoid;">{single_table}{single_table}</div>'
+
+                print_html = f"<script>function doPrint() {{ var w = window.open('', '', 'width=1000,height=1000'); w.document.write(`<html><head><title>Print</title><style>table, th, td {{ border: 1px solid black; border-collapse: collapse; padding: 3px; text-align: center; }} body {{ font-family: Arial; }}</style></head><body dir='rtl'>{h_content}<script>setTimeout(function() {{ window.print(); window.close(); }}, 800);<\\/script></body></html>`); w.document.close(); }}</script><button onclick='doPrint()' style='width:100%; height:60px; background-color:#28a745; color:white; border-radius:10px; font-size:22px; cursor:pointer; margin-bottom:10px;'>🖨️ فتح صفحة الطباعة (التنسيق الحلو)</button>"
+                st.components.v1.html(print_html, height=80)
+
+                # --- كبسة التصديق مع PDF والواتساب ---
+                if st.button("🚀 تصديق الطلب وإصدار الفواتير PDF", type="primary", use_container_width=True):
                     prices, phones = get_system_data(sh)
                     idx_status = header.index('الحالة') + 1
-                    idx_qty = (header.index('الكميه المطلوبه') + 1) if 'الكميه المطلوبه' in header else (header.index('العدد') + 1)
+                    idx_qty = header.index('الكميه المطلوبه') + 1
                     
-                    for _, r in edited.iterrows():
-                        row_idx = int(r['row_no'])
-                        ws.update_cell(row_idx, idx_status, "تم التصديق" if str(r['الكميه المطلوبه']) not in ["0", ""] else "ملغى")
-                        ws.update_cell(row_idx, idx_qty, r['الكميه المطلوبه'])
-                        time.sleep(0.2)
+                    with st.spinner("جاري التحديث وإنتاج الفواتير..."):
+                        for _, r in edited.iterrows():
+                            row_idx = int(r['row_no'])
+                            ws.update_cell(row_idx, idx_status, "تم التصديق" if str(r['الكميه المطلوبه']) not in ["0", ""] else "ملغى")
+                            ws.update_cell(row_idx, idx_qty, r['الكميه المطلوبه'])
+                            time.sleep(0.2)
 
-                    for tg in edited['الوجهة'].unique():
-                        if tg == "جردة سيارة": continue
-                        cust_items = edited[edited['الوجهة'] == tg].to_dict('records')
-                        inv_no = cust_items[0].get('رقم الطلب', '---')
-                        pdf_bytes, g_total = generate_invoice_pdf(selected_rep, tg, cust_items, inv_no, prices)
-                        
-                        st.download_button(f"📥 تحميل فاتورة: {tg}", data=pdf_bytes, file_name=f"Invoice_{tg}.pdf")
-                        
-                        msg = f"تحية طيبة، مرفق فاتورة الزبون {tg}. المجموع: ${g_total:.2f}"
-                        phone = phones.get(selected_rep, "")
-                        wa_url = f"https://web.whatsapp.com/send?phone={phone}&text={urllib.parse.quote(msg)}"
-                        st.markdown(f'<a href="{wa_url}" target="_blank"><button style="width:100%; background-color:#25D366; color:white; border:none; padding:10px; border-radius:5px; margin-bottom:10px;">💬 إرسال واتساب لـ {selected_rep}</button></a>', unsafe_allow_html=True)
+                        for tg in edited['الوجهة'].unique():
+                            if tg == "جردة سيارة": continue
+                            cust_items = edited[edited['الوجهة'] == tg].to_dict('records')
+                            inv_no = cust_items[0].get('رقم الطلب', '---')
+                            pdf_bytes, g_total = generate_invoice_pdf(selected_rep, tg, cust_items, inv_no, prices)
+                            
+                            st.download_button(f"📥 تحميل فاتورة: {tg}", data=pdf_bytes, file_name=f"Invoice_{tg}.pdf")
+                            
+                            msg = f"تحية طيبة، مرفق فاتورة الزبون {tg}. المجموع: ${g_total:.2f}"
+                            phone = phones.get(selected_rep, "")
+                            wa_url = f"https://web.whatsapp.com/send?phone={phone}&text={urllib.parse.quote(msg)}"
+                            st.markdown(f'<a href="{wa_url}" target="_blank"><button style="width:100%; background-color:#25D366; color:white; border:none; padding:10px; border-radius:5px; margin-bottom:10px;">💬 إرسال واتساب لـ {selected_rep}</button></a>', unsafe_allow_html=True)
 
-                    st.success("✅ تم التصديق!")
+                    st.success("✅ تم التصديق وتوليد الفواتير!")
                     st.session_state.orders = [o for o in st.session_state.orders if o['name'] != selected_rep]
                     time.sleep(1)
                     st.rerun()
