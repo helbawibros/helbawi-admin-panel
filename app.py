@@ -9,7 +9,6 @@ import pytz
 import time
 import urllib.parse
 from fpdf import FPDF
-import base64
 
 # --- 1. إعدادات الصفحة والستايل ---
 st.set_page_config(page_title="إدارة حلباوي - المتكامل", layout="wide")
@@ -21,11 +20,12 @@ st.markdown("""
         background-color: #ff4b4b; color: white; border: none;
         box-shadow: 0 0 15px rgba(255, 75, 75, 0.6); font-weight: bold; height: 50px;
     }
-    div[data-testid="column"] button {
+    .rep-btn {
         background-color: #28a745 !important; color: white !important;
-        height: 80px !important; border: 2px solid #1e7e34 !important;
-        font-size: 16px !important; white-space: pre-wrap !important;
+        border-radius: 10px; padding: 10px; margin-bottom: 5px;
+        text-align: center; border: 2px solid #1e7e34;
     }
+    .time-label { font-size: 12px; color: #ffcc00; display: block; }
     .company-title {
         font-family: 'Arial Black', sans-serif;
         color: #D4AF37; text-align: center; font-size: 50px;
@@ -41,9 +41,7 @@ def get_sh():
         info = json.loads(st.secrets["gcp_service_account"]["json_data"].strip(), strict=False)
         creds = Credentials.from_service_account_info(info, scopes=["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"])
         return gspread.authorize(creds).open_by_key("1flePWR4hlSMjVToZfkselaf0M95fcFMtcn_G-KCK3yQ")
-    except Exception as e:
-        st.error(f"⚠️ خطأ اتصال بجوجل: {e}")
-        return None
+    except: return None
 
 @st.cache_data(ttl=300)
 def get_system_data(_sh):
@@ -92,7 +90,7 @@ def generate_invoice_pdf(rep_name, customer_name, items_list, inv_no, price_dict
     pdf.cell(160, 10, f"Grand Total: ${g_total:.2f}", 0, 1, 'R')
     return pdf.output(dest='S').encode('latin-1'), g_total
 
-# --- 3. نظام الدخول ---
+# --- 3. الدخول الرئيسي ---
 if 'admin_logged_in' not in st.session_state: st.session_state.admin_logged_in = False
 if not st.session_state.admin_logged_in:
     col_l = st.columns([1, 2, 1])[1]
@@ -113,7 +111,7 @@ sh = get_sh()
 def fetch_delegates(_sh):
     try:
         ws_list = _sh.worksheets()
-        excluded = ["طلبات", "الأسعار", "البيانات", "الزبائن", "Sheet1", "Status", "رقم الطلب", "بيانات المندوبين", "المبيعات"]
+        excluded = ["طلبات", "الأسعار", "البيانات", "الزبائن", "Status", "رقم الطلب", "المبيعات"]
         return [ws.title for ws in ws_list if ws.title not in excluded]
     except: return []
 
@@ -129,17 +127,23 @@ if sh:
                 if len(data) > 1:
                     header = data[0]
                     idx_status = header.index('الحالة')
+                    idx_time = header.index('الوقت') if 'الوقت' in header else -1
                     for row in data[1:]:
                         if row[idx_status] == "بانتظار التصديق":
-                            st.session_state.orders.append({"name": rep})
+                            order_time = row[idx_time] if idx_time != -1 else "غير محدد"
+                            st.session_state.orders.append({"name": rep, "time": order_time})
                             break
             except: continue
 
+    # عرض أزرار المندوبين مع الوقت
     if st.session_state.orders:
         cols = st.columns(len(st.session_state.orders))
         for i, o in enumerate(st.session_state.orders):
-            if cols[i].button(f"📦 {o['name']}", key=f"btn_{o['name']}"):
-                st.session_state.active_rep = o['name']
+            with cols[i]:
+                # الزر يظهر الاسم والوقت بوضوح
+                btn_label = f"📦 {o['name']}\n🕒 {o['time']}"
+                if st.button(btn_label, key=f"btn_{o['name']}_{i}"):
+                    st.session_state.active_rep = o['name']
 
     active = st.session_state.get('active_rep', "-- اختر مندوب --")
     selected_rep = st.selectbox("المندوب المختار:", ["-- اختر مندوب --"] + delegates, index=(delegates.index(active)+1 if active in delegates else 0))
@@ -154,27 +158,29 @@ if sh:
             pending = df[df['الحالة'] == "بانتظار التصديق"].copy()
             
             if not pending.empty:
+                # عرض تفاصيل الوقت في الجدول كمان
+                st.info(f"📅 طلبات المندوب {selected_rep} (آخر تحديث: {pending['الوقت'].iloc[0] if 'الوقت' in pending.columns else '---'})")
+                
                 pending['الوجهة'] = pending['اسم الزبون'].fillna('جردة سيارة').str.strip()
-                edited = st.data_editor(pending[['row_no', 'رقم الطلب', 'اسم الصنف', 'الكميه المطلوبه', 'الوجهة']], hide_index=True, use_container_width=True)
+                edited = st.data_editor(pending[['row_no', 'رقم الطلب', 'الوقت', 'اسم الصنف', 'الكميه المطلوبه', 'الوجهة']], hide_index=True, use_container_width=True)
                 
                 # --- [ كود الطباعة HTML المزدوج ] ---
                 p_now = datetime.now(beirut_tz).strftime('%Y-%m-%d | %I:%M %p')
                 h_content = ""
                 for tg in edited['الوجهة'].unique():
                     curr_rows = edited[edited['الوجهة'] == tg]
-                    o_id = curr_rows['رقم الطلب'].iloc[0] if 'رقم الطلب' in curr_rows.columns else "---"
-                    rows_html = "".join([f"<tr><td style='width:30px;'>{i+1}</td><td style='text-align:right;'>{r['اسم الصنف']}</td><td style='font-weight:bold;'>{r['الكميه المطلوبه']}</td></tr>" for i, (_, r) in enumerate(curr_rows.iterrows())])
+                    o_id = curr_rows['رقم الطلب'].iloc[0]
+                    rows_html = "".join([f"<tr><td>{i+1}</td><td style='text-align:right;'>{r['اسم الصنف']}</td><td>{r['الكميه المطلوبه']}</td></tr>" for i, (_, r) in enumerate(curr_rows.iterrows())])
                     single_table = f"""<div style="width: 48%; border: 1.5px solid black; padding: 5px; margin: 2px;"><div style="display: flex; justify-content: space-between; border-bottom: 2px solid black;"><div>طلب: {o_id}</div><div style="font-weight:bold;">{tg}</div><div>{p_now}</div></div><table style="width:100%; border-collapse:collapse;"><thead><tr style="background:#eee;"><th>ت</th><th>اسم الصنف</th><th>العدد</th></tr></thead><tbody>{rows_html}</tbody></table></div>"""
                     h_content += f'<div style="display:flex; justify-content:space-between; margin-bottom:15px; page-break-inside:avoid;">{single_table}{single_table}</div>'
 
-                print_html = f"<script>function doPrint() {{ var w = window.open('', '', 'width=1000,height=1000'); w.document.write(`<html><head><style>table, th, td {{ border: 1px solid black; border-collapse: collapse; padding: 3px; text-align: center; }}</style></head><body dir='rtl'>{h_content}<script>setTimeout(function() {{ window.print(); window.close(); }}, 800);<\\/script></body></html>`); w.document.close(); }}</script><button onclick='doPrint()' style='width:100%; height:60px; background-color:#28a745; color:white; border-radius:10px; font-size:22px;'>🖨️ فتح صفحة الطباعة</button>"
-                st.components.v1.html(print_html, height=80)
+                st.components.v1.html(f"<script>function doPrint() {{ var w = window.open('', '', 'width=1000,height=1000'); w.document.write(`<html><head><style>table, th, td {{ border: 1px solid black; border-collapse: collapse; padding: 3px; text-align: center; }}</style></head><body dir='rtl'>{h_content}<script>setTimeout(function() {{ window.print(); window.close(); }}, 800);<\\/script></body></html>`); w.document.close(); }}</script><button onclick='doPrint()' style='width:100%; height:60px; background-color:#28a745; color:white; border-radius:10px; font-size:22px;'>🖨️ فتح صفحة الطباعة</button>", height=80)
 
-                # --- كبسة التصديق الصاروخية (التحديث بالجملة) ---
-                if st.button("🚀 تصديق الطلب وإصدار الفاتورة PDF", type="primary", use_container_width=True):
+                # --- كبسة التصديق الصاروخية ---
+                if st.button("🚀 تصديق الطلب وإصدار الفواتير PDF", type="primary", use_container_width=True):
                     prices, phones = get_system_data(sh)
                     idx_status = header.index('الحالة') + 1
-                    idx_qty = (header.index('الكميه المطلوبه') + 1) if 'الكميه المطلوبه' in header else (header.index('العدد') + 1)
+                    idx_qty = (header.index('الكميه المطلوبه') + 1)
                     
                     with st.spinner("🚀 جاري التحديث البرقي..."):
                         updates = []
