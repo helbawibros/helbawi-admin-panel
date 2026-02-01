@@ -177,13 +177,15 @@ if sh:
                     st.components.v1.html(print_html, height=80)
 
                     # --- كبسة التصديق الصاروخية (PDF + واتساب) ---
-                    if st.button("🚀 تصديق الطلب وإصدار الفواتير PDF", type="primary", use_container_width=True):
-                        prices, phones = get_system_data(sh)
+                                        if st.button("🚀 تصديق الطلب، PDF، وإرسال واتساب", type="primary", use_container_width=True):
+                        # 1. جلب الأسعار والأرقام (تأكد أن الوظائف موجودة فوق في الكود)
+                        prices, phones = get_system_data(sh) 
+                        
                         idx_status = header.index('الحالة') + 1
                         idx_qty = header.index('الكميه المطلوبه') + 1
                         
                         with st.spinner("جاري التحديث البرقي وإنتاج الفواتير..."):
-                            # 1. تحديث بالجملة (Batch Update)
+                            # 2. تحديث بالجملة (Batch Update) لسرعة البرق
                             updates = []
                             for _, r in edited.iterrows():
                                 row_idx = int(r['row_no'])
@@ -192,19 +194,44 @@ if sh:
                                 updates.append({'range': gspread.utils.rowcol_to_a1(row_idx, idx_qty), 'values': [[r['الكميه المطلوبه']]]})
                             ws.batch_update(updates)
 
-                            # 2. إنتاج الـ PDF والواتساب لكل زبون
+                            # 3. إنتاج الـ PDF والواتساب لكل زبون
                             for tg in edited['الوجهة'].unique():
                                 if tg == "جردة سيارة": continue
-                                cust_items = edited[edited['الوجهة'] == tg].to_dict('records')
-                                pdf_b, g_total = generate_invoice_pdf(selected_rep, tg, cust_items, cust_items[0].get('رقم الطلب', '---'), prices)
-                                st.download_button(f"📥 تحميل فاتورة: {tg}", data=pdf_b, file_name=f"Invoice_{tg}.pdf")
                                 
-                                phone = phones.get(selected_rep, "")
-                                wa_url = f"https://web.whatsapp.com/send?phone={phone}&text={urllib.parse.quote(f'تحية طيبة، مرفق فاتورة الزبون {tg}. المجموع: ${g_total:.2f}')}"
-                                st.markdown(f'<a href="{wa_url}" target="_blank"><button style="width:100%; background-color:#25D366; color:white; border:none; padding:10px; border-radius:5px; margin-bottom:10px;">💬 إرسال واتساب لـ {selected_rep}</button></a>', unsafe_allow_html=True)
+                                # تصفية الأصناف لكل زبون
+                                cust_items = edited[edited['الوجهة'] == tg].to_dict('records')
+                                
+                                # توليد الـ PDF
+                                try:
+                                    pdf_b, g_total = generate_invoice_pdf(selected_rep, tg, cust_items, cust_items[0].get('رقم الطلب', '---'), prices)
+                                    st.download_button(f"📥 تحميل فاتورة: {tg}", data=pdf_b, file_name=f"Invoice_{tg}.pdf", key=f"pdf_{tg}")
+                                except Exception as e:
+                                    st.error(f"خطأ في توليد PDF للزبون {tg}: {e}")
+                                    g_total = 0
 
-                        st.success("✅ تم التصديق بنجاح!")
+                                # سحب رقم المندوب من شيت "البيانات"
+                                # تأكد أن اسم المندوب في الشيت مطابق لاسم شيت الطلبات
+                                raw_phone = str(phones.get(selected_rep, "")).strip()
+                                
+                                if raw_phone:
+                                    # تنظيف الرقم من أي فراغات أو إشارات زائد
+                                    clean_phone = raw_phone.replace("+", "").replace(" ", "")
+                                    wa_msg = f"تحية طيبة، تم تصديق طلبية الزبون: {tg}. المجموع: ${g_total:.2f}"
+                                    wa_url = f"https://wa.me/{clean_phone}?text={urllib.parse.quote(wa_msg)}"
+                                    
+                                    st.markdown(f"""
+                                        <a href="{wa_url}" target="_blank">
+                                            <button style="width:100%; background-color:#25D366; color:white; border:none; padding:12px; border-radius:10px; margin-bottom:10px; cursor:pointer; font-weight:bold;">
+                                                💬 إرسال واتساب لـ {selected_rep} (فاتورة {tg})
+                                            </button>
+                                        </a>
+                                    """, unsafe_allow_html=True)
+                                else:
+                                    st.warning(f"⚠️ رقم المندوب {selected_rep} غير موجود في شيت البيانات")
+
+                        st.success("✅ تم التصديق وتجهيز الروابط!")
+                        # تنظيف الإشعارات بعد التحديث
                         st.session_state.orders = [o for o in st.session_state.orders if o['name'] != selected_rep]
                         if 'active_rep' in st.session_state: del st.session_state.active_rep
-                        time.sleep(1)
+                        time.sleep(2)
                         st.rerun()
