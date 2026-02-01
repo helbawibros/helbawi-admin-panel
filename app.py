@@ -45,16 +45,16 @@ def get_sh():
         return None
 
 @st.cache_data(ttl=300)
-def get_system_data(_sh):
+def get_phones_data(_sh):
     try:
-        p_sheet = _sh.worksheet("الأسعار")
-        p_data = p_sheet.get_all_values()
-        prices = {row[0].strip(): float(row[1]) for row in p_data[1:] if len(row) > 1 and row[1]}
+        # قراءة شيت البيانات (التي تحتوي على أرقام المناديب)
         d_sheet = _sh.worksheet("البيانات")
         d_data = d_sheet.get_all_values()
-        phones = {row[0].strip(): row[1].strip() for row in d_data[1:] if len(row) > 1}
-        return prices, phones
-    except: return {}, {}
+        # تحويلها لقاموس {الاسم: الرقم}
+        return {row[0].strip(): row[1].strip() for row in d_data if len(row) > 1}
+    except:
+        return {}
+
 
 def generate_invoice_pdf(rep_name, customer_name, items_list, inv_no, price_dict):
     pdf = FPDF()
