@@ -13,25 +13,25 @@ from fpdf import FPDF  # أضفنا المكتبة هنا لضمان العمل
 # --- 1. المحركات والدالات (المصنع) ---
 
 def generate_invoice_pdf(rep_name, customer_name, items_list):
-    # استخدام Unicode عشان العربي
     pdf = FPDF()
     pdf.add_page()
     
-    # ملاحظة: الـ FPDF الافتراضي بمكتبة fpdf ما بيدعم عربي بسهولة
-    # عشان هيك رح نخلي العناوين إنجليزية والبيانات "Product" 
-    # لنتخطى خطأ الـ latin-1 فوراً
-    
+    # رأس الفاتورة
     pdf.set_font("Arial", 'B', 16)
     pdf.cell(200, 10, txt="HELBAWI BROS - INVOICE", ln=True, align='C')
     
     pdf.set_font("Arial", '', 12)
     pdf.ln(10)
-    # رح نستخدم customer_name بس نشيل منه أي حرف غريب إذا سبب مشكلة
-    clean_name = "".join([i if ord(i) < 128 else " " for i in customer_name])
-    pdf.cell(200, 10, txt=f"Delegate: {rep_name}", ln=True)
-    pdf.cell(200, 10, txt=f"Customer: {clean_name}", ln=True)
+    
+    # تنظيف الأسماء من الحروف العربية لمنع الخطأ
+    def clean_text(text):
+        return "".join([i if ord(i) < 128 else " " for i in str(text)])
+
+    pdf.cell(200, 10, txt=f"Delegate: {clean_text(rep_name)}", ln=True)
+    pdf.cell(200, 10, txt=f"Customer: {clean_text(customer_name)}", ln=True)
     pdf.ln(5)
     
+    # الجدول
     pdf.set_fill_color(230, 230, 230)
     pdf.cell(90, 10, "Product Detail", 1, 0, 'C', True)
     pdf.cell(30, 10, "Qty", 1, 0, 'C', True)
@@ -41,13 +41,14 @@ def generate_invoice_pdf(rep_name, customer_name, items_list):
     total_invoice = 0.0
     for item in items_list:
         try:
-            p_val = item.get('سعر', 0)
-            price = float(p_val) if str(p_val).replace('.','').isdigit() else 0.0
+            # قراءة السعر من عمود "سعر"
+            p_raw = item.get('سعر', 0)
+            price = float(p_raw) if str(p_raw).replace('.','').isdigit() else 0.0
             qty = float(item.get('الكميه المطلوبه', 0))
             row_total = price * qty
             total_invoice += row_total
             
-            pdf.cell(90, 10, "Item", 1) # شلنا اسم الصنف العربي مؤقتاً ليمشي الحال
+            pdf.cell(90, 10, "Item", 1)
             pdf.cell(30, 10, f"{qty:g}", 1, 0, 'C')
             pdf.cell(30, 10, f"${price:.2f}", 1, 0, 'C')
             pdf.cell(40, 10, f"${row_total:.2f}", 1, 1, 'C')
@@ -57,50 +58,9 @@ def generate_invoice_pdf(rep_name, customer_name, items_list):
     pdf.set_font("Arial", 'B', 14)
     pdf.cell(190, 10, txt=f"GRAND TOTAL: ${total_invoice:.2f}", ln=True, align='R')
     
-    # التعديل الجوهري: شلنا .encode('latin-1') عشان ما يوقف الكود
+    # تغيير الترميز لمنع الانهيار نهائياً
     return pdf.output(dest='S').encode('utf-8', errors='ignore'), total_invoice
 
-@st.cache_resource
-def get_sh():
-    try:
-        info = json.loads(st.secrets["gcp_service_account"]["json_data"].strip(), strict=False)
-        creds = Credentials.from_service_account_info(info, scopes=["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"])
-        return gspread.authorize(creds).open_by_key("1flePWR4hlSMjVToZfkselaf0M95fcFMtcn_G-KCK3yQ")
-    except Exception as e:
-        st.error(f"⚠️ خطأ اتصال بجوجل: {e}")
-        return None
-
-@st.cache_data(ttl=600)
-def fetch_delegates(_sh):
-    try:
-        all_worksheets = _sh.worksheets()
-        excluded_list = ["طلبات", "الأسعار", "البيانات", "الزبائن", "Sheet1", "Status", "رقم الطلب", "بيانات المندوبين", "المبيعات", "الاسعار"]
-        return [ws.title for ws in all_worksheets if ws.title not in excluded_list]
-    except Exception as e:
-        return []
-
-# --- 2. إعدادات الصفحة والستايل ---
-st.set_page_config(page_title="إدارة حلباوي", layout="wide")
-beirut_tz = pytz.timezone('Asia/Beirut')
-
-st.markdown("""
-    <style>
-    div.stButton > button:first-child[kind="secondary"] {
-        background-color: #ff4b4b; color: white; border: none;
-        box-shadow: 0 0 15px rgba(255, 75, 75, 0.6); font-weight: bold; height: 50px;
-    }
-    div[data-testid="column"] button {
-        background-color: #28a745 !important; color: white !important;
-        height: 100px !important; border: 2px solid #1e7e34 !important;
-        font-size: 18px !important; white-space: pre-wrap !important;
-    }
-    .company-title {
-        font-family: 'Arial Black', sans-serif;
-        color: #D4AF37; text-align: center; font-size: 50px;
-        text-shadow: 2px 2px 4px #000000; margin-bottom: 20px;
-    }
-    </style>
-""", unsafe_allow_html=True)
 
 if 'admin_logged_in' not in st.session_state: st.session_state.admin_logged_in = False
 if 'orders' not in st.session_state: st.session_state.orders = []
