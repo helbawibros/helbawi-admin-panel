@@ -35,6 +35,44 @@ st.markdown("""
 if 'admin_logged_in' not in st.session_state: st.session_state.admin_logged_in = False
 if 'orders' not in st.session_state: st.session_state.orders = []
 
+def generate_invoice_pdf(rep_name, customer_name, items_list, price_dict):
+    pdf = FPDF()
+    pdf.add_page()
+    
+    # إعدادات الخط (Arial أساسي يدعم الإنجليزية فقط حالياً)
+    pdf.set_font("Arial", 'B', 16)
+    pdf.cell(200, 10, txt="HELBAWI BROS - INVOICE", ln=True, align='C')
+    
+    pdf.set_font("Arial", '', 12)
+    pdf.ln(10)
+    pdf.cell(200, 10, txt=f"Delegate: {rep_name}", ln=True)
+    pdf.cell(200, 10, txt=f"Customer: {customer_name}", ln=True)
+    pdf.ln(5)
+    
+    # الجدول (العناوين بالإنجليزية)
+    pdf.set_fill_color(200, 200, 200)
+    pdf.cell(100, 10, "Item Name", 1, 0, 'C', True)
+    pdf.cell(40, 10, "Qty", 1, 0, 'C', True)
+    pdf.cell(40, 10, "Total", 1, 1, 'C', True)
+    
+    total_invoice = 0.0
+    for item in items_list:
+        price = price_dict.get(item['اسم الصنف'], 0.0)
+        qty = float(item['الكميه المطلوبه'])
+        row_total = price * qty
+        total_invoice += row_total
+        
+        # نكتب "Product" بدلاً من الاسم العربي حالياً لتجنب الانهيار
+        pdf.cell(100, 10, "Product Detail", 1)
+        pdf.cell(40, 10, f"{qty:g}", 1, 0, 'C')
+        pdf.cell(40, 10, f"${row_total:.2f}", 1, 1, 'C')
+        
+    pdf.ln(5)
+    pdf.set_font("Arial", 'B', 14)
+    pdf.cell(180, 10, txt=f"GRAND TOTAL: ${total_invoice:.2f}", ln=True, align='R')
+    
+    return pdf.output(dest='S').encode('latin-1'), total_invoice
+
 @st.cache_resource
 def get_sh():
     try:
@@ -190,10 +228,34 @@ if sh:
                     }}
                     </script>
                     <button onclick="doPrint()" style="width:100%; height:60px; background-color:#28a745; color:white; border:none; border-radius:10px; font-weight:bold; font-size:22px; cursor:pointer; box-shadow: 0 4px 8px rgba(0,0,0,0.2);">
-                        🖨️ فتح صفحة الطباعة (الاسم بالوسط)
+                        🖨️ فتح صفحة الطباعة (نسختين على ورقه)
                     </button>
                     """
                     st.components.v1.html(print_html, height=80)
+                    # كبسة PDF منفصلة للتجربة
+                    if st.button("📄 توليد فاتورة PDF (اختبار)", use_container_width=True):
+                        prices, _ = get_system_data(sh)
+    
+                        # بنعمل حلقة لكل زبون بالجدول المعدل
+                        for tg in edited['اسم الزبون'].unique():
+                            try:
+                                cust_items = edited[edited['اسم الزبون'] == tg].to_dict('records')
+            
+                                 # تشغيل المحرك
+                                pdf_bytes, total = generate_invoice_pdf(selected_rep, tg, cust_items, prices)
+            
+                                # زر التحميل الفعلي اللي بيظهر للمستخدم
+                                st.download_button(
+                                    label=f"📥 تحميل فاتورة: {tg}",
+                                    data=pdf_bytes,
+                                    file_name=f"Invoice_{tg}.pdf",
+                                    mime="application/pdf",
+                                    key=f"pdf_btn_{tg}"
+                                )
+                                st.success(f"✅ تم تجهيز فاتورة {tg} بنجاح!")
+            
+                            except Exception as e:
+                                st.error(f"⚠️ صار خطأ مع {tg}: {e}")
 
                     if st.button("🚀 تصديق وإغلاق الطلب نهائياً", type="primary", use_container_width=True):
                         idx_status = header.index('الحالة') + 1
