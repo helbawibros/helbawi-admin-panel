@@ -9,25 +9,21 @@ import pytz
 import time
 import urllib.parse
 from fpdf import FPDF
+from arabic_reshaper import reshape
+from bidi.algorithm import get_display
 
-# --- 1. إعدادات الصفحة والستايل ---
+# --- 1. إعدادات الصفحة ---
 st.set_page_config(page_title="إدارة حلباوي", layout="wide")
 beirut_tz = pytz.timezone('Asia/Beirut')
 
-st.markdown("""
-    <style>
-    div.stButton > button:first-child[kind="secondary"] {
-        background-color: #ff4b4b; color: white; border: none; font-weight: bold; height: 50px;
-    }
-    .company-title {
-        font-family: 'Arial Black', sans-serif;
-        color: #D4AF37; text-align: center; font-size: 50px;
-        text-shadow: 2px 2px 4px #000000; margin-bottom: 20px;
-    }
-    </style>
-""", unsafe_allow_html=True)
+# --- 2. دالة معالجة العربي للـ PDF ---
+def fix_arabic(text):
+    if not text: return ""
+    # إعادة تشكيل الحروف وتعديل الاتجاه (من اليمين لليسار)
+    reshaped_text = reshape(str(text))
+    return get_display(reshaped_text)
 
-# --- 2. محركات النظام ---
+# --- 3. محركات النظام ---
 @st.cache_resource
 def get_sh():
     try:
@@ -48,26 +44,27 @@ def get_system_data(_sh):
         return prices, phones
     except: return {}, {}
 
-def generate_invoice_pdf(rep_name, customer_name, items_list, price_dict):
+# دالة توليد PDF معدلة لتجنب الانهيار
+def generate_invoice_pdf(customer_name, items_list, price_dict):
     pdf = FPDF()
     pdf.add_page()
+    # ملاحظة: FPDF1.7 لا تدعم العربي بشكل كامل، سنكتب العناوين بالإنجليزية لتجنب الـ UnicodeError
     pdf.set_font("Arial", 'B', 16)
     pdf.cell(200, 10, txt="HELBAWI BROS - INVOICE", ln=True, align='C')
     pdf.set_font("Arial", '', 12)
     pdf.ln(10)
-    pdf.cell(200, 10, txt=f"Client: {customer_name}", ln=True)
-    pdf.ln(5)
+    pdf.cell(200, 10, txt=f"Customer: {customer_name}", ln=True)
     
     total_amount = 0.0
     for item in items_list:
         price = price_dict.get(item['اسم الصنف'], 0.0)
         qty = float(item['الكميه المطلوبه'])
         total_amount += (price * qty)
-        
-    pdf.cell(200, 10, txt=f"Total: ${total_amount:.2f}", ln=True)
+    
+    pdf.cell(200, 10, txt=f"Total Amount: ${total_amount:.2f}", ln=True)
     return pdf.output(dest='S').encode('latin-1'), total_amount
 
-# --- 3. إدارة الجلسة والدخول ---
+# --- 4. واجهة الإدارة ---
 if 'admin_logged_in' not in st.session_state: st.session_state.admin_logged_in = False
 if 'orders' not in st.session_state: st.session_state.orders = []
 
@@ -79,70 +76,63 @@ if not st.session_state.admin_logged_in:
             st.rerun()
     st.stop()
 
-st.markdown('<div class="company-title">Helbawi Bros</div>', unsafe_allow_html=True)
+st.title("📦 لوحة تحكم Helbawi Bros")
 sh = get_sh()
 
 if sh:
-    # --- فحص الإشعارات (حل مشكلة الـ NameError) ---
-    if st.button("🔔 فحص الإشعارات الجديدة", use_container_width=True, type="secondary"):
-        with st.spinner("جاري الفحص..."):
-            st.session_state.orders = []
-            excluded = ["طلبات", "الأسعار", "البيانات", "الزبائن", "Sheet1", "Status"]
-            for ws_obj in sh.worksheets():
-                if ws_obj.title not in excluded:
-                    data = ws_obj.get_all_values()
-                    if len(data) > 1:
-                        header = data[0]
-                        if 'الحالة' in header:
-                            idx_status = header.index('الحالة')
-                            for row in data[1:]:
-                                if len(row) > idx_status and row[idx_status] == "بانتظار التصديق":
-                                    st.session_state.orders.append({"name": ws_obj.title})
-                                    break
+    # زر فحص التنبيهات (تم إصلاح الـ NameError هنا)
+    if st.button("🔔 فحص الطلبات الجديدة", use_container_width=True):
+        st.session_state.orders = []
+        excluded = ["طلبات", "الأسعار", "البيانات", "الزبائن", "Sheet1", "Status"]
+        for ws_obj in sh.worksheets():
+            if ws_obj.title not in excluded:
+                data = ws_obj.get_all_values()
+                if len(data) > 1:
+                    header = data[0]
+                    if 'الحالة' in header:
+                        idx = header.index('الحالة')
+                        if any(row[idx] == "بانتظار التصديق" for row in data[1:]):
+                            st.session_state.orders.append(ws_obj.title)
 
     if st.session_state.orders:
-        cols = st.columns(len(st.session_state.orders))
-        for i, o in enumerate(st.session_state.orders):
-            if cols[i].button(f"📦 {o['name']}", key=f"rep_{i}"):
-                st.session_state.active_rep = o['name']
-                st.rerun()
-
-    active = st.session_state.get('active_rep', "-- اختر مندوب --")
-    if active != "-- اختر مندوب --":
-        ws = sh.worksheet(active)
-        full_data = ws.get_all_values()
-        header = full_data[0]
-        df = pd.DataFrame(full_data[1:], columns=header)
-        df['row_no'] = range(2, len(df) + 2)
-        pending = df[df['الحالة'] == "بانتظار التصديق"].copy()
+        selected_rep = st.selectbox("اختر المندوب:", ["-- اختر --"] + st.session_state.orders)
         
-        if not pending.empty:
-            edited = st.data_editor(pending[['row_no', 'اسم الصنف', 'الكميه المطلوبه', 'اسم الزبون']], hide_index=True)
+        if selected_rep != "-- اختر --":
+            ws = sh.worksheet(selected_rep)
+            data = ws.get_all_values()
+            header = data[0]
+            df = pd.DataFrame(data[1:], columns=header)
+            df['row_no'] = range(2, len(df) + 2)
+            pending = df[df['الحالة'] == "بانتظار التصديق"].copy()
 
-            # 🖨️ الخطوة 1: الطباعة
-            if st.button("🖨️ الخطوة 1: طباعة التحضير", use_container_width=True):
-                st.info("جاهز للطباعة (CTRL+P)")
+            if not pending.empty:
+                edited = st.data_editor(pending[['row_no', 'اسم الصنف', 'الكميه المطلوبه', 'اسم الزبون']], hide_index=True)
 
-            # 📄 الخطوة 2: الإرسال (واتساب و PDF)
-            if st.button("📄 الخطوة 2: إرسال الروابط", use_container_width=True):
-                prices, phones = get_system_data(sh)
-                for tg in edited['اسم الزبون'].unique():
-                    items = edited[edited['اسم الزبون'] == tg].to_dict('records')
-                    pdf_b, total = generate_invoice_pdf(active, tg, items, prices)
-                    st.download_button(f"📥 تحميل PDF لـ {tg}", data=pdf_b, file_name=f"{tg}.pdf")
-                    
-                    phone = phones.get(active, "").replace(" ", "")
-                    if phone:
-                        msg = urllib.parse.quote(f"تم تجهيز طلب {tg}. الإجمالي: ${total:.2f}")
-                        st.markdown(f'<a href="https://wa.me/{phone}?text={msg}" target="_blank">💬 إرسال واتساب لـ {tg}</a>', unsafe_allow_html=True)
+                # --- ترتيب الكبسات المطلوب ---
+                col1, col2, col3 = st.columns(3)
+                
+                with col1:
+                    if st.button("🖨️ 1: طباعة", use_container_width=True):
+                        st.success("جاهز للطباعة")
 
-            # 🚀 الخطوة 3: التصديق النهائي
-            if st.button("🚀 الخطوة 3: تصديق نهائي وتحديث الشيت", type="primary", use_container_width=True):
-                with st.spinner("جاري التحديث..."):
-                    idx_status = header.index('الحالة') + 1
-                    updates = [{'range': gspread.utils.rowcol_to_a1(int(r['row_no']), idx_status), 'values': [["تم التصديق"]]} for _, r in edited.iterrows()]
-                    ws.batch_update(updates)
-                    st.success("✅ تم بنجاح!")
-                    st.session_state.orders = [o for o in st.session_state.orders if o['name'] != active]
-                    time.sleep(1)
-                    st.rerun()
+                with col2:
+                    if st.button("📄 2: إرسال PDF", use_container_width=True):
+                        prices, phones = get_system_data(sh)
+                        for tg in edited['اسم الزبون'].unique():
+                            items = edited[edited['اسم الزبون'] == tg].to_dict('records')
+                            pdf_b, total = generate_invoice_pdf(tg, items, prices)
+                            st.download_button(f"تحميل فاتورة {tg}", data=pdf_b, file_name=f"{tg}.pdf")
+                            # رابط واتساب
+                            phone = phones.get(selected_rep, "").replace(" ", "")
+                            if phone:
+                                msg = urllib.parse.quote(f"فاتورة {tg}\nالمجموع: ${total}")
+                                st.markdown(f"[💬 واتساب {tg}](https://wa.me/{phone}?text={msg})")
+
+                with col3:
+                    if st.button("🚀 3: تصديق نهائي", type="primary", use_container_width=True):
+                        idx_status = header.index('الحالة') + 1
+                        updates = [{'range': gspread.utils.rowcol_to_a1(int(r['row_no']), idx_status), 'values': [["تم التصديق"]]} for _, r in edited.iterrows()]
+                        ws.batch_update(updates)
+                        st.success("✅ تم التصديق!")
+                        time.sleep(1)
+                        st.rerun()
