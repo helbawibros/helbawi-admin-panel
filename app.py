@@ -23,17 +23,17 @@ def generate_invoice_pdf(rep_name, customer_name, items_list):
     pdf.set_font("Arial", '', 12)
     pdf.ln(10)
     
-    # تنظيف الأسماء من الحروف العربية لمنع الخطأ
-    def clean_text(text):
-        return "".join([i if ord(i) < 128 else " " for i in str(text)])
+    # وظيفة ذكية لتنظيف الحروف العربية عشان ما ينهار الكود
+    def fix_text(t):
+        return "".join([i if ord(i) < 128 else " " for i in str(t)])
 
-    pdf.cell(200, 10, txt=f"Delegate: {clean_text(rep_name)}", ln=True)
-    pdf.cell(200, 10, txt=f"Customer: {clean_text(customer_name)}", ln=True)
+    pdf.cell(200, 10, txt=f"Delegate: {fix_text(rep_name)}", ln=True)
+    pdf.cell(200, 10, txt=f"Customer: {fix_text(customer_name)}", ln=True)
     pdf.ln(5)
     
-    # الجدول
+    # العناوين
     pdf.set_fill_color(230, 230, 230)
-    pdf.cell(90, 10, "Product Detail", 1, 0, 'C', True)
+    pdf.cell(90, 10, "Product", 1, 0, 'C', True)
     pdf.cell(30, 10, "Qty", 1, 0, 'C', True)
     pdf.cell(30, 10, "Price", 1, 0, 'C', True)
     pdf.cell(40, 10, "Total", 1, 1, 'C', True)
@@ -41,14 +41,14 @@ def generate_invoice_pdf(rep_name, customer_name, items_list):
     total_invoice = 0.0
     for item in items_list:
         try:
-            # قراءة السعر من عمود "سعر"
-            p_raw = item.get('سعر', 0)
-            price = float(p_raw) if str(p_raw).replace('.','').isdigit() else 0.0
+            # سحب السعر من العمود الجديد اللي سميناه "سعر"
+            p_val = item.get('سعر', 0)
+            price = float(p_val) if str(p_val).replace('.','').isdigit() else 0.0
             qty = float(item.get('الكميه المطلوبه', 0))
             row_total = price * qty
             total_invoice += row_total
             
-            pdf.cell(90, 10, "Item", 1)
+            pdf.cell(90, 10, "Item Detail", 1) # استبدلنا الاسم العربي بكلمة ثابتة لمنع الخطأ
             pdf.cell(30, 10, f"{qty:g}", 1, 0, 'C')
             pdf.cell(30, 10, f"${price:.2f}", 1, 0, 'C')
             pdf.cell(40, 10, f"${row_total:.2f}", 1, 1, 'C')
@@ -58,8 +58,9 @@ def generate_invoice_pdf(rep_name, customer_name, items_list):
     pdf.set_font("Arial", 'B', 14)
     pdf.cell(190, 10, txt=f"GRAND TOTAL: ${total_invoice:.2f}", ln=True, align='R')
     
-    # تغيير الترميز لمنع الانهيار نهائياً
+    # السر هنا: استخدام utf-8 وتجاهل الأخطاء
     return pdf.output(dest='S').encode('utf-8', errors='ignore'), total_invoice
+
 
 
 if 'admin_logged_in' not in st.session_state: st.session_state.admin_logged_in = False
