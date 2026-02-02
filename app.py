@@ -61,7 +61,17 @@ if not st.session_state.admin_logged_in:
 
 st.markdown('<div class="company-title">Helbawi Bros</div>', unsafe_allow_html=True)
 st.divider()
+# 1. جلب المندوبين
+    delegates = fetch_delegates(sh) # تأكد أن الدالة موجودة
+    active = st.session_state.get('active_rep', "-- اختر مندوب --")
+    selected_rep = st.selectbox("المندوب:", ["-- اختر مندوب --"] + delegates)
 
+    if selected_rep != "-- اختر مندوب --":
+        ws = sh.worksheet(selected_rep)
+        data = ws.get_all_values()
+        header = data[0]
+        df = pd.DataFrame(data[1:], columns=header)
+        df['row_no'] = range(2, len(df) + 2)
 
 # --- 3. نظام الطلبات وفحص الإشعارات ---
 sh = get_sh()
@@ -110,7 +120,18 @@ if sh:
             if cols[i].button(f"📦 {o['name']}\n🕒 {o['time']}", key=f"o_{o['name']}"):
                 st.session_state.active_rep = o['name']
                 st.rerun()
+         with col2:
+                if st.button("📄 2. إرسال PDF", use_container_width=True):
+                    # ملاحظة: سنكتب بالإنجليزية لتجنب الانهيار UnicodeError حالياً
+                    pdf = FPDF()
+                    pdf.add_page()
+                    pdf.set_font("Arial", size=12)
+                    pdf.cell(200, 10, txt="Invoice - Helbawi Bros", ln=True, align='C')
+                    # هنا نرسل الـ PDF "بدون عربي" حالياً عشان تنام
+                    pdf_output = pdf.output(dest='S').encode('latin-1')
+                    st.download_button("تحميل الفاتورة (EN)", data=pdf_output, file_name="invoice.pdf")
 
+    
     active = st.session_state.get('active_rep', "-- اختر مندوب --")
     selected_rep = st.selectbox("المندوب المختار:", ["-- اختر مندوب --"] + delegates, index=(delegates.index(active)+1 if active in delegates else 0))
 
