@@ -187,7 +187,7 @@ if sh:
                     st.components.v1.html(print_html, height=80)
 
                     # --- كبسة التصديق الصاروخية (PDF + واتساب) ---
-                                        if st.button("🚀 تصديق الطلب، PDF، وإرسال واتساب", type="primary", use_container_width=True):
+                        if st.button("🚀 تصديق الطلب، PDF، وإرسال واتساب", type="primary", use_container_width=True):
                         # 1. جلب الأسعار والأرقام (تأكد أن الوظائف موجودة فوق في الكود)
                         prices, phones = get_system_data(sh) 
                         
