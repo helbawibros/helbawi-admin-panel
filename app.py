@@ -13,20 +13,25 @@ from fpdf import FPDF  # أضفنا المكتبة هنا لضمان العمل
 # --- 1. المحركات والدالات (المصنع) ---
 
 def generate_invoice_pdf(rep_name, customer_name, items_list):
+    # استخدام Unicode عشان العربي
     pdf = FPDF()
     pdf.add_page()
     
-    # رأس الفاتورة
+    # ملاحظة: الـ FPDF الافتراضي بمكتبة fpdf ما بيدعم عربي بسهولة
+    # عشان هيك رح نخلي العناوين إنجليزية والبيانات "Product" 
+    # لنتخطى خطأ الـ latin-1 فوراً
+    
     pdf.set_font("Arial", 'B', 16)
     pdf.cell(200, 10, txt="HELBAWI BROS - INVOICE", ln=True, align='C')
     
     pdf.set_font("Arial", '', 12)
     pdf.ln(10)
+    # رح نستخدم customer_name بس نشيل منه أي حرف غريب إذا سبب مشكلة
+    clean_name = "".join([i if ord(i) < 128 else " " for i in customer_name])
     pdf.cell(200, 10, txt=f"Delegate: {rep_name}", ln=True)
-    pdf.cell(200, 10, txt=f"Customer: {customer_name}", ln=True)
+    pdf.cell(200, 10, txt=f"Customer: {clean_name}", ln=True)
     pdf.ln(5)
     
-    # تصميم الجدول
     pdf.set_fill_color(230, 230, 230)
     pdf.cell(90, 10, "Product Detail", 1, 0, 'C', True)
     pdf.cell(30, 10, "Qty", 1, 0, 'C', True)
@@ -36,17 +41,13 @@ def generate_invoice_pdf(rep_name, customer_name, items_list):
     total_invoice = 0.0
     for item in items_list:
         try:
-            # الخطة الذكية: سحب السعر من عمود "سعر" في الشيت
-            price_raw = item.get('سعر', 0)
-            price = float(price_raw) if str(price_raw).replace('.','').isdigit() else 0.0
-            
-            qty_raw = item.get('الكميه المطلوبه', 0)
-            qty = float(qty_raw) if str(qty_raw).replace('.','').isdigit() else 0.0
-            
+            p_val = item.get('سعر', 0)
+            price = float(p_val) if str(p_val).replace('.','').isdigit() else 0.0
+            qty = float(item.get('الكميه المطلوبه', 0))
             row_total = price * qty
             total_invoice += row_total
             
-            pdf.cell(90, 10, "Item Detail", 1)
+            pdf.cell(90, 10, "Item", 1) # شلنا اسم الصنف العربي مؤقتاً ليمشي الحال
             pdf.cell(30, 10, f"{qty:g}", 1, 0, 'C')
             pdf.cell(30, 10, f"${price:.2f}", 1, 0, 'C')
             pdf.cell(40, 10, f"${row_total:.2f}", 1, 1, 'C')
@@ -56,7 +57,8 @@ def generate_invoice_pdf(rep_name, customer_name, items_list):
     pdf.set_font("Arial", 'B', 14)
     pdf.cell(190, 10, txt=f"GRAND TOTAL: ${total_invoice:.2f}", ln=True, align='R')
     
-    return pdf.output(dest='S').encode('latin-1'), total_invoice
+    # التعديل الجوهري: شلنا .encode('latin-1') عشان ما يوقف الكود
+    return pdf.output(dest='S').encode('utf-8', errors='ignore'), total_invoice
 
 @st.cache_resource
 def get_sh():
