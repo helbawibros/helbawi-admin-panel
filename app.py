@@ -103,6 +103,27 @@ st.divider()
 
 # --- 3. نظام الطلبات وفحص الإشعارات ---
 sh = get_sh()
+@st.cache_data(ttl=600)
+def get_system_data(_sh):
+    try:
+        # جلب شيت الأسعار
+        p_sheet = _sh.worksheet("الأسعار")
+        p_data = p_sheet.get_all_values()
+        # تحويلها لقاموس {اسم الصنف: السعر}
+        prices = {row[0].strip(): float(row[1]) for row in p_data[1:] if len(row) > 1 and row[1]}
+        
+        # جلب شيت البيانات (لأرقام الهواتف)
+        try:
+            d_sheet = _sh.worksheet("البيانات")
+            d_data = d_sheet.get_all_values()
+            phones = {row[0].strip(): row[1].strip() for row in d_data if len(row) > 1}
+        except:
+            phones = {} # إذا ما في شيت بيانات ما يوقف البرنامج
+            
+        return prices, phones
+    except Exception as e:
+        st.error(f"⚠️ خطأ في جلب الأسعار: {e}")
+        return {}, {}
 
 # --- 1. تعريف وظيفة الجلب مع التخزين المؤقت (حطها قبل الـ if sh) ---
 @st.cache_data(ttl=600)  # بيحفظ البيانات 10 دقائق عشان ما يضل يسأل جوجل
@@ -233,6 +254,7 @@ if sh:
                     """
                     st.components.v1.html(print_html, height=80)
                     # كبسة PDF منفصلة للتجربة
+                    
                     if st.button("📄 توليد فاتورة PDF (اختبار)", use_container_width=True):
                         prices, _ = get_system_data(sh)
     
