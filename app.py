@@ -8,65 +8,45 @@ from datetime import datetime
 import pytz 
 import time
 import urllib.parse
-from fpdf import FPDF  # أضفنا المكتبة هنا لضمان العمل
 
-# --- 1. المحركات والدالات (المصنع) ---
+# --- 1. إعدادات الصفحة والستايل ---
+st.set_page_config(page_title="إدارة حلباوي", layout="wide")
+beirut_tz = pytz.timezone('Asia/Beirut')
 
-def generate_invoice_pdf(rep_name, customer_name, items_list):
-    pdf = FPDF()
-    pdf.add_page()
-    
-    # رأس الفاتورة
-    pdf.set_font("Arial", 'B', 16)
-    pdf.cell(200, 10, txt="HELBAWI BROS - INVOICE", ln=True, align='C')
-    
-    pdf.set_font("Arial", '', 12)
-    pdf.ln(10)
-    
-    # وظيفة ذكية لتنظيف الحروف العربية عشان ما ينهار الكود
-    def fix_text(t):
-        return "".join([i if ord(i) < 128 else " " for i in str(t)])
-
-    pdf.cell(200, 10, txt=f"Delegate: {fix_text(rep_name)}", ln=True)
-    pdf.cell(200, 10, txt=f"Customer: {fix_text(customer_name)}", ln=True)
-    pdf.ln(5)
-    
-    # العناوين
-    pdf.set_fill_color(230, 230, 230)
-    pdf.cell(90, 10, "Product", 1, 0, 'C', True)
-    pdf.cell(30, 10, "Qty", 1, 0, 'C', True)
-    pdf.cell(30, 10, "Price", 1, 0, 'C', True)
-    pdf.cell(40, 10, "Total", 1, 1, 'C', True)
-    
-    total_invoice = 0.0
-    for item in items_list:
-        try:
-            # سحب السعر من العمود الجديد اللي سميناه "سعر"
-            p_val = item.get('سعر', 0)
-            price = float(p_val) if str(p_val).replace('.','').isdigit() else 0.0
-            qty = float(item.get('الكميه المطلوبه', 0))
-            row_total = price * qty
-            total_invoice += row_total
-            
-            pdf.cell(90, 10, "Item Detail", 1) # استبدلنا الاسم العربي بكلمة ثابتة لمنع الخطأ
-            pdf.cell(30, 10, f"{qty:g}", 1, 0, 'C')
-            pdf.cell(30, 10, f"${price:.2f}", 1, 0, 'C')
-            pdf.cell(40, 10, f"${row_total:.2f}", 1, 1, 'C')
-        except: continue
-        
-    pdf.ln(10)
-    pdf.set_font("Arial", 'B', 14)
-    pdf.cell(190, 10, txt=f"GRAND TOTAL: ${total_invoice:.2f}", ln=True, align='R')
-    
-    # السر هنا: استخدام utf-8 وتجاهل الأخطاء
-    return pdf.output(dest='S').encode('utf-8', errors='ignore'), total_invoice
-
-
+st.markdown("""
+    <style>
+    div.stButton > button:first-child[kind="secondary"] {
+        background-color: #ff4b4b; color: white; border: none;
+        box-shadow: 0 0 15px rgba(255, 75, 75, 0.6); font-weight: bold; height: 50px;
+    }
+    div[data-testid="column"] button {
+        background-color: #28a745 !important; color: white !important;
+        height: 100px !important; border: 2px solid #1e7e34 !important;
+        font-size: 18px !important; white-space: pre-wrap !important;
+    }
+    .company-title {
+        font-family: 'Arial Black', sans-serif;
+        color: #D4AF37; text-align: center; font-size: 50px;
+        text-shadow: 2px 2px 4px #000000; margin-bottom: 20px;
+    }
+    </style>
+""", unsafe_allow_html=True)
 
 if 'admin_logged_in' not in st.session_state: st.session_state.admin_logged_in = False
 if 'orders' not in st.session_state: st.session_state.orders = []
 
-# --- 3. نظام الدخول ---
+@st.cache_resource
+def get_sh():
+    try:
+        # الربط مع الملف الجديد
+        info = json.loads(st.secrets["gcp_service_account"]["json_data"].strip(), strict=False)
+        creds = Credentials.from_service_account_info(info, scopes=["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"])
+        return gspread.authorize(creds).open_by_key("1flePWR4hlSMjVToZfkselaf0M95fcFMtcn_G-KCK3yQ")
+    except Exception as e:
+        st.error(f"⚠️ خطأ اتصال بجوجل: {e}")
+        return None
+
+# --- 2. نظام الدخول (هون بيبدأ القسم اللي سألت عنه) ---
 if not st.session_state.admin_logged_in:
     col_l = st.columns([1, 2, 1])[1]
     with col_l:
@@ -82,35 +62,52 @@ if not st.session_state.admin_logged_in:
 st.markdown('<div class="company-title">Helbawi Bros</div>', unsafe_allow_html=True)
 st.divider()
 
-# --- 4. تشغيل النظام وجلب البيانات ---
+
+# --- 3. نظام الطلبات وفحص الإشعارات ---
 sh = get_sh()
 
+# --- 1. تعريف وظيفة الجلب مع التخزين المؤقت (حطها قبل الـ if sh) ---
+@st.cache_data(ttl=600)  # بيحفظ البيانات 10 دقائق عشان ما يضل يسأل جوجل
+def fetch_delegates(_sh):
+    try:
+        # بنادي جوجل مرة واحدة بس
+        all_worksheets = _sh.worksheets()
+        excluded_list = ["طلبات", "الأسعار", "البيانات", "الزبائن", "Sheet1", "Status", "رقم الطلب", "بيانات المندوبين", "المبيعات"]
+        return [ws.title for ws in all_worksheets if ws.title not in excluded_list]
+    except Exception as e:
+        return []
+
+# --- 2. السطر 70 الجديد والمطور ---
 if sh:
     delegates = fetch_delegates(sh)
     if not delegates:
+        # إذا جوجل أعطى خطأ أو تأخر، جرب مرة تانية بعد ثانيتين
         time.sleep(2)
-        st.cache_data.clear()
+        st.cache_data.clear() # بيمسح الكاش القديم ليحاول من جديد
         delegates = fetch_delegates(sh)
 
-    if st.button("🔔 فحص الإشعارات الجديدة", use_container_width=True, type="secondary"):
+    
+    if st.button("🔔 فحص الإشعارات الجديدة (الطلبات المنتظرة)", use_container_width=True, type="secondary"):
         st.session_state.orders = []
-        with st.spinner("جاري الفحص..."):
+        with st.spinner("جاري فحص ملفات المندوبين..."):
             for rep in delegates:
                 try:
                     data = sh.worksheet(rep).get_all_values()
                     if len(data) > 1:
                         header = data[0]
                         idx_status = header.index('الحالة')
+                        idx_time = header.index('التاريخ و الوقت') if 'التاريخ و الوقت' in header else -1
                         for row in data[1:]:
                             if row[idx_status] == "بانتظار التصديق":
-                                st.session_state.orders.append({"name": rep, "time": "جديد"})
+                                order_time = row[idx_time] if idx_time != -1 else "---"
+                                st.session_state.orders.append({"name": rep, "time": order_time})
                                 break
                 except: continue
 
     if st.session_state.orders:
         cols = st.columns(len(st.session_state.orders))
         for i, o in enumerate(st.session_state.orders):
-            if cols[i].button(f"📦 {o['name']}", key=f"o_{o['name']}"):
+            if cols[i].button(f"📦 {o['name']}\n🕒 {o['time']}", key=f"o_{o['name']}"):
                 st.session_state.active_rep = o['name']
                 st.rerun()
 
@@ -121,8 +118,9 @@ if sh:
         ws = sh.worksheet(selected_rep)
         raw = ws.get_all_values()
         if len(raw) > 1:
-            header = [h.strip() for h in raw[0]]
+            header = raw[0]
             df = pd.DataFrame(raw[1:], columns=header)
+            df.columns = df.columns.str.strip()
             
             if len(df.columns) >= 6:
                 df.columns.values[5] = "رقم الطلب"
@@ -134,44 +132,90 @@ if sh:
                 if not pending.empty:
                     pending['الوجهة'] = pending['اسم الزبون'].astype(str).replace(['nan', '', 'None'], 'جردة سيارة').str.strip()
                     
-                    # نأخذ الأعمدة الموجودة فعلياً بما فيها "سعر" إذا توفر
-                    cols_to_show = ['row_no', 'رقم الطلب', 'اسم الصنف', 'الكميه المطلوبه', 'سعر', 'الوجهة']
-                    existing_cols = [c for c in cols_to_show if c in pending.columns]
-                    edited = st.data_editor(pending[existing_cols], hide_index=True, use_container_width=True)
+                    cols_to_show = ['row_no', 'رقم الطلب', 'اسم الصنف', 'الكميه المطلوبه', 'الوجهة']
+                    display_df = pending[[c for c in cols_to_show if c in pending.columns]]
+                    edited = st.data_editor(display_df, hide_index=True, use_container_width=True)
                     
-                    # --- كود الطباعة HTML (لا يتغير) ---
+                    # --- تحضير الطباعة بالتنسيق الجديد (ت - اسم الصنف - العدد) ---
+                                        # --- تحضير الطباعة بتنسيق ملموم (ت - اسم الصنف - العدد) ---
                     p_now = datetime.now(beirut_tz).strftime('%Y-%m-%d | %I:%M %p')
                     h_content = ""
+                    
                     for tg in edited['الوجهة'].unique():
                         curr_rows = edited[edited['الوجهة'] == tg]
-                        rows_html = "".join([f"<tr><td>{i+1}</td><td style='text-align:right;'>{r['اسم الصنف']}</td><td><b>{r['الكميه المطلوبه']}</b></td></tr>" for i, (_, r) in enumerate(curr_rows.iterrows())])
-                        single_table = f"""<div style="width: 49%; border: 1.5px solid black; padding: 5px; background: white; color: black;"><div style="text-align: center; font-weight: bold; border-bottom: 2px solid black;">{tg}</div><table style="width:100%; border-collapse:collapse; margin-top:5px;"><thead><tr style="background:#eee;"><th>ت</th><th>اسم الصنف</th><th>العدد</th></tr></thead><tbody>{rows_html}</tbody></table></div>"""
+                        o_id = curr_rows['رقم الطلب'].iloc[0] if 'رقم الطلب' in curr_rows.columns else "---"
+                        
+                        # التعديل هنا: صغرنا الخطوط وشلنا الحشوة (padding) الزيادة
+                        rows_html = "".join([f"<tr><td style='width:30px;'>{i+1}</td><td style='text-align:right; padding-right:5px; font-size:14px;'>{r['اسم الصنف']}</td><td style='font-size:16px; font-weight:bold; width:50px;'>{r['الكميه المطلوبه']}</td></tr>" for i, (_, r) in enumerate(curr_rows.iterrows())])
+                        
+                        single_table = f"""
+                        <div style="width: 49%; border: 1.5px solid black; padding: 5px; box-sizing: border-box; background-color: white; color: black;">
+                            <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid black; padding-bottom: 3px; margin-bottom: 5px;">
+                                <div style="text-align: right; font-size: 14px; font-weight: bold; width: 33%;">🔢 طلب: {o_id}</div>
+                                <div style="text-align: center; font-size: 16px; font-weight: bold; width: 34%;">{tg}</div>
+                                <div style="text-align: left; font-size: 11px; width: 33%;">{p_now}</div>
+                            </div>
+                            <div style="text-align: right; font-size: 12px; margin-bottom: 3px;">👤 المندوب: {selected_rep}</div>
+                            <table style="width:100%; border-collapse:collapse; table-layout: fixed;">
+                                <thead style="background:#eee;">
+                                    <tr>
+                                        <th style="width:35px; border:1px solid black; font-size:12px;">ت</th>
+                                        <th style="border:1px solid black; text-align:right; padding-right:5px; font-size:12px;">اسم الصنف</th>
+                                        <th style="width:55px; border:1px solid black; font-size:12px;">العدد</th>
+                                    </tr>
+                                </thead>
+                                <tbody>{rows_html}</tbody>
+                            </table>
+                            <div style="margin-top: 5px; text-align: left; font-weight: bold; font-size: 12px;">إجمالي الأصناف: {len(curr_rows)}</div>
+                        </div>
+                        """
                         h_content += f'<div style="display:flex; justify-content:space-between; margin-bottom:15px; page-break-inside:avoid;">{single_table}{single_table}</div>'
 
-                    print_html = f"""<script>function doPrint() {{ var w = window.open('', '', 'width=1000'); w.document.write(`<html><body dir="rtl">{h_content}<script>setTimeout(function() {{ window.print(); window.close(); }}, 800);<\\/script></body></html>`); w.document.close(); }}</script><button onclick="doPrint()" style="width:100%; height:60px; background:#28a745; color:white; font-weight:bold; font-size:20px; border-radius:10px; cursor:pointer;">🖨️ طباعة الطلبات</button>"""
+                    # الستايل العام المصغر
+                    final_style = """
+                    <style>
+                        table, th, td { border: 1px solid black; border-collapse: collapse; padding: 3px; text-align: center; }
+                        body { font-family: Arial, sans-serif; margin: 0; padding: 10px; }
+                        @media print { .no-print { display: none; } }
+                    </style>
+                    """
+
+                    
+                    print_html = f"""
+                    <script>
+                    function doPrint() {{ 
+                        var w = window.open('', '', 'width=1000,height=1000'); 
+                        w.document.write(`<html><head><title>طباعة طلبات</title>{final_style}</head><body dir="rtl"> {h_content} <script>setTimeout(function() {{ window.print(); window.close(); }}, 800);<\\/script></body></html>`); 
+                        w.document.close(); 
+                    }}
+                    </script>
+                    <button onclick="doPrint()" style="width:100%; height:60px; background-color:#28a745; color:white; border:none; border-radius:10px; font-weight:bold; font-size:22px; cursor:pointer; box-shadow: 0 4px 8px rgba(0,0,0,0.2);">
+                        🖨️ فتح صفحة الطباعة (الاسم بالوسط)
+                    </button>
+                    """
                     st.components.v1.html(print_html, height=80)
 
-                    # --- كبسة الـ PDF الجديدة والمطورة ---
-                    st.markdown("---")
-                    if st.button("📄 توليد فواتير PDF للزبائن", use_container_width=True):
-                        for tg in edited['الوجهة'].unique():
-                            try:
-                                cust_items = edited[edited['الوجهة'] == tg].to_dict('records')
-                                pdf_bytes, total = generate_invoice_pdf(selected_rep, tg, cust_items)
-                                st.download_button(label=f"📥 تحميل فاتورة {tg} (${total:.2f})", data=pdf_bytes, file_name=f"Invoice_{tg}.pdf", mime="application/pdf", key=f"pdf_{tg}")
-                            except Exception as e:
-                                st.error(f"⚠️ خطأ في فاتورة {tg}: {e}")
-
-                    # --- كبسة التصديق ---
                     if st.button("🚀 تصديق وإغلاق الطلب نهائياً", type="primary", use_container_width=True):
                         idx_status = header.index('الحالة') + 1
-                        idx_qty = header.index('الكميه المطلوبه') + 1
+                        try: idx_qty = header.index('الكميه المطلوبه') + 1
+                        except: idx_qty = header.index('العدد') + 1
+                        
                         with st.spinner("جاري التحديث..."):
                             for _, r in edited.iterrows():
                                 try:
-                                    ws.update_cell(int(r['row_no']), idx_qty, r['الكميه المطلوبه'])
-                                    ws.update_cell(int(r['row_no']), idx_status, "تم التصديق")
+                                    row_idx = int(r['row_no'])
+                                    item_qty = str(r['الكميه المطلوبه']).strip()
+                                    if item_qty in ["", "0", "None", "nan"]:
+                                        ws.update_cell(row_idx, idx_status, "ملغى")
+                                    else:
+                                        ws.update_cell(row_idx, idx_qty, r['الكميه المطلوبه'])
+                                        ws.update_cell(row_idx, idx_status, "تم التصديق")
+                                    time.sleep(0.3)
                                 except: continue
-                        st.success("✅ تم التصديق!")
+                        
+                        st.success("✅ تم التصديق وتحديث الطلبات!")
+                        st.session_state.orders = [o for o in st.session_state.orders if o['name'] != selected_rep]
+                        if 'active_rep' in st.session_state: del st.session_state.active_rep
                         time.sleep(1)
                         st.rerun()
+
