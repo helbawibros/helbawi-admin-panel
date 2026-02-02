@@ -33,7 +33,8 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-# --- 2. محركات النظام (جلب الأسعار وتوليد PDF) ---
+# --- 2. محركات النظام (جلب الأسعار، الأرقام، وتوليد PDF) ---
+
 @st.cache_resource
 def get_sh():
     try:
@@ -45,15 +46,24 @@ def get_sh():
         return None
 
 @st.cache_data(ttl=300)
-def get_phones_data(_sh):
+def get_system_data(_sh):
+    """جلب الأسعار من شيت الأسعار والأرقام من شيت البيانات في وقت واحد"""
     try:
-        # قراءة شيت البيانات (التي تحتوي على أرقام المناديب)
+        # 1. جلب الأسعار
+        p_sheet = _sh.worksheet("الأسعار")
+        p_data = p_sheet.get_all_values()
+        prices = {row[0].strip(): float(row[1]) for row in p_data[1:] if len(row) > 1 and row[1]}
+        
+        # 2. جلب أرقام الهواتف من شيت "البيانات" كما في صورتك
         d_sheet = _sh.worksheet("البيانات")
         d_data = d_sheet.get_all_values()
-        # تحويلها لقاموس {الاسم: الرقم}
-        return {row[0].strip(): row[1].strip() for row in d_data if len(row) > 1}
-    except:
-        return {}
+        phones = {row[0].strip(): row[1].strip() for row in d_data if len(row) > 1}
+        
+        return prices, phones
+    except Exception as e:
+        st.error(f"⚠️ خطأ في قراءة الجداول: {e}")
+        return {}, {}
+
 
 
 def generate_invoice_pdf(rep_name, customer_name, items_list, inv_no, price_dict):
