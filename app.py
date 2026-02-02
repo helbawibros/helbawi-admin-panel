@@ -10,16 +10,53 @@ import time
 import urllib.parse
 
 
-@st.cache_data(ttl=600)
-def get_system_data(_sh):
-    try:
-        p_sheet = _sh.worksheet("الأسعار")
-        p_data = p_sheet.get_all_values()
-        # تحويل شيت الأسعار لقاموس
-        prices = {row[0].strip(): float(row[1]) for row in p_data[1:] if len(row) > 1 and row[1]}
-        return prices, {}
-    except:
-        return {}, {}
+def generate_invoice_pdf(rep_name, customer_name, items_list):
+    pdf = FPDF()
+    pdf.add_page()
+    
+    # رأس الفاتورة
+    pdf.set_font("Arial", 'B', 16)
+    pdf.cell(200, 10, txt="HELBAWI BROS - INVOICE", ln=True, align='C')
+    
+    pdf.set_font("Arial", '', 12)
+    pdf.ln(10)
+    pdf.cell(200, 10, txt=f"Delegate: {rep_name}", ln=True)
+    pdf.cell(200, 10, txt=f"Customer: {customer_name}", ln=True)
+    pdf.ln(5)
+    
+    # تصميم الجدول
+    pdf.set_fill_color(230, 230, 230)
+    pdf.cell(90, 10, "Product (Check WhatsApp for Arabic Name)", 1, 0, 'C', True)
+    pdf.cell(30, 10, "Qty", 1, 0, 'C', True)
+    pdf.cell(30, 10, "Price", 1, 0, 'C', True)
+    pdf.cell(40, 10, "Total", 1, 1, 'C', True)
+    
+    total_invoice = 0.0
+    for item in items_list:
+        try:
+            # سحب السعر من عمود "سعر" اللي جهزناه
+            price_raw = item.get('سعر', 0)
+            price = float(price_raw) if str(price_raw).replace('.','').isdigit() else 0.0
+            
+            qty_raw = item.get('الكميه المطلوبه', 0)
+            qty = float(qty_raw) if str(qty_raw).replace('.','').isdigit() else 0.0
+            
+            row_total = price * qty
+            total_invoice += row_total
+            
+            # كتابة السطر
+            pdf.cell(90, 10, "Item Detail", 1)
+            pdf.cell(30, 10, f"{qty:g}", 1, 0, 'C')
+            pdf.cell(30, 10, f"${price:.2f}", 1, 0, 'C')
+            pdf.cell(40, 10, f"${row_total:.2f}", 1, 1, 'C')
+        except: continue
+        
+    pdf.ln(10)
+    pdf.set_font("Arial", 'B', 14)
+    pdf.cell(190, 10, txt=f"GRAND TOTAL: ${total_invoice:.2f}", ln=True, align='R')
+    
+    return pdf.output(dest='S').encode('latin-1'), total_invoice
+
 
 
 # --- 1. إعدادات الصفحة والستايل ---
