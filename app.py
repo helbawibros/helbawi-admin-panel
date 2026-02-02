@@ -10,7 +10,7 @@ import time
 import urllib.parse
 from fpdf import FPDF
 
-# --- 1. إعدادات الصفحة والستايل (كودك القديم) ---
+# --- 1. إعدادات الصفحة والستايل ---
 st.set_page_config(page_title="إدارة حلباوي", layout="wide")
 beirut_tz = pytz.timezone('Asia/Beirut')
 
@@ -30,11 +30,11 @@ st.markdown("""
         color: #D4AF37; text-align: center; font-size: 50px;
         text-shadow: 2px 2px 4px #000000; margin-bottom: 20px;
     }
+    .st-emotion-cache-12w0qpk { border: 2px solid #28a745; border-radius: 10px; }
     </style>
 """, unsafe_allow_html=True)
 
-# --- 2. محركات النظام (جلب الأسعار، الأرقام، وتوليد PDF) ---
-
+# --- 2. محركات النظام ---
 @st.cache_resource
 def get_sh():
     try:
@@ -47,24 +47,15 @@ def get_sh():
 
 @st.cache_data(ttl=300)
 def get_system_data(_sh):
-    """جلب الأسعار من شيت الأسعار والأرقام من شيت البيانات في وقت واحد"""
     try:
-        # 1. جلب الأسعار
         p_sheet = _sh.worksheet("الأسعار")
         p_data = p_sheet.get_all_values()
         prices = {row[0].strip(): float(row[1]) for row in p_data[1:] if len(row) > 1 and row[1]}
-        
-        # 2. جلب أرقام الهواتف من شيت "البيانات" كما في صورتك
         d_sheet = _sh.worksheet("البيانات")
         d_data = d_sheet.get_all_values()
         phones = {row[0].strip(): row[1].strip() for row in d_data if len(row) > 1}
-        
         return prices, phones
-    except Exception as e:
-        st.error(f"⚠️ خطأ في قراءة الجداول: {e}")
-        return {}, {}
-
-
+    except: return {}, {}
 
 def generate_invoice_pdf(rep_name, customer_name, items_list, inv_no, price_dict):
     pdf = FPDF()
@@ -121,10 +112,12 @@ sh = get_sh()
 @st.cache_data(ttl=600)
 def fetch_delegates(_sh):
     try:
-        all_worksheets = _sh.worksheets()
-        excluded_list = ["طلبات", "الأسعار", "البيانات", "الزبائن", "Sheet1", "Status", "رقم الطلب", "بيانات المندوبين", "المبيعات"]
-        return [ws.title for ws in all_worksheets if ws.title not in excluded_list]
+        ws_list = _sh.worksheets()
+        excluded = ["طلبات", "الأسعار", "البيانات", "الزبائن", "Sheet1", "Status", "رقم الطلب", "بيانات المندوبين", "المبيعات"]
+        return [ws.title for ws in ws_list if ws.title not in excluded]
     except: return []
+
+if 'orders' not in st.session_state: st.session_state.orders = []
 
 if sh:
     delegates = fetch_delegates(sh)
@@ -137,7 +130,6 @@ if sh:
                     if len(data) > 1:
                         header = data[0]
                         idx_status = header.index('الحالة')
-                        # البحث عن عمود "التاريخ و الوقت" لإنهاء مشكلة "غير محدد"
                         idx_time = header.index('التاريخ و الوقت') if 'التاريخ و الوقت' in header else -1
                         for row in data[1:]:
                             if row[idx_status] == "بانتظار التصديق":
@@ -173,29 +165,42 @@ if sh:
                     pending['الوجهة'] = pending['اسم الزبون'].astype(str).replace(['nan', '', 'None'], 'جردة سيارة').str.strip()
                     edited = st.data_editor(pending[['row_no', 'رقم الطلب', 'اسم الصنف', 'الكميه المطلوبه', 'الوجهة']], hide_index=True, use_container_width=True)
                     
-                    # --- كود الطباعة HTML (تنسيقك المفضل) ---
+                    st.divider()
+                    
+                    # --- 1. كبسة الطباعة (الأولى) ---
                     p_now = datetime.now(beirut_tz).strftime('%Y-%m-%d | %I:%M %p')
                     h_content = ""
                     for tg in edited['الوجهة'].unique():
                         curr_rows = edited[edited['الوجهة'] == tg]
                         o_id = curr_rows['رقم الطلب'].iloc[0] if 'رقم الطلب' in curr_rows.columns else "---"
-                        rows_html = "".join([f"<tr><td style='width:30px;'>{i+1}</td><td style='text-align:right; padding-right:5px; font-size:14px;'>{r['اسم الصنف']}</td><td style='font-size:16px; font-weight:bold; width:50px;'>{r['الكميه المطلوبه']}</td></tr>" for i, (_, r) in enumerate(curr_rows.iterrows())])
-                        single_table = f"""<div style="width: 49%; border: 1.5px solid black; padding: 5px; box-sizing: border-box; background-color: white; color: black;"><div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid black; padding-bottom: 3px; margin-bottom: 5px;"><div style="text-align: right; font-size: 14px; font-weight: bold; width: 33%;">🔢 طلب: {o_id}</div><div style="text-align: center; font-size: 16px; font-weight: bold; width: 34%;">{tg}</div><div style="text-align: left; font-size: 11px; width: 33%;">{p_now}</div></div><table style="width:100%; border-collapse:collapse;"><thead><tr style="background:#eee;"><th>ت</th><th>اسم الصنف</th><th>العدد</th></tr></thead><tbody>{rows_html}</tbody></table></div>"""
+                        rows_html = "".join([f"<tr><td>{i+1}</td><td style='text-align:right;'>{r['اسم الصنف']}</td><td>{r['الكميه المطلوبه']}</td></tr>" for i, (_, r) in enumerate(curr_rows.iterrows())])
+                        single_table = f"""<div style="width: 49%; border: 1.5px solid black; padding: 5px; box-sizing: border-box;"><div style="display: flex; justify-content: space-between; font-weight:bold; border-bottom: 2px solid black;"><div>طلب: {o_id}</div><div>{tg}</div></div><table style="width:100%; border-collapse:collapse;"><thead><tr style="background:#eee;"><th>ت</th><th>الصنف</th><th>العدد</th></tr></thead><tbody>{rows_html}</tbody></table></div>"""
                         h_content += f'<div style="display:flex; justify-content:space-between; margin-bottom:15px; page-break-inside:avoid;">{single_table}{single_table}</div>'
 
-                    print_html = f"<script>function doPrint() {{ var w = window.open('', '', 'width=1000,height=1000'); w.document.write(`<html><head><style>table, th, td {{ border: 1px solid black; border-collapse: collapse; padding: 3px; text-align: center; }} body {{ font-family: Arial; }}</style></head><body dir='rtl'>{h_content}<script>setTimeout(function() {{ window.print(); window.close(); }}, 800);<\\/script></body></html>`); w.document.close(); }}</script><button onclick='doPrint()' style='width:100%; height:60px; background-color:#28a745; color:white; border:none; border-radius:10px; font-weight:bold; font-size:22px; cursor:pointer;'>🖨️ فتح صفحة الطباعة</button>"
-                    st.components.v1.html(print_html, height=80)
+                    print_html = f"<script>function doPrint() {{ var w = window.open('', '', 'width=1000,height=1000'); w.document.write(`<html><head><style>table, th, td {{ border: 1px solid black; border-collapse: collapse; padding: 3px; text-align: center; font-size:12px; }}</style></head><body dir='rtl'>{h_content}<script>setTimeout(function() {{ window.print(); window.close(); }}, 800);<\\/script></body></html>`); }}</script><button onclick='doPrint()' style='width:100%; height:50px; background-color:#28a745; color:white; border-radius:10px; font-weight:bold; cursor:pointer;'>🖨️ الخطوة 1: طباعة التحضير</button>"
+                    st.components.v1.html(print_html, height=60)
 
-                    # --- كبسة التصديق الصاروخية (PDF + واتساب) ---
-                    if st.button("🚀 تصديق الطلب، PDF، وإرسال واتساب", type="primary", use_container_width=True):
-                        # 1. جلب الأسعار والأرقام (تأكد أن الوظائف موجودة فوق في الكود)
-                        prices, phones = get_system_data(sh) 
-                        
-                        idx_status = header.index('الحالة') + 1
-                        idx_qty = header.index('الكميه المطلوبه') + 1
-                        
-                        with st.spinner("جاري التحديث البرقي وإنتاج الفواتير..."):
-                            # 2. تحديث بالجملة (Batch Update) لسرعة البرق
+                    # --- 2. قسم الإرسال (الثانية) ---
+                    st.markdown("### 📄 الخطوة 2: إرسال الفواتير")
+                    if st.button("🔄 تجهيز روابط الـ PDF والواتساب", use_container_width=True):
+                        prices, phones = get_system_data(sh)
+                        for tg in edited['الوجهة'].unique():
+                            if tg == "جردة سيارة": continue
+                            items = edited[edited['الوجهة'] == tg].to_dict('records')
+                            pdf_b, g_total = generate_invoice_pdf(selected_rep, tg, items, items[0].get('رقم الطلب', '---'), prices)
+                            st.download_button(f"📥 تحميل فاتورة {tg}", data=pdf_b, file_name=f"Inv_{tg}.pdf", key=f"pdf_{tg}")
+                            
+                            phone = phones.get(selected_rep, "").replace("+", "").replace(" ", "")
+                            if phone:
+                                wa_msg = urllib.parse.quote(f"تم تصديق فاتورة {tg}. المجموع: ${g_total:.2f}")
+                                st.markdown(f'<a href="https://wa.me/{phone}?text={wa_msg}" target="_blank"><button style="width:100%; background-color:#25D366; color:white; border:none; padding:10px; border-radius:10px; margin-bottom:10px;">💬 إرسال واتساب ({tg})</button></a>', unsafe_allow_html=True)
+
+                    # --- 3. كبسة التصديق النهائي (الثالثة) ---
+                    st.divider()
+                    if st.button("🚀 الخطوة 3: تصديق نهائي وإغلاق الطلب", type="primary", use_container_width=True):
+                        with st.spinner("جاري التحديث النهائي..."):
+                            idx_status = header.index('الحالة') + 1
+                            idx_qty = header.index('الكميه المطلوبه') + 1
                             updates = []
                             for _, r in edited.iterrows():
                                 row_idx = int(r['row_no'])
@@ -203,45 +208,9 @@ if sh:
                                 updates.append({'range': gspread.utils.rowcol_to_a1(row_idx, idx_status), 'values': [[st_val]]})
                                 updates.append({'range': gspread.utils.rowcol_to_a1(row_idx, idx_qty), 'values': [[r['الكميه المطلوبه']]]})
                             ws.batch_update(updates)
-
-                            # 3. إنتاج الـ PDF والواتساب لكل زبون
-                            for tg in edited['الوجهة'].unique():
-                                if tg == "جردة سيارة": continue
-                                
-                                # تصفية الأصناف لكل زبون
-                                cust_items = edited[edited['الوجهة'] == tg].to_dict('records')
-                                
-                                # توليد الـ PDF
-                                try:
-                                    pdf_b, g_total = generate_invoice_pdf(selected_rep, tg, cust_items, cust_items[0].get('رقم الطلب', '---'), prices)
-                                    st.download_button(f"📥 تحميل فاتورة: {tg}", data=pdf_b, file_name=f"Invoice_{tg}.pdf", key=f"pdf_{tg}")
-                                except Exception as e:
-                                    st.error(f"خطأ في توليد PDF للزبون {tg}: {e}")
-                                    g_total = 0
-
-                                # سحب رقم المندوب من شيت "البيانات"
-                                # تأكد أن اسم المندوب في الشيت مطابق لاسم شيت الطلبات
-                                raw_phone = str(phones.get(selected_rep, "")).strip()
-                                
-                                if raw_phone:
-                                    # تنظيف الرقم من أي فراغات أو إشارات زائد
-                                    clean_phone = raw_phone.replace("+", "").replace(" ", "")
-                                    wa_msg = f"تحية طيبة، تم تصديق طلبية الزبون: {tg}. المجموع: ${g_total:.2f}"
-                                    wa_url = f"https://wa.me/{clean_phone}?text={urllib.parse.quote(wa_msg)}"
-                                    
-                                    st.markdown(f"""
-                                        <a href="{wa_url}" target="_blank">
-                                            <button style="width:100%; background-color:#25D366; color:white; border:none; padding:12px; border-radius:10px; margin-bottom:10px; cursor:pointer; font-weight:bold;">
-                                                💬 إرسال واتساب لـ {selected_rep} (فاتورة {tg})
-                                            </button>
-                                        </a>
-                                    """, unsafe_allow_html=True)
-                                else:
-                                    st.warning(f"⚠️ رقم المندوب {selected_rep} غير موجود في شيت البيانات")
-
-                        st.success("✅ تم التصديق وتجهيز الروابط!")
-                        # تنظيف الإشعارات بعد التحديث
-                        st.session_state.orders = [o for o in st.session_state.orders if o['name'] != selected_rep]
-                        if 'active_rep' in st.session_state: del st.session_state.active_rep
-                        time.sleep(2)
-                        st.rerun()
+                            
+                            st.success("✅ تم التصديق بنجاح!")
+                            st.session_state.orders = [o for o in st.session_state.orders if o['name'] != selected_rep]
+                            if 'active_rep' in st.session_state: del st.session_state.active_rep
+                            time.sleep(1)
+                            st.rerun()
