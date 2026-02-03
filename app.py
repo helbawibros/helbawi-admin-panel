@@ -220,75 +220,81 @@ if sh:
                         st.rerun()
 
 # --- 4. قسم أرشيف الفواتير المصورة (العمود G) ---
+# --- 4. قسم أرشيف الفواتير المصورة (العمود G) ---
 st.divider()
 st.markdown("<h3 style='text-align:right;'>📁 أرشيف الفواتير المصورة</h3>", unsafe_allow_html=True)
 
 try:
-    # 1. الاتصال بالشيت
+    # 1. الاتصال بالشيت وجلب البيانات خام
     archive_ws = sh.worksheet("بيانات المندوبين")
     all_data = archive_ws.get_all_values()
     
     if len(all_data) > 1:
-        # تحويل البيانات لجدول (بدون تسمية أعمدة لتجنب أخطاء الأسماء)
+        # تحويل البيانات لجدول (بدون تسمية أعمدة لتجنب الـ KeyError)
         df_raw = pd.DataFrame(all_data[1:]) 
         
-        # حسب صور الشيت اللي بعتها:
+        # إحداثيات الأعمدة حسب صورك (A=0, B=1, C=2, D=3, E=4, F=5, G=6)
         # العمود 2 هو C (رقم الفاتورة)
         # العمود 4 هو E (اسم المندوب)
         # العمود 5 هو F (التاريخ)
         # العمود 6 هو G (كود التصميم HTML)
-        
+
         # أدوات البحث
         c1, c2 = st.columns(2)
         with c1:
-            search_no = st.text_input("🔍 رقم الفاتورة للبحث", key="s_inv_final")
+            search_no = st.text_input("🔍 رقم الفاتورة للبحث", key="final_search_inv")
         with c2:
-            search_rep = st.text_input("👤 اسم المندوب للبحث", key="s_rep_final")
+            search_rep = st.text_input("👤 اسم المندوب للبحث", key="final_search_rep")
 
         # زر البحث
         if st.button("🚀 ابدأ البحث في الأرشيف", use_container_width=True):
-            # فلترة الأسطر التي تحتوي على كود HTML في العمود G (Index 6)
-            # وتتجاهل أسطر الدفعات مثل "دفعة كاش"
-            df_filtered = df_raw[df_raw.iloc[:, 6].str.contains("<div", na=False)].copy()
+            # تصفية الأسطر: فقط التي تحتوي على كود <div في العمود G (رقم 6)
+            # وتجنب أسطر الدفعات مثل "دفعة كاش"
+            mask_html = df_raw.iloc[:, 6].str.contains("<div", na=False)
+            df_filtered = df_raw[mask_html].copy()
 
-            # تطبيق بحث رقم الفاتورة على العمود C (Index 2)
+            # فلترة حسب رقم الفاتورة (العمود رقم 2)
             if search_no:
                 df_filtered = df_filtered[df_filtered.iloc[:, 2].astype(str).str.strip().str.contains(search_no.strip())]
             
-            # تطبيق بحث المندوب على العمود E (Index 4)
+            # فلترة حسب المندوب (العمود رقم 4)
             if search_rep:
                 df_filtered = df_filtered[df_filtered.iloc[:, 4].astype(str).str.contains(search_rep)]
 
             if not df_filtered.empty:
-                # تجهيز الخيارات للعرض (رقم الفاتورة من C | التاريخ من F | المندوب من E)
+                # تجهيز القائمة: (رقم الفاتورة من C | التاريخ من F | المندوب من E)
                 invoice_options = []
                 for idx, r in df_filtered.iterrows():
                     label = f"📄 #{r[2]} | {r[5]} | {r[4]}"
                     invoice_options.append(label)
                 
-                selected = st.selectbox("👇 اختر الفاتورة المطلوبة للعرض:", ["-- اختر --"] + invoice_options[::-1])
+                # تخزين النتائج في Session State لضمان بقائها بعد الاختيار
+                st.session_state.found_invoices = df_filtered
+                st.session_state.invoice_labels = invoice_options[::-1]
 
-                if selected != "-- اختر --":
-                    # جلب رقم الفاتورة المختار
-                    inv_id = selected.split('|')[0].replace('📄 #', '').strip()
-                    # جلب الـ HTML من العمود G (Index 6) للسطر الذي يطابق رقم الفاتورة في C (Index 2)
-                    target_row = df_filtered[df_filtered.iloc[:, 2].astype(str).str.strip() == inv_id].iloc[0]
-                    html_content = target_row[6]
-
-                    st.markdown("---")
-                    st.info(f"✅ عرض الفاتورة رقم: {inv_id}")
-                    # عرض التصميم الكامل الواصل على G
-                    st.markdown(html_content, unsafe_allow_html=True)
-                    
-                    if st.button("🖨️ طباعة النسخة المؤرشفة"):
-                        p_script = f"""<script>var w=window.open('','','width=900,height=900');w.document.write(`{html_content}`);setTimeout(function(){{w.print();w.close();}},500);</script>"""
-                        st.components.v1.html(p_script, height=0)
             else:
-                st.warning(f"⚠️ لم يتم العثور على فاتورة بالرقم {search_no} تحتوي على كود تصميم (G).")
+                st.warning("⚠️ لم يتم العثور على فواتير تطابق بحثك.")
+                if 'found_invoices' in st.session_state: del st.session_state.found_invoices
+
+        # عرض النتائج إذا وجدت
+        if 'found_invoices' in st.session_state:
+            selected = st.selectbox("👇 اختر الفاتورة لعرضها:", ["-- اختر --"] + st.session_state.invoice_labels)
+
+            if selected != "-- اختر --":
+                inv_id = selected.split('|')[0].replace('📄 #', '').strip()
+                # جلب الـ HTML من العمود رقم 6 للسطر اللي رقمه بالعمود 2 بيطابق inv_id
+                target_data = st.session_state.found_invoices[st.session_state.found_invoices.iloc[:, 2].astype(str).str.strip() == inv_id].iloc[0]
+                html_content = target_data[6]
+
+                st.markdown("---")
+                st.markdown(html_content, unsafe_allow_html=True)
+                
+                if st.button("🖨️ طباعة النسخة"):
+                    p_script = f"""<script>var w=window.open('','','width=900,height=900');w.document.write(`{html_content}`);setTimeout(function(){{w.print();w.close();}},500);</script>"""
+                    st.components.v1.html(p_script, height=0)
         else:
-            st.info("💡 أدخل رقم الفاتورة واضغط على الزر الملون...")
-    else:
-        st.write("📭 الأرشيف فارغ.")
+            st.info("💡 أدخل بيانات البحث واضغط الزر الأحمر.")
 
 except Exception as e:
-    st.error(f"⚠️ خطأ فني: تأكد أن العمود C يحتوي على أرقام والعمود G يحتوي على الكود. التفاصيل: {e}")
+    # هنا الكود صار "ذكي" بيطبع نوع الخطأ بالظبط إذا صار شي
+    st.error(f"⚠️ تنبيه: تأكد من تعبئة البيانات في الشيت بشكل صحيح. (تفاصيل: {e})")
