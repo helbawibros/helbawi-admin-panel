@@ -218,4 +218,52 @@ if sh:
                         if 'active_rep' in st.session_state: del st.session_state.active_rep
                         time.sleep(1)
                         st.rerun()
+          
+# --- قسم أرشيف الفواتير المصورة (العمود G) ---
+st.divider()
+st.markdown("<h3 style='text-align:right;'>📁 أرشيف الفواتير المصورة</h3>", unsafe_allow_html=True)
 
+try:
+    # 1. الاتصال بشيت "بيانات المندوبين" حيث تُخزن الـ HTML
+    archive_ws = sh.worksheet("بيانات المندوبين")
+    all_rows = archive_ws.get_all_values()
+    
+    if len(all_rows) > 1:
+        header_arch = all_rows[0]
+        df_arch = pd.DataFrame(all_rows[1:], columns=header_arch)
+        
+        # 2. أدوات البحث
+        c1, c2 = st.columns(2)
+        with c1:
+            search_no = st.text_input("🔍 بحث برقم الفاتورة", placeholder="مثلاً: 50040")
+        with c2:
+            search_rep_name = st.text_input("👤 بحث باسم المندوب")
+
+        # تصفية البيانات
+        mask = df_arch.apply(lambda row: (search_no in str(row['رقم الفاتورة']) if search_no else True) and 
+                                         (search_rep_name in str(row['المندوب']) if search_rep_name else True), axis=1)
+        filtered_df = df_arch[mask]
+
+        if not filtered_df.empty:
+            invoice_list = [f"📄 #{r['رقم الفاتورة']} | {r['التاريخ']} | {r['المندوب']} | {r['الزبون']}" for _, r in filtered_df.iterrows()]
+            selected_invoice_label = st.selectbox("👇 اختر فاتورة لعرضها:", ["-- اختر من الأرشيف --"] + invoice_list[::-1])
+
+            if selected_invoice_label != "-- اختر من الأرشيف --":
+                # جلب الـ HTML من العمود G (الخانة الأخيرة في السطر)
+                selected_inv_no = selected_invoice_label.split('|')[0].replace('📄 #', '').strip()
+                target_row = filtered_df[filtered_df['رقم الفاتورة'] == selected_inv_no].iloc[0]
+                invoice_html_content = target_row.values[-1] 
+
+                if invoice_html_content and "<div" in str(invoice_html_content):
+                    st.markdown("---")
+                    st.markdown(invoice_html_content, unsafe_allow_html=True)
+                    
+                    if st.button("🖨️ طباعة النسخة المؤرشفة"):
+                        p_script = f"""<script>var w=window.open('','','width=900,height=900');w.document.write(`{invoice_html_content}`);setTimeout(function(){{w.print();w.close();}},500);</script>"""
+                        st.components.v1.html(p_script, height=0)
+                else:
+                    st.warning("⚠️ لا يوجد كود HTML مخزن لهذه الفاتورة.")
+        else:
+            st.info("🚫 لا توجد نتائج.")
+except Exception as e:
+    st.error(f"⚠️ خطأ في الأرشيف: {e}")
