@@ -220,18 +220,28 @@ if sh:
                         st.rerun()
           
 # --- قسم أرشيف الفواتير المصورة (العمود G) ---
+# --- 4. قسم أرشيف الفواتير المصورة (العمود G) ---
 st.divider()
 st.markdown("<h3 style='text-align:right;'>📁 أرشيف الفواتير المصورة</h3>", unsafe_allow_html=True)
 
 try:
-    # 1. الاتصال بشيت "بيانات المندوبين" حيث تُخزن الـ HTML
+    # 1. الاتصال بالشيت وجلب البيانات
     archive_ws = sh.worksheet("بيانات المندوبين")
-    all_rows = archive_ws.get_all_values()
+    all_data = archive_ws.get_all_values()
     
-    if len(all_rows) > 1:
-        header_arch = all_rows[0]
-        df_arch = pd.DataFrame(all_rows[1:], columns=header_arch)
+    if len(all_data) > 1:
+        # قراءة العناوين وتنظيفها من الفراغات
+        header_arch = [h.strip() for h in all_data[0]]
+        df_arch = pd.DataFrame(all_data[1:], columns=header_arch)
         
+        # تحديد أسماء الأعمدة ديناميكياً لتجنب أي KeyError
+        col_inv = 'رقم الفاتورة'
+        col_rep = 'اسم المندوب'
+        col_date = 'التاريخ'
+        col_cust = 'اسم الزبون'
+        # العمود G هو العمود السابع (Index 6)
+        col_html_idx = 6 
+
         # 2. أدوات البحث
         c1, c2 = st.columns(2)
         with c1:
@@ -239,31 +249,42 @@ try:
         with c2:
             search_rep_name = st.text_input("👤 بحث باسم المندوب")
 
-        # تصفية البيانات
-        mask = df_arch.apply(lambda row: (search_no in str(row['رقم الفاتورة']) if search_no else True) and 
-                                         (search_rep_name in str(row['المندوب']) if search_rep_name else True), axis=1)
-        filtered_df = df_arch[mask]
+        # 3. الفلترة الذكية (Filtering)
+        # نأخذ فقط الأسطر التي تحتوي على كود HTML في العمود G (الذي يبدأ بـ <div)
+        df_display = df_arch[df_arch.iloc[:, col_html_idx].str.contains("<div", na=False)].copy()
 
-        if not filtered_df.empty:
-            invoice_list = [f"📄 #{r['رقم الفاتورة']} | {r['التاريخ']} | {r['المندوب']} | {r['الزبون']}" for _, r in filtered_df.iterrows()]
-            selected_invoice_label = st.selectbox("👇 اختر فاتورة لعرضها:", ["-- اختر من الأرشيف --"] + invoice_list[::-1])
+        if search_no:
+            df_display = df_display[df_display[col_inv].astype(str).str.contains(search_no)]
+        if search_rep_name:
+            df_display = df_display[df_display[col_rep].astype(str).str.contains(search_rep_name)]
 
-            if selected_invoice_label != "-- اختر من الأرشيف --":
-                # جلب الـ HTML من العمود G (الخانة الأخيرة في السطر)
-                selected_inv_no = selected_invoice_label.split('|')[0].replace('📄 #', '').strip()
-                target_row = filtered_df[filtered_df['رقم الفاتورة'] == selected_inv_no].iloc[0]
-                invoice_html_content = target_row.values[-1] 
+        if not df_display.empty:
+            # تجهيز القائمة المنسدلة (الأحدث أولاً)
+            invoice_options = []
+            for _, r in df_display.iterrows():
+                label = f"📄 #{r[col_inv]} | {r[col_date]} | {r[col_rep]} | {r[col_cust]}"
+                invoice_options.append(label)
+            
+            selected_label = st.selectbox("👇 اختر فاتورة للمعالجة:", ["-- اختر من الأرشيف --"] + invoice_options[::-1])
 
-                if invoice_html_content and "<div" in str(invoice_html_content):
-                    st.markdown("---")
-                    st.markdown(invoice_html_content, unsafe_allow_html=True)
-                    
-                    if st.button("🖨️ طباعة النسخة المؤرشفة"):
-                        p_script = f"""<script>var w=window.open('','','width=900,height=900');w.document.write(`{invoice_html_content}`);setTimeout(function(){{w.print();w.close();}},500);</script>"""
-                        st.components.v1.html(p_script, height=0)
-                else:
-                    st.warning("⚠️ لا يوجد كود HTML مخزن لهذه الفاتورة.")
+            if selected_label != "-- اختر من الأرشيف --":
+                # استخراج رقم الفاتورة المختار لجلب السطر الصحيح
+                inv_id = selected_label.split('|')[0].replace('📄 #', '').strip()
+                row_data = df_display[df_display[col_inv] == inv_id].iloc[0]
+                
+                # جلب كود التصميم من العمود G
+                html_content = row_data.iloc[col_html_idx]
+
+                st.markdown("---")
+                # عرض الفاتورة بالديزاين الكامل (حلباوي إخوان)
+                st.markdown(html_content, unsafe_allow_html=True)
+                
+                if st.button("🖨️ طباعة النسخة المؤرشفة"):
+                    p_script = f"""<script>var w=window.open('','','width=900,height=900');w.document.write(`{html_content}`);setTimeout(function(){{w.print();w.close();}},500);</script>"""
+                    st.components.v1.html(p_script, height=0)
         else:
-            st.info("🚫 لا توجد نتائج.")
+            st.info("🚫 لا توجد فواتير مؤرشفة تطابق البحث.")
+    else:
+        st.write("📭 الشيت فارغ.")
 except Exception as e:
     st.error(f"⚠️ خطأ في الأرشيف: {e}")
