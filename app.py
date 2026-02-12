@@ -16,6 +16,7 @@ beirut_tz = pytz.timezone('Asia/Beirut')
 
 st.markdown("""
     <style>
+    /* تنسيق الأزرار */
     div.stButton > button:first-child[kind="secondary"] {
         background-color: #ff4b4b; color: white; border: none;
         box-shadow: 0 0 15px rgba(255, 75, 75, 0.6); font-weight: bold; height: 50px;
@@ -31,24 +32,27 @@ st.markdown("""
         text-shadow: 2px 2px 4px #000000; margin-bottom: 5px;
     }
     
-    /* ستايل اللمبات */
+    /* ستايل اللمبات (Status Lights) */
     .status-bar {
         display: flex; justify-content: center; gap: 15px; margin-bottom: 20px;
-        background: #0e1117; padding: 10px; border-radius: 20px; border: 1px solid #333;
+        background: #0e1117; padding: 15px; border-radius: 20px; border: 1px solid #333;
     }
     .bulb {
-        width: 25px; height: 25px; border-radius: 50%;
+        width: 30px; height: 30px; border-radius: 50%;
         border: 2px solid rgba(255,255,255,0.2); cursor: help; transition: transform 0.2s;
+        display: flex; align-items: center; justify-content: center; color: white; font-size: 10px; font-weight: bold;
     }
-    .bulb:hover { transform: scale(1.3); }
+    .bulb:hover { transform: scale(1.2); }
     .bulb-on { background-color: #00e676; box-shadow: 0 0 15px #00e676; }
-    .bulb-off { background-color: #b71c1c; opacity: 0.4; }
+    .bulb-off { background-color: #b71c1c; opacity: 0.3; }
     
     /* زر الواتساب */
     .wa-btn {
-        background-color: #25D366; color: white; padding: 10px; text-align: center;
-        border-radius: 8px; text-decoration: none; display: block; font-weight: bold; margin-top: 5px;
+        background-color: #25D366; color: white; padding: 12px; text-align: center;
+        border-radius: 10px; text-decoration: none; display: block; font-weight: bold; margin-top: 5px;
+        font-size: 18px; border: 1px solid #128c7e;
     }
+    .wa-btn:hover { background-color: #128c7e; }
     </style>
 """, unsafe_allow_html=True)
 
@@ -65,44 +69,49 @@ def get_sh():
         st.error(f"⚠️ خطأ اتصال بجوجل: {e}")
         return None
 
-# --- دوال الميزات الجديدة (PDF, Phone, Lights) ---
+# --- دوال المساعدة (جديدة) ---
 
-# 1. جلب رقم الهاتف
 def get_delegate_phone(_sh, name):
     try:
         ws = _sh.worksheet("البيانات")
-        # نفترض أن العمود A فيه الاسم والعمود B فيه الرقم
+        # البحث عن الاسم في العمود A وجلب الرقم من العمود B
         cell = ws.find(name.strip())
         if cell:
-            return ws.cell(cell.row, 2).value # العمود الثاني
+            return ws.cell(cell.row, 2).value 
         return None
     except: return None
 
-# 2. إنشاء PDF
-def create_pdf(delegate_name, items):
+# دالة PDF "الآمنة" (لمنع الانهيار بسبب اللغة العربية)
+def create_safe_pdf(delegate_name, items):
     pdf = FPDF()
     pdf.add_page()
     pdf.set_font("Arial", 'B', 16)
-    pdf.cell(190, 10, f"Order: {delegate_name}", 0, 1, 'C')
+    
+    # تنظيف العنوان (إزالة الحروف العربية لمنع الخطأ)
+    safe_title = delegate_name.encode('latin-1', 'ignore').decode('latin-1')
+    pdf.cell(190, 10, f"Order Summary: {safe_title}", 0, 1, 'C')
+    
     pdf.set_font("Arial", '', 12)
     pdf.cell(190, 10, f"Date: {datetime.now().strftime('%Y-%m-%d')}", 0, 1, 'C')
     pdf.ln(5)
     
     pdf.set_fill_color(240, 240, 240)
     pdf.cell(20, 10, "#", 1, 0, 'C', 1)
-    pdf.cell(130, 10, "Item", 1, 0, 'C', 1)
+    pdf.cell(130, 10, "Item Name (Latin Only)", 1, 0, 'C', 1) # ملاحظة: الـ PDF لا يدعم العربي
     pdf.cell(40, 10, "Qty", 1, 1, 'C', 1)
     
     for i, item in enumerate(items, 1):
-        # تنظيف الاسم للعربية (لتجنب تعليق الـ PDF)
-        clean_name = str(item['name']).encode('latin-1', 'ignore').decode('latin-1')
+        # تنظيف اسم الصنف
+        safe_item_name = str(item['name']).encode('latin-1', 'ignore').decode('latin-1')
+        if not safe_item_name.strip(): safe_item_name = "--- (Arabic Item) ---"
+        
         pdf.cell(20, 10, str(i), 1, 0, 'C')
-        pdf.cell(130, 10, clean_name[:45], 1, 0, 'L')
+        pdf.cell(130, 10, safe_item_name[:45], 1, 0, 'L')
         pdf.cell(40, 10, str(item['qty']), 1, 1, 'C')
+        
     return pdf.output(dest='S').encode('latin-1')
 
-# 3. جلب حالة اللمبات
-def get_active_status(_sh, delegates_list):
+def get_active_status(_sh):
     try:
         ws = _sh.worksheet("Active_Users")
         data = ws.get_all_records()
@@ -113,8 +122,7 @@ def get_active_status(_sh, delegates_list):
             last_time = row.get('آخر_ظهور') or row.get('time')
             try:
                 t = datetime.strptime(str(last_time), "%Y-%m-%d %H:%M")
-                # أونلاين إذا ظهر خلال آخر 15 دقيقة
-                if (now - t).total_seconds() < 900: 
+                if (now - t).total_seconds() < 900: # 15 دقيقة
                     status[str(name).strip()] = True
             except: continue
         return status
@@ -135,12 +143,12 @@ if not st.session_state.admin_logged_in:
 
 st.markdown('<div class="company-title">Helbawi Bros</div>', unsafe_allow_html=True)
 
-# --- 3. المنطق الرئيسي ---
+# --- 3. النظام الرئيسي ---
 sh = get_sh()
 
-# قائمة الممنوعات الصارمة (الفلتر الجديد)
+# القائمة السوداء الصارمة (للفلترة)
 BLACKLIST = [
-    "طلبات", "الأسعار", "البيانات", "الزبائن", "Sheet1", "Status", 
+    "طلبات", "الأسعار", "الاسعار", "البيانات", "الزبائن", "Sheet1", "Status", 
     "رقم الطلب", "بيانات المندوبين", "المبيعات", "الذمم", "عاجل", 
     "Active_Users", "Item", "Products", "أرشيف"
 ]
@@ -149,8 +157,8 @@ BLACKLIST = [
 def fetch_delegates(_sh):
     try:
         all_worksheets = _sh.worksheets()
-        # الفلتر: نأخذ فقط الصفحات التي ليست في القائمة السوداء
-        return [ws.title for ws in all_worksheets if ws.title not in BLACKLIST]
+        # الفلترة: استبعاد أي اسم موجود في القائمة السوداء
+        return [ws.title for ws in all_worksheets if ws.title.strip() not in BLACKLIST]
     except Exception as e:
         return []
 
@@ -159,19 +167,23 @@ if sh:
     if not delegates:
         time.sleep(2); st.cache_data.clear(); delegates = fetch_delegates(sh)
 
-    # --- رسم شريط اللمبات (Status Lights) ---
-    status_map = get_active_status(sh, delegates)
-    lights_html = '<div class="status-bar">'
-    for rep in delegates:
-        state = "bulb-on" if status_map.get(rep.strip()) else "bulb-off"
-        # اللمبة تظهر فقط لون، وعند تمرير الماوس يظهر الاسم
-        lights_html += f'<div class="bulb {state}" title="{rep}"></div>'
-    lights_html += '</div>'
-    st.markdown(lights_html, unsafe_allow_html=True)
+    # --- 1. رادار اللمبات (Status Lights) ---
+    # يظهر في الأعلى دائماً
+    if delegates:
+        status_map = get_active_status(sh)
+        lights_html = '<div class="status-bar">'
+        for rep in delegates:
+            is_on = status_map.get(rep.strip())
+            state = "bulb-on" if is_on else "bulb-off"
+            initial = rep.strip()[0] if rep else "?"
+            # اللمبة تعرض الحرف الأول، وعند وضع الماوس يظهر الاسم الكامل
+            lights_html += f'<div class="bulb {state}" title="{rep}">{initial}</div>'
+        lights_html += '</div>'
+        st.markdown(lights_html, unsafe_allow_html=True)
     
     st.divider()
 
-    # --- زر فحص الإشعارات ---
+    # --- 2. زر الإشعارات ---
     if st.button("🔔 فحص الإشعارات الجديدة (الطلبات المنتظرة)", use_container_width=True, type="secondary"):
         st.session_state.orders = []
         with st.spinner("جاري فحص ملفات المندوبين..."):
@@ -221,7 +233,7 @@ if sh:
                     display_df = pending[[c for c in cols_to_show if c in pending.columns]]
                     edited = st.data_editor(display_df, hide_index=True, use_container_width=True)
                     
-                    # --- تحضير الطباعة ---
+                    # --- تحضير كود الطباعة (HTML) ---
                     p_now = datetime.now(beirut_tz).strftime('%Y-%m-%d | %I:%M %p')
                     h_content = ""
                     
@@ -269,30 +281,33 @@ if sh:
                     """
                     st.components.v1.html(print_html, height=80)
 
-                    # --- أزرار الخدمات الجديدة (PDF & WhatsApp) ---
-                    col_wa, col_pdf = st.columns(2)
+                    # --- أزرار الخدمات الإضافية (PDF & WhatsApp) ---
+                    c_wa, c_pdf = st.columns(2)
                     
-                    # 1. زر الـ PDF
-                    items_for_pdf = [{'name': r['اسم الصنف'], 'qty': r['الكميه المطلوبه']} for _, r in edited.iterrows()]
-                    pdf_bytes = create_pdf(selected_rep, items_for_pdf)
-                    with col_pdf:
+                    # 1. زر تحميل PDF (مع الحماية من الانهيار)
+                    items_data = [{'name': r['اسم الصنف'], 'qty': r['الكميه المطلوبه']} for _, r in edited.iterrows()]
+                    # نستخدم دالة Safe PDF لتجنب الخطأ الأحمر
+                    pdf_bytes = create_safe_pdf(selected_rep, items_data)
+                    
+                    with c_pdf:
                         st.download_button(
-                            label="📥 تحميل PDF",
+                            label="📥 تحميل PDF (أرقام فقط)",
                             data=pdf_bytes,
                             file_name=f"Order_{selected_rep}.pdf",
                             mime="application/pdf",
-                            use_container_width=True
+                            use_container_width=True,
+                            help="ملاحظة: هذا الملف قد لا يظهر الأسماء العربية، استخدم زر الطباعة الأخضر للغة العربية."
                         )
-                    
+
                     # 2. زر الواتساب
-                    with col_wa:
+                    with c_wa:
                         phone = get_delegate_phone(sh, selected_rep)
                         if phone:
-                            msg = f"مرحباً {selected_rep}،\nتم تصديق طلبيتك ({len(items_for_pdf)} صنف).\nيرجى تحميل الملف المرفق."
+                            msg = f"مرحباً {selected_rep}،\nتم تصديق طلبيتك ({len(items_data)} صنف).\nيرجى استلام المرفق."
                             wa_url = f"https://api.whatsapp.com/send?phone={phone}&text={urllib.parse.quote(msg)}"
-                            st.markdown(f'<a href="{wa_url}" target="_blank" class="wa-btn">📲 إرسال واتساب</a>', unsafe_allow_html=True)
+                            st.markdown(f'<a href="{wa_url}" target="_blank" class="wa-btn">📲 إرسال واتساب للمندوب</a>', unsafe_allow_html=True)
                         else:
-                            st.warning("⚠️ لا يوجد رقم هاتف (تأكد من شيت البيانات)")
+                            st.warning("⚠️ لا يوجد رقم هاتف (راجع شيت البيانات)")
 
                     st.markdown("---")
 
@@ -320,7 +335,7 @@ if sh:
                         time.sleep(1)
                         st.rerun()
 
-# --- 4. قسم أرشيف الفواتير المصورة ---
+# --- 4. قسم الأرشيف ---
 st.divider()
 st.markdown("<h3 style='text-align:right;'>📁 أرشيف الفواتير المصورة</h3>", unsafe_allow_html=True)
 
