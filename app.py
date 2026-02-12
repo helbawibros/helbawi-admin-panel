@@ -8,6 +8,7 @@ from datetime import datetime
 import pytz 
 import time
 import urllib.parse
+from fpdf import FPDF 
 
 # --- 1. إعدادات الصفحة والستايل ---
 st.set_page_config(page_title="إدارة حلباوي", layout="wide")
@@ -27,7 +28,26 @@ st.markdown("""
     .company-title {
         font-family: 'Arial Black', sans-serif;
         color: #D4AF37; text-align: center; font-size: 50px;
-        text-shadow: 2px 2px 4px #000000; margin-bottom: 20px;
+        text-shadow: 2px 2px 4px #000000; margin-bottom: 5px;
+    }
+    
+    /* ستايل اللمبات */
+    .status-bar {
+        display: flex; justify-content: center; gap: 15px; margin-bottom: 20px;
+        background: #0e1117; padding: 10px; border-radius: 20px; border: 1px solid #333;
+    }
+    .bulb {
+        width: 25px; height: 25px; border-radius: 50%;
+        border: 2px solid rgba(255,255,255,0.2); cursor: help; transition: transform 0.2s;
+    }
+    .bulb:hover { transform: scale(1.3); }
+    .bulb-on { background-color: #00e676; box-shadow: 0 0 15px #00e676; }
+    .bulb-off { background-color: #b71c1c; opacity: 0.4; }
+    
+    /* زر الواتساب */
+    .wa-btn {
+        background-color: #25D366; color: white; padding: 10px; text-align: center;
+        border-radius: 8px; text-decoration: none; display: block; font-weight: bold; margin-top: 5px;
     }
     </style>
 """, unsafe_allow_html=True)
@@ -38,7 +58,6 @@ if 'orders' not in st.session_state: st.session_state.orders = []
 @st.cache_resource
 def get_sh():
     try:
-        # الربط مع الملف الجديد
         info = json.loads(st.secrets["gcp_service_account"]["json_data"].strip(), strict=False)
         creds = Credentials.from_service_account_info(info, scopes=["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"])
         return gspread.authorize(creds).open_by_key("1flePWR4hlSMjVToZfkselaf0M95fcFMtcn_G-KCK3yQ")
@@ -46,7 +65,62 @@ def get_sh():
         st.error(f"⚠️ خطأ اتصال بجوجل: {e}")
         return None
 
-# --- 2. نظام الدخول (هون بيبدأ القسم اللي سألت عنه) ---
+# --- دوال الميزات الجديدة (PDF, Phone, Lights) ---
+
+# 1. جلب رقم الهاتف
+def get_delegate_phone(_sh, name):
+    try:
+        ws = _sh.worksheet("البيانات")
+        # نفترض أن العمود A فيه الاسم والعمود B فيه الرقم
+        cell = ws.find(name.strip())
+        if cell:
+            return ws.cell(cell.row, 2).value # العمود الثاني
+        return None
+    except: return None
+
+# 2. إنشاء PDF
+def create_pdf(delegate_name, items):
+    pdf = FPDF()
+    pdf.add_page()
+    pdf.set_font("Arial", 'B', 16)
+    pdf.cell(190, 10, f"Order: {delegate_name}", 0, 1, 'C')
+    pdf.set_font("Arial", '', 12)
+    pdf.cell(190, 10, f"Date: {datetime.now().strftime('%Y-%m-%d')}", 0, 1, 'C')
+    pdf.ln(5)
+    
+    pdf.set_fill_color(240, 240, 240)
+    pdf.cell(20, 10, "#", 1, 0, 'C', 1)
+    pdf.cell(130, 10, "Item", 1, 0, 'C', 1)
+    pdf.cell(40, 10, "Qty", 1, 1, 'C', 1)
+    
+    for i, item in enumerate(items, 1):
+        # تنظيف الاسم للعربية (لتجنب تعليق الـ PDF)
+        clean_name = str(item['name']).encode('latin-1', 'ignore').decode('latin-1')
+        pdf.cell(20, 10, str(i), 1, 0, 'C')
+        pdf.cell(130, 10, clean_name[:45], 1, 0, 'L')
+        pdf.cell(40, 10, str(item['qty']), 1, 1, 'C')
+    return pdf.output(dest='S').encode('latin-1')
+
+# 3. جلب حالة اللمبات
+def get_active_status(_sh, delegates_list):
+    try:
+        ws = _sh.worksheet("Active_Users")
+        data = ws.get_all_records()
+        status = {}
+        now = datetime.now()
+        for row in data:
+            name = row.get('المندوب') or row.get('User')
+            last_time = row.get('آخر_ظهور') or row.get('time')
+            try:
+                t = datetime.strptime(str(last_time), "%Y-%m-%d %H:%M")
+                # أونلاين إذا ظهر خلال آخر 15 دقيقة
+                if (now - t).total_seconds() < 900: 
+                    status[str(name).strip()] = True
+            except: continue
+        return status
+    except: return {}
+
+# --- 2. نظام الدخول ---
 if not st.session_state.admin_logged_in:
     col_l = st.columns([1, 2, 1])[1]
     with col_l:
@@ -60,33 +134,44 @@ if not st.session_state.admin_logged_in:
     st.stop()
 
 st.markdown('<div class="company-title">Helbawi Bros</div>', unsafe_allow_html=True)
-st.divider()
 
-
-# --- 3. نظام الطلبات وفحص الإشعارات ---
+# --- 3. المنطق الرئيسي ---
 sh = get_sh()
 
-# --- 1. تعريف وظيفة الجلب مع التخزين المؤقت (حطها قبل الـ if sh) ---
-@st.cache_data(ttl=600)  # بيحفظ البيانات 10 دقائق عشان ما يضل يسأل جوجل
+# قائمة الممنوعات الصارمة (الفلتر الجديد)
+BLACKLIST = [
+    "طلبات", "الأسعار", "البيانات", "الزبائن", "Sheet1", "Status", 
+    "رقم الطلب", "بيانات المندوبين", "المبيعات", "الذمم", "عاجل", 
+    "Active_Users", "Item", "Products", "أرشيف"
+]
+
+@st.cache_data(ttl=600)
 def fetch_delegates(_sh):
     try:
-        # بنادي جوجل مرة واحدة بس
         all_worksheets = _sh.worksheets()
-        excluded_list = ["طلبات", "الأسعار", "البيانات", "الزبائن", "Sheet1", "Status", "رقم الطلب", "بيانات المندوبين", "المبيعات"]
-        return [ws.title for ws in all_worksheets if ws.title not in excluded_list]
+        # الفلتر: نأخذ فقط الصفحات التي ليست في القائمة السوداء
+        return [ws.title for ws in all_worksheets if ws.title not in BLACKLIST]
     except Exception as e:
         return []
 
-# --- 2. السطر 70 الجديد والمطور ---
 if sh:
     delegates = fetch_delegates(sh)
     if not delegates:
-        # إذا جوجل أعطى خطأ أو تأخر، جرب مرة تانية بعد ثانيتين
-        time.sleep(2)
-        st.cache_data.clear() # بيمسح الكاش القديم ليحاول من جديد
-        delegates = fetch_delegates(sh)
+        time.sleep(2); st.cache_data.clear(); delegates = fetch_delegates(sh)
 
+    # --- رسم شريط اللمبات (Status Lights) ---
+    status_map = get_active_status(sh, delegates)
+    lights_html = '<div class="status-bar">'
+    for rep in delegates:
+        state = "bulb-on" if status_map.get(rep.strip()) else "bulb-off"
+        # اللمبة تظهر فقط لون، وعند تمرير الماوس يظهر الاسم
+        lights_html += f'<div class="bulb {state}" title="{rep}"></div>'
+    lights_html += '</div>'
+    st.markdown(lights_html, unsafe_allow_html=True)
     
+    st.divider()
+
+    # --- زر فحص الإشعارات ---
     if st.button("🔔 فحص الإشعارات الجديدة (الطلبات المنتظرة)", use_container_width=True, type="secondary"):
         st.session_state.orders = []
         with st.spinner("جاري فحص ملفات المندوبين..."):
@@ -136,16 +221,13 @@ if sh:
                     display_df = pending[[c for c in cols_to_show if c in pending.columns]]
                     edited = st.data_editor(display_df, hide_index=True, use_container_width=True)
                     
-                    # --- تحضير الطباعة بالتنسيق الجديد (ت - اسم الصنف - العدد) ---
-                                        # --- تحضير الطباعة بتنسيق ملموم (ت - اسم الصنف - العدد) ---
+                    # --- تحضير الطباعة ---
                     p_now = datetime.now(beirut_tz).strftime('%Y-%m-%d | %I:%M %p')
                     h_content = ""
                     
                     for tg in edited['الوجهة'].unique():
                         curr_rows = edited[edited['الوجهة'] == tg]
                         o_id = curr_rows['رقم الطلب'].iloc[0] if 'رقم الطلب' in curr_rows.columns else "---"
-                        
-                        # التعديل هنا: صغرنا الخطوط وشلنا الحشوة (padding) الزيادة
                         rows_html = "".join([f"<tr><td style='width:30px;'>{i+1}</td><td style='text-align:right; padding-right:5px; font-size:14px;'>{r['اسم الصنف']}</td><td style='font-size:16px; font-weight:bold; width:50px;'>{r['الكميه المطلوبه']}</td></tr>" for i, (_, r) in enumerate(curr_rows.iterrows())])
                         
                         single_table = f"""
@@ -171,15 +253,7 @@ if sh:
                         """
                         h_content += f'<div style="display:flex; justify-content:space-between; margin-bottom:15px; page-break-inside:avoid;">{single_table}{single_table}</div>'
 
-                    # الستايل العام المصغر
-                    final_style = """
-                    <style>
-                        table, th, td { border: 1px solid black; border-collapse: collapse; padding: 3px; text-align: center; }
-                        body { font-family: Arial, sans-serif; margin: 0; padding: 10px; }
-                        @media print { .no-print { display: none; } }
-                    </style>
-                    """
-
+                    final_style = """<style>table, th, td { border: 1px solid black; border-collapse: collapse; padding: 3px; text-align: center; } body { font-family: Arial, sans-serif; margin: 0; padding: 10px; } @media print { .no-print { display: none; } }</style>"""
                     
                     print_html = f"""
                     <script>
@@ -194,6 +268,33 @@ if sh:
                     </button>
                     """
                     st.components.v1.html(print_html, height=80)
+
+                    # --- أزرار الخدمات الجديدة (PDF & WhatsApp) ---
+                    col_wa, col_pdf = st.columns(2)
+                    
+                    # 1. زر الـ PDF
+                    items_for_pdf = [{'name': r['اسم الصنف'], 'qty': r['الكميه المطلوبه']} for _, r in edited.iterrows()]
+                    pdf_bytes = create_pdf(selected_rep, items_for_pdf)
+                    with col_pdf:
+                        st.download_button(
+                            label="📥 تحميل PDF",
+                            data=pdf_bytes,
+                            file_name=f"Order_{selected_rep}.pdf",
+                            mime="application/pdf",
+                            use_container_width=True
+                        )
+                    
+                    # 2. زر الواتساب
+                    with col_wa:
+                        phone = get_delegate_phone(sh, selected_rep)
+                        if phone:
+                            msg = f"مرحباً {selected_rep}،\nتم تصديق طلبيتك ({len(items_for_pdf)} صنف).\nيرجى تحميل الملف المرفق."
+                            wa_url = f"https://api.whatsapp.com/send?phone={phone}&text={urllib.parse.quote(msg)}"
+                            st.markdown(f'<a href="{wa_url}" target="_blank" class="wa-btn">📲 إرسال واتساب</a>', unsafe_allow_html=True)
+                        else:
+                            st.warning("⚠️ لا يوجد رقم هاتف (تأكد من شيت البيانات)")
+
+                    st.markdown("---")
 
                     if st.button("🚀 تصديق وإغلاق الطلب نهائياً", type="primary", use_container_width=True):
                         idx_status = header.index('الحالة') + 1
@@ -219,70 +320,46 @@ if sh:
                         time.sleep(1)
                         st.rerun()
 
-# --- 4. قسم أرشيف الفواتير المصورة (العمود G) ---
-# --- 4. قسم أرشيف الفواتير المصورة (العمود G) ---
+# --- 4. قسم أرشيف الفواتير المصورة ---
 st.divider()
 st.markdown("<h3 style='text-align:right;'>📁 أرشيف الفواتير المصورة</h3>", unsafe_allow_html=True)
 
 try:
-    # 1. الاتصال بالشيت وجلب البيانات خام
     archive_ws = sh.worksheet("بيانات المندوبين")
     all_data = archive_ws.get_all_values()
     
     if len(all_data) > 1:
-        # تحويل البيانات لجدول (بدون تسمية أعمدة لتجنب الـ KeyError)
         df_raw = pd.DataFrame(all_data[1:]) 
         
-        # إحداثيات الأعمدة حسب صورك (A=0, B=1, C=2, D=3, E=4, F=5, G=6)
-        # العمود 2 هو C (رقم الفاتورة)
-        # العمود 4 هو E (اسم المندوب)
-        # العمود 5 هو F (التاريخ)
-        # العمود 6 هو G (كود التصميم HTML)
-
-        # أدوات البحث
         c1, c2 = st.columns(2)
-        with c1:
-            search_no = st.text_input("🔍 رقم الفاتورة للبحث", key="final_search_inv")
-        with c2:
-            search_rep = st.text_input("👤 اسم المندوب للبحث", key="final_search_rep")
+        with c1: search_no = st.text_input("🔍 رقم الفاتورة للبحث", key="final_search_inv")
+        with c2: search_rep = st.text_input("👤 اسم المندوب للبحث", key="final_search_rep")
 
-        # زر البحث
         if st.button("🚀 ابدأ البحث في الأرشيف", use_container_width=True):
-            # تصفية الأسطر: فقط التي تحتوي على كود <div في العمود G (رقم 6)
-            # وتجنب أسطر الدفعات مثل "دفعة كاش"
             mask_html = df_raw.iloc[:, 6].str.contains("<div", na=False)
             df_filtered = df_raw[mask_html].copy()
 
-            # فلترة حسب رقم الفاتورة (العمود رقم 2)
             if search_no:
                 df_filtered = df_filtered[df_filtered.iloc[:, 2].astype(str).str.strip().str.contains(search_no.strip())]
-            
-            # فلترة حسب المندوب (العمود رقم 4)
             if search_rep:
                 df_filtered = df_filtered[df_filtered.iloc[:, 4].astype(str).str.contains(search_rep)]
 
             if not df_filtered.empty:
-                # تجهيز القائمة: (رقم الفاتورة من C | التاريخ من F | المندوب من E)
                 invoice_options = []
                 for idx, r in df_filtered.iterrows():
-                    label = f"📄 #{r[2]} | {r[5]} | {r[3]}"
-                    invoice_options.append(label)
+                    invoice_options.append(f"📄 #{r[2]} | {r[5]} | {r[3]}")
                 
-                # تخزين النتائج في Session State لضمان بقائها بعد الاختيار
                 st.session_state.found_invoices = df_filtered
                 st.session_state.invoice_labels = invoice_options[::-1]
-
             else:
-                st.warning("⚠️ لم يتم العثور على فواتير تطابق بحثك.")
+                st.warning("⚠️ لم يتم العثور على فواتير.")
                 if 'found_invoices' in st.session_state: del st.session_state.found_invoices
 
-        # عرض النتائج إذا وجدت
         if 'found_invoices' in st.session_state:
-            selected = st.selectbox("👇 اختر الفاتورة لعرضها:", ["-- اختر --"] + st.session_state.invoice_labels)
+            selected = st.selectbox("👇 اختر الفاتورة:", ["-- اختر --"] + st.session_state.invoice_labels)
 
             if selected != "-- اختر --":
                 inv_id = selected.split('|')[0].replace('📄 #', '').strip()
-                # جلب الـ HTML من العمود رقم 6 للسطر اللي رقمه بالعمود 2 بيطابق inv_id
                 target_data = st.session_state.found_invoices[st.session_state.found_invoices.iloc[:, 2].astype(str).str.strip() == inv_id].iloc[0]
                 html_content = target_data[6]
 
@@ -292,9 +369,6 @@ try:
                 if st.button("🖨️ طباعة النسخة"):
                     p_script = f"""<script>var w=window.open('','','width=900,height=900');w.document.write(`{html_content}`);setTimeout(function(){{w.print();w.close();}},500);</script>"""
                     st.components.v1.html(p_script, height=0)
-        else:
-            st.info("💡 أدخل بيانات البحث واضغط الزر الأحمر.")
 
 except Exception as e:
-    # هنا الكود صار "ذكي" بيطبع نوع الخطأ بالظبط إذا صار شي
-    st.error(f"⚠️ تنبيه: تأكد من تعبئة البيانات في الشيت بشكل صحيح. (تفاصيل: {e})")
+    st.error(f"⚠️ تنبيه: {e}")
