@@ -45,24 +45,20 @@ st.markdown("""
     }
     .bulb:hover { transform: scale(1.3); }
     
-    /* الأخضر المضيء */
-    .bulb-on { 
-        background: radial-gradient(circle at 30% 30%, #4bff88, #00e676);
-        box-shadow: 0 0 15px #00e676, inset -1px -1px 3px rgba(0,0,0,0.2);
-    }
-    /* الأحمر المطفى */
-    .bulb-off { 
-        background: radial-gradient(circle at 30% 30%, #ff6b6b, #b71c1c);
-        opacity: 0.6; box-shadow: inset -1px -1px 3px rgba(0,0,0,0.2);
-    }
+    .bulb-on { background: radial-gradient(circle at 30% 30%, #4bff88, #00e676); box-shadow: 0 0 15px #00e676; }
+    .bulb-off { background: radial-gradient(circle at 30% 30%, #ff6b6b, #b71c1c); opacity: 0.6; }
     
-    /* زر الواتساب */
+    /* زر الواتساب الجديد */
     .wa-btn {
-        background-color: #25D366; color: white; padding: 12px; text-align: center;
-        border-radius: 10px; text-decoration: none; display: block; font-weight: bold; margin-top: 5px;
-        font-size: 18px; border: 1px solid #128c7e; transition: 0.3s;
+        background-color: #25D366; color: white; padding: 15px; text-align: center;
+        border-radius: 12px; text-decoration: none; display: block; font-weight: bold; margin-top: 10px;
+        font-size: 18px; border: 2px solid #128c7e; transition: 0.3s; box-shadow: 0 4px 6px rgba(0,0,0,0.1);
     }
-    .wa-btn:hover { background-color: #128c7e; transform: scale(1.02); }
+    .wa-btn:hover { background-color: #128c7e; transform: scale(1.02); color: white; text-decoration: none; }
+    
+    .wa-report-box {
+        background-color: #e8f5e9; border: 1px solid #c8e6c9; border-radius: 8px; padding: 10px; margin-top: 10px; color: #1b5e20;
+    }
     </style>
 """, unsafe_allow_html=True)
 
@@ -100,7 +96,7 @@ def get_active_status(_sh):
             last_time = row.get('آخر_ظهور') or row.get('time')
             try:
                 t = datetime.strptime(str(last_time), "%Y-%m-%d %H:%M")
-                if (now - t).total_seconds() < 900: # 15 دقيقة
+                if (now - t).total_seconds() < 900: 
                     status[str(name).strip()] = True
             except: continue
         return status
@@ -121,7 +117,6 @@ if not st.session_state.admin_logged_in:
 
 st.markdown('<div class="company-title">Helbawi Bros</div>', unsafe_allow_html=True)
 
-# --- 3. النظام الرئيسي ---
 sh = get_sh()
 
 BLACKLIST = [
@@ -143,7 +138,7 @@ if sh:
     if not delegates:
         time.sleep(2); st.cache_data.clear(); delegates = fetch_delegates(sh)
 
-    # --- 1. رادار اللمبات 3D (بدون أحرف) ---
+    # --- 1. رادار اللمبات ---
     if delegates:
         status_map = get_active_status(sh)
         lights_html = '<div class="status-bar">'
@@ -204,16 +199,63 @@ if sh:
                     
                     cols_to_show = ['row_no', 'رقم الطلب', 'اسم الصنف', 'الكميه المطلوبه', 'الوجهة']
                     display_df = pending[[c for c in cols_to_show if c in pending.columns]]
+                    
+                    # تعديل الجدول
                     edited = st.data_editor(display_df, hide_index=True, use_container_width=True)
                     
-                    # --- HTML Print (الزر الأخضر) ---
+                    # ========================================================
+                    # 🔥 كود التقرير الذكي للواتساب (الحل الجديد) 🔥
+                    # ========================================================
+                    
+                    # 1. تحويل الكميات لأرقام للتأكد
+                    edited['الكميه المطلوبه'] = pd.to_numeric(edited['الكميه المطلوبه'], errors='coerce').fillna(0)
+
+                    # 2. فصل المقبول عن الملغى
+                    approved_items = edited[edited['الكميه المطلوبه'] > 0]
+                    cancelled_items = edited[edited['الكميه المطلوبه'] <= 0]
+                    
+                    # 3. بناء نص الرسالة
+                    msg_lines = []
+                    msg_lines.append(f"📦 *تقرير تحميل: {selected_rep}*")
+                    msg_lines.append(f"📅 {datetime.now(beirut_tz).strftime('%Y-%m-%d | %I:%M %p')}")
+                    msg_lines.append("------------------")
+                    
+                    if not approved_items.empty:
+                        msg_lines.append("✅ *تم الموافقة والتحميل:*")
+                        for _, row in approved_items.iterrows():
+                            # عرض: اسم الصنف (العدد)
+                            line = f"▪️ {row['اسم الصنف']}: *{int(row['الكميه المطلوبه'])}*"
+                            msg_lines.append(line)
+                    
+                    if not cancelled_items.empty:
+                        msg_lines.append("\n❌ *ملغى / غير متوفر:*")
+                        for _, row in cancelled_items.iterrows():
+                            line = f"▫️ ~{row['اسم الصنف']}~"
+                            msg_lines.append(line)
+                            
+                    msg_lines.append("\n⚠️ *يرجى التأكد من البضاعة قبل الانطلاق*")
+                    
+                    # دمج الرسالة وتشفيرها للرابط
+                    final_msg = "\n".join(msg_lines)
+                    encoded_msg = urllib.parse.quote(final_msg)
+                    
+                    # جلب رقم الهاتف
+                    phone = get_delegate_phone(sh, selected_rep)
+                    
+                    # ========================================================
+
+                    # --- HTML Print (الزر الأخضر - القديم) ---
+                    # (تم إبقاء كود الطباعة كما هو لطباعة الورقة في المكتب)
                     p_now = datetime.now(beirut_tz).strftime('%Y-%m-%d | %I:%M %p')
                     h_content = ""
-                    
                     for tg in edited['الوجهة'].unique():
                         curr_rows = edited[edited['الوجهة'] == tg]
+                        # نأخذ فقط الموافق عليه للطباعة
+                        curr_rows_print = curr_rows[pd.to_numeric(curr_rows['الكميه المطلوبه'], errors='coerce') > 0]
+                        if curr_rows_print.empty: continue
+
                         o_id = curr_rows['رقم الطلب'].iloc[0] if 'رقم الطلب' in curr_rows.columns else "---"
-                        rows_html = "".join([f"<tr><td style='width:30px;'>{i+1}</td><td style='text-align:right; padding-right:5px; font-size:14px;'>{r['اسم الصنف']}</td><td style='font-size:16px; font-weight:bold; width:50px;'>{r['الكميه المطلوبه']}</td></tr>" for i, (_, r) in enumerate(curr_rows.iterrows())])
+                        rows_html = "".join([f"<tr><td style='width:30px;'>{i+1}</td><td style='text-align:right; padding-right:5px; font-size:14px;'>{r['اسم الصنف']}</td><td style='font-size:16px; font-weight:bold; width:50px;'>{r['الكميه المطلوبه']}</td></tr>" for i, (_, r) in enumerate(curr_rows_print.iterrows())])
                         
                         single_table = f"""
                         <div style="width: 49%; border: 1.5px solid black; padding: 5px; box-sizing: border-box; background-color: white; color: black;">
@@ -233,35 +275,40 @@ if sh:
                                 </thead>
                                 <tbody>{rows_html}</tbody>
                             </table>
-                            <div style="margin-top: 5px; text-align: left; font-weight: bold; font-size: 12px;">إجمالي الأصناف: {len(curr_rows)}</div>
                         </div>
                         """
                         h_content += f'<div style="display:flex; justify-content:space-between; margin-bottom:15px; page-break-inside:avoid;">{single_table}{single_table}</div>'
-
-                    final_style = """<style>table, th, td { border: 1px solid black; border-collapse: collapse; padding: 3px; text-align: center; } body { font-family: Arial, sans-serif; margin: 0; padding: 10px; } @media print { .no-print { display: none; } }</style>"""
                     
-                    print_html = f"""
-                    <script>
-                    function doPrint() {{ 
-                        var w = window.open('', '', 'width=1000,height=1000'); 
-                        w.document.write(`<html><head><title>طباعة طلبات</title>{final_style}</head><body dir="rtl"> {h_content} <script>setTimeout(function() {{ window.print(); window.close(); }}, 800);<\\/script></body></html>`); 
-                        w.document.close(); 
-                    }}
-                    </script>
-                    <button onclick="doPrint()" style="width:100%; height:60px; background-color:#28a745; color:white; border:none; border-radius:10px; font-weight:bold; font-size:22px; cursor:pointer; box-shadow: 0 4px 8px rgba(0,0,0,0.2);">
-                        🖨️ فتح صفحة الطباعة (نسخة للمكتب و للتحضير)
-                    </button>
-                    """
-                    st.components.v1.html(print_html, height=80)
-
-                    # --- زر الواتساب فقط (بدون PDF) ---
-                    phone = get_delegate_phone(sh, selected_rep)
-                    if phone:
-                        msg = f"مرحباً {selected_rep}،\nتم تصديق طلبيتك ({len(edited)} صنف)."
-                        wa_url = f"https://api.whatsapp.com/send?phone={phone}&text={urllib.parse.quote(msg)}"
-                        st.markdown(f'<a href="{wa_url}" target="_blank" class="wa-btn">📲 إرسال إشعار واتساب للمندوب</a>', unsafe_allow_html=True)
-                    else:
-                        st.warning("⚠️ لا يوجد رقم هاتف (راجع شيت البيانات)")
+                    # عرض الأزرار (طباعة + واتساب الجديد)
+                    col_print, col_wa = st.columns([1, 1])
+                    
+                    with col_print:
+                        final_style = """<style>table, th, td { border: 1px solid black; border-collapse: collapse; padding: 3px; text-align: center; } body { font-family: Arial, sans-serif; margin: 0; padding: 10px; } @media print { .no-print { display: none; } }</style>"""
+                        print_html = f"""
+                        <script>
+                        function doPrint() {{ 
+                            var w = window.open('', '', 'width=1000,height=1000'); 
+                            w.document.write(`<html><head><title>طباعة</title>{final_style}</head><body dir="rtl"> {h_content} <script>setTimeout(function() {{ window.print(); window.close(); }}, 800);<\\/script></body></html>`); 
+                            w.document.close(); 
+                        }}
+                        </script>
+                        <button onclick="doPrint()" style="width:100%; height:80px; background-color:#28a745; color:white; border:none; border-radius:12px; font-weight:bold; font-size:20px; cursor:pointer; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
+                            🖨️ طباعة الورقة
+                        </button>
+                        """
+                        st.components.v1.html(print_html, height=100)
+                    
+                    with col_wa:
+                        if phone:
+                            wa_url = f"https://api.whatsapp.com/send?phone={phone}&text={encoded_msg}"
+                            st.markdown(f'''
+                                <a href="{wa_url}" target="_blank" class="wa-btn">
+                                    📲 إرسال تقرير التحميل (واتساب)
+                                    <br><span style="font-size:14px; font-weight:normal;">(يحتوي على المقبول والملغى)</span>
+                                </a>
+                            ''', unsafe_allow_html=True)
+                        else:
+                            st.error("⚠️ رقم المندوب غير مسجل في شيت 'البيانات'")
 
                     st.markdown("---")
 
@@ -275,7 +322,9 @@ if sh:
                                 try:
                                     row_idx = int(r['row_no'])
                                     item_qty = str(r['الكميه المطلوبه']).strip()
-                                    if item_qty in ["", "0", "None", "nan"]:
+                                    
+                                    # إذا الكمية 0 أو فارغة نلغي الطلب
+                                    if item_qty in ["", "0", "None", "nan", "0.0"]:
                                         ws.update_cell(row_idx, idx_status, "ملغى")
                                     else:
                                         ws.update_cell(row_idx, idx_qty, r['الكميه المطلوبه'])
@@ -289,7 +338,7 @@ if sh:
                         time.sleep(1)
                         st.rerun()
 
-# --- 4. قسم الأرشيف ---
+# --- 4. قسم الأرشيف (باقي الكود كما هو) ---
 st.divider()
 st.markdown("<h3 style='text-align:right;'>📁 أرشيف الفواتير المصورة</h3>", unsafe_allow_html=True)
 
