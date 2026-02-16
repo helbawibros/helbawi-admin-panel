@@ -56,9 +56,6 @@ st.markdown("""
     }
     .wa-btn:hover { background-color: #128c7e; transform: scale(1.02); color: white; text-decoration: none; }
     
-    .wa-report-box {
-        background-color: #e8f5e9; border: 1px solid #c8e6c9; border-radius: 8px; padding: 10px; margin-top: 10px; color: #1b5e20;
-    }
     </style>
 """, unsafe_allow_html=True)
 
@@ -79,9 +76,13 @@ def get_sh():
 
 def get_delegate_phone(_sh, name):
     try:
+        # 1. يفتح شيت "البيانات"
         ws = _sh.worksheet("البيانات")
+        # 2. يبحث عن اسم المندوب في العمود الأول
         cell = ws.find(name.strip())
-        if cell: return ws.cell(cell.row, 2).value 
+        if cell: 
+            # 3. يعيد القيمة الموجودة في العمود الثاني (B) بجانب الاسم
+            return ws.cell(cell.row, 2).value 
         return None
     except: return None
 
@@ -204,10 +205,10 @@ if sh:
                     edited = st.data_editor(display_df, hide_index=True, use_container_width=True)
                     
                     # ========================================================
-                    # 🔥 كود التقرير الذكي للواتساب (الحل الجديد) 🔥
+                    # 🔥 كود التقرير الذكي المبوب حسب الوجهة 🔥
                     # ========================================================
                     
-                    # 1. تحويل الكميات لأرقام للتأكد
+                    # 1. تحويل الكميات لأرقام
                     edited['الكميه المطلوبه'] = pd.to_numeric(edited['الكميه المطلوبه'], errors='coerce').fillna(0)
 
                     # 2. فصل المقبول عن الملغى
@@ -222,20 +223,33 @@ if sh:
                     
                     if not approved_items.empty:
                         msg_lines.append("✅ *تم الموافقة والتحميل:*")
-                        for _, row in approved_items.iterrows():
-                            # عرض: اسم الصنف (العدد)
-                            line = f"▪️ {row['اسم الصنف']}: *{int(row['الكميه المطلوبه'])}*"
-                            msg_lines.append(line)
+                        
+                        # 🔥 التجميع حسب الوجهة 🔥
+                        # نأخذ قائمة الوجهات الفريدة (جردة سيارة، Test 2، إلخ)
+                        destinations = approved_items['الوجهة'].unique()
+                        
+                        for dest in destinations:
+                            # تصفية الأصناف لهذه الوجهة فقط
+                            dest_items = approved_items[approved_items['الوجهة'] == dest]
+                            
+                            # إضافة عنوان الوجهة
+                            msg_lines.append(f"\n*{dest}*")
+                            
+                            # إضافة الأصناف تحتها
+                            for _, row in dest_items.iterrows():
+                                line = f"▪️ {row['اسم الصنف']}: *{int(row['الكميه المطلوبه'])}*"
+                                msg_lines.append(line)
                     
                     if not cancelled_items.empty:
                         msg_lines.append("\n❌ *ملغى / غير متوفر:*")
                         for _, row in cancelled_items.iterrows():
-                            line = f"▫️ ~{row['اسم الصنف']}~"
+                            # نظهر الاسم والوجهة في الملغى للتوضيح
+                            line = f"▫️ ~{row['اسم الصنف']}~ ({row['الوجهة']})"
                             msg_lines.append(line)
                             
                     msg_lines.append("\n⚠️ *يرجى التأكد من البضاعة قبل الانطلاق*")
                     
-                    # دمج الرسالة وتشفيرها للرابط
+                    # دمج الرسالة وتشفيرها
                     final_msg = "\n".join(msg_lines)
                     encoded_msg = urllib.parse.quote(final_msg)
                     
@@ -244,13 +258,12 @@ if sh:
                     
                     # ========================================================
 
-                    # --- HTML Print (الزر الأخضر - القديم) ---
-                    # (تم إبقاء كود الطباعة كما هو لطباعة الورقة في المكتب)
+                    # --- HTML Print (الزر الأخضر) ---
+                    # (كود الطباعة للمكتب يبقى كما هو)
                     p_now = datetime.now(beirut_tz).strftime('%Y-%m-%d | %I:%M %p')
                     h_content = ""
                     for tg in edited['الوجهة'].unique():
                         curr_rows = edited[edited['الوجهة'] == tg]
-                        # نأخذ فقط الموافق عليه للطباعة
                         curr_rows_print = curr_rows[pd.to_numeric(curr_rows['الكميه المطلوبه'], errors='coerce') > 0]
                         if curr_rows_print.empty: continue
 
@@ -279,7 +292,7 @@ if sh:
                         """
                         h_content += f'<div style="display:flex; justify-content:space-between; margin-bottom:15px; page-break-inside:avoid;">{single_table}{single_table}</div>'
                     
-                    # عرض الأزرار (طباعة + واتساب الجديد)
+                    # عرض الأزرار
                     col_print, col_wa = st.columns([1, 1])
                     
                     with col_print:
@@ -293,7 +306,7 @@ if sh:
                         }}
                         </script>
                         <button onclick="doPrint()" style="width:100%; height:80px; background-color:#28a745; color:white; border:none; border-radius:12px; font-weight:bold; font-size:20px; cursor:pointer; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
-                            🖨️ طباعة الورقة
+                            🖨️ طباعة الورقة للمكتب
                         </button>
                         """
                         st.components.v1.html(print_html, height=100)
@@ -303,8 +316,8 @@ if sh:
                             wa_url = f"https://api.whatsapp.com/send?phone={phone}&text={encoded_msg}"
                             st.markdown(f'''
                                 <a href="{wa_url}" target="_blank" class="wa-btn">
-                                    📲 إرسال تقرير التحميل (واتساب)
-                                    <br><span style="font-size:14px; font-weight:normal;">(يحتوي على المقبول والملغى)</span>
+                                    📲 إرسال تقرير التحميل المفصل (واتساب)
+                                    <br><span style="font-size:14px; font-weight:normal;">(مبوب حسب الوجهة)</span>
                                 </a>
                             ''', unsafe_allow_html=True)
                         else:
@@ -323,7 +336,6 @@ if sh:
                                     row_idx = int(r['row_no'])
                                     item_qty = str(r['الكميه المطلوبه']).strip()
                                     
-                                    # إذا الكمية 0 أو فارغة نلغي الطلب
                                     if item_qty in ["", "0", "None", "nan", "0.0"]:
                                         ws.update_cell(row_idx, idx_status, "ملغى")
                                     else:
