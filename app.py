@@ -365,7 +365,7 @@ try:
         with c1: search_no = st.text_input("🔍 رقم الفاتورة للبحث", key="final_search_inv")
         with c2: search_rep = st.text_input("👤 اسم المندوب للبحث", key="final_search_rep")
 
-                if st.button("🚀 ابدأ البحث في الأرشيف", use_container_width=True):
+        if st.button("🚀 ابدأ البحث في الأرشيف", use_container_width=True):
             # التأكد من وجود عمود HTML (العمود السابع - index 6)
             mask_has_html = df_raw.iloc[:, 6].str.len() > 10 # فلترة الصفوف الفارغة
             df_filtered = df_raw[mask_has_html].copy()
