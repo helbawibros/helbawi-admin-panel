@@ -249,7 +249,7 @@ if sh:
                     }}
                     </script>
                     <button onclick="doPrint()" style="width:100%; height:60px; background-color:#28a745; color:white; border:none; border-radius:10px; font-weight:bold; font-size:22px; cursor:pointer; box-shadow: 0 4px 8px rgba(0,0,0,0.2);">
-                        🖨️ فتح صفحة الطباعة (الاسم بالوسط)
+                        🖨️ فتح صفحة الطباعة (نسخة للمكب و للتحضير)
                     </button>
                     """
                     st.components.v1.html(print_html, height=80)
