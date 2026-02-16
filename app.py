@@ -366,77 +366,40 @@ try:
         with c2: search_rep = st.text_input("👤 اسم المندوب للبحث", key="final_search_rep")
 
         if st.button("🚀 ابدأ البحث في الأرشيف", use_container_width=True):
-            # التأكد من وجود عمود HTML (العمود السابع - index 6)
-            mask_has_html = df_raw.iloc[:, 6].str.len() > 10 # فلترة الصفوف الفارغة
-            df_filtered = df_raw[mask_has_html].copy()
+            mask_html = df_raw.iloc[:, 6].str.contains("<div", na=False)
+            df_filtered = df_raw[mask_html].copy()
 
-            # تطبيق الفلتر حسب المدخلات
             if search_no:
                 df_filtered = df_filtered[df_filtered.iloc[:, 2].astype(str).str.strip().str.contains(search_no.strip())]
             if search_rep:
                 df_filtered = df_filtered[df_filtered.iloc[:, 4].astype(str).str.contains(search_rep)]
 
-            # النتائج
             if not df_filtered.empty:
                 invoice_options = []
                 for idx, r in df_filtered.iterrows():
-                    # تنسيق القائمة: رقم الفاتورة | التاريخ | الزبون (المندوب)
-                    # العمود 2: الرقم، 5: التاريخ، 3: الزبون، 4: المندوب
-                    label = f"📄 #{r[2]} | 📅 {r[5]} | 👤 {r[3]} ({r[4]})"
-                    invoice_options.append(label)
+                    invoice_options.append(f"📄 #{r[2]} | {r[5]} | {r[3]}")
                 
                 st.session_state.found_invoices = df_filtered
-                st.session_state.invoice_labels = invoice_options[::-1] # الأحدث أولاً
-                st.toast(f"✅ تم العثور على {len(df_filtered)} فاتورة")
+                st.session_state.invoice_labels = invoice_options[::-1]
             else:
-                st.warning("⚠️ لم يتم العثور على فواتير مطابقة.")
-                if 'found_invoices' in st.session_state: 
-                    del st.session_state.found_invoices
-                    del st.session_state.invoice_labels
+                st.warning("⚠️ لم يتم العثور على فواتير.")
+                if 'found_invoices' in st.session_state: del st.session_state.found_invoices
 
-        # --- عرض النتائج ---
-        if st.session_state.get('found_invoices') is not None:
-            st.divider()
-            
-            selected_label = st.selectbox("👇 اختر الفاتورة من النتائج:", ["-- اختر --"] + st.session_state.get('invoice_labels', []))
+        if 'found_invoices' in st.session_state:
+            selected = st.selectbox("👇 اختر الفاتورة:", ["-- اختر --"] + st.session_state.invoice_labels)
 
-            if selected_label != "-- اختر --":
-                # استخراج رقم الفاتورة من النص (أول جزء قبل الـ |)
-                inv_id = selected_label.split('|')[0].replace('📄 #', '').strip()
-                
-                # جلب الصف المطابق
-                target_row = st.session_state.found_invoices[
-                    st.session_state.found_invoices.iloc[:, 2].astype(str).str.strip() == inv_id
-                ].iloc[0]
-                
-                html_content = target_row[6] # عمود الـ HTML
+            if selected != "-- اختر --":
+                inv_id = selected.split('|')[0].replace('📄 #', '').strip()
+                target_data = st.session_state.found_invoices[st.session_state.found_invoices.iloc[:, 2].astype(str).str.strip() == inv_id].iloc[0]
+                html_content = target_data[6]
 
                 st.markdown("---")
-                st.components.v1.html(html_content, height=600, scrolling=True)
+                st.markdown(html_content, unsafe_allow_html=True)
                 
-                # زر الطباعة (Javascript محسن)
-                print_js = f"""
-                <script>
-                    function printInvoice() {{
-                        var win = window.open('', '', 'width=900,height=900');
-                        win.document.write(`<html><head><title>Print Invoice</title></head><body dir="rtl" style="margin:0; padding:0;">`);
-                        win.document.write(`{html_content}`);
-                        win.document.write(`</body></html>`);
-                        win.document.close();
-                        setTimeout(function() {{ win.print(); win.close(); }}, 500);
-                    }}
-                </script>
-                <button onclick="printInvoice()" style="width:100%; padding:12px; background-color:#28a745; color:white; border:none; border-radius:8px; font-weight:bold; font-size:18px; cursor:pointer; margin-top:10px;">
-                    🖨️ طباعة الفاتورة
-                </button>
-                """
-                st.components.v1.html(print_js, height=70)
-            
-            # زر لتنظيف البحث
-            if st.button("❌ مسح البحث (بحث جديد)", use_container_width=True):
-                del st.session_state.found_invoices
-                del st.session_state.invoice_labels
-                st.rerun()
+                if st.button("🖨️ طباعة النسخة"):
+                    p_script = f"""<script>var w=window.open('','','width=900,height=900');w.document.write(`{html_content}`);setTimeout(function(){{w.print();w.close();}},500);</script>"""
+                    st.components.v1.html(p_script, height=0)
 
 except Exception as e:
-    st.error(f"خطأ في تحميل الأرشيف: {e}")
+    pass
+
