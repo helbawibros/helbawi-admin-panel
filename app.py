@@ -326,6 +326,7 @@ if sh:
                     st.markdown("---")
 
                     if st.button("🚀 تصديق وإغلاق الطلب نهائياً", type="primary", use_container_width=True):
+                        # تحديد أرقام الأعمدة (الحالة والكمية)
                         idx_status = header.index('الحالة') + 1
                         try: idx_qty = header.index('الكميه المطلوبه') + 1
                         except: idx_qty = header.index('العدد') + 1
@@ -336,15 +337,24 @@ if sh:
                                     row_idx = int(r['row_no'])
                                     item_qty = str(r['الكميه المطلوبه']).strip()
                                     
+                                    # --- التعديل الجوهري هنا ---
+                                    # إذا كانت الكمية صفر أو فارغة:
                                     if item_qty in ["", "0", "None", "nan", "0.0"]:
+                                        # 1. نضع الكمية 0 في الشيت (العمود C)
+                                        ws.update_cell(row_idx, idx_qty, 0) 
+                                        # 2. نغير الحالة لـ "ملغى" (العمود D)
                                         ws.update_cell(row_idx, idx_status, "ملغى")
                                     else:
+                                        # إذا الكمية مقبولة:
                                         ws.update_cell(row_idx, idx_qty, r['الكميه المطلوبه'])
                                         ws.update_cell(row_idx, idx_status, "تم التصديق")
-                                    time.sleep(0.3)
-                                except: continue
+                                    
+                                    time.sleep(0.5) # زدنا الوقت شوي لضمان الكتابة
+                                except Exception as e:
+                                    print(e)
+                                    continue
                         
-                        st.success("✅ تم التصديق وتحديث الطلبات!")
+                        st.success("✅ تم التصديق! (تم تصفير الكميات الملغية في الشيت)")
                         st.session_state.orders = [o for o in st.session_state.orders if o['name'] != selected_rep]
                         if 'active_rep' in st.session_state: del st.session_state.active_rep
                         time.sleep(1)
