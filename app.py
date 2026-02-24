@@ -333,7 +333,7 @@ if sh:
 
                     st.markdown("---")
 
-                    if st.button("🚀 تصديق وإغلاق الطلب نهائياً", type="primary", use_container_width=True):
+                    if st.button("🚀 بعص وإغلاق الطلب نهائياً", type="primary", use_container_width=True):
                         # تحديد أرقام الأعمدة (الحالة والكمية)
                         idx_status = header.index('الحالة') + 1
                         try: idx_qty = header.index('الكميه المطلوبه') + 1
