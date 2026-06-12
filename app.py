@@ -339,34 +339,72 @@ if sh:
                         try: idx_qty = header.index('الكميه المطلوبه') + 1
                         except: idx_qty = header.index('العدد') + 1
                         
-                        with st.spinner("جاري التحديث..."):
+                        with st.spinner("جاري التحديث ونقل البيانات..."):
+                            # 👈 تجهيز قائمة لتجميع أصناف خضر إذا كان هو المندوب
+                            khodor_items = []
+                            order_id = "---"
+                            customer_target = "---"
+                            
                             for _, r in edited.iterrows():
                                 try:
                                     row_idx = int(r['row_no'])
                                     item_qty = str(r['الكميه المطلوبه']).strip()
                                     
-                                    # --- التعديل الجوهري هنا ---
                                     # إذا كانت الكمية صفر أو فارغة:
                                     if item_qty in ["", "0", "None", "nan", "0.0"]:
-                                        # 1. نضع الكمية 0 في الشيت (العمود C)
                                         ws.update_cell(row_idx, idx_qty, 0) 
-                                        # 2. نغير الحالة لـ "ملغى" (العمود D)
                                         ws.update_cell(row_idx, idx_status, "ملغى")
                                     else:
-                                        # إذا الكمية مقبولة:
                                         ws.update_cell(row_idx, idx_qty, r['الكميه المطلوبه'])
                                         ws.update_cell(row_idx, idx_status, "تم التصديق")
+                                        
+                                        # 👈 إذا كان المندوب خضر الشيخ، بنجمع الأصناف المقبولة
+                                        if selected_rep == "خضر الشيخ":
+                                            order_id = r.get('رقم الطلب', '---')
+                                            customer_target = r.get('الوجهة', '---')
+                                            khodor_items.append(f"{r['اسم الصنف']}: {r['الكميه المطلوبه']}")
                                     
-                                    time.sleep(0.5) # زدنا الوقت شوي لضمان الكتابة
+                                    time.sleep(0.4) 
                                 except Exception as e:
                                     print(e)
                                     continue
+                            
+                            # 🔥 هيدا هو جسر الربط مع برنامج خطوط التوزيع 🔥
+                            if selected_rep == "خضر الشيخ" and khodor_items:
+                                try:
+                                    # 1. فتح شيت التوزيع الجديد
+                                    try:
+                                        dist_ws = sh.worksheet("جدولة_التوزيع")
+                                    except:
+                                        # إذا مش منشأ الشيت، البرنامج بيعمله تلقائياً
+                                        dist_ws = sh.add_worksheet(title="جدولة_التوزيع", rows="100", cols="7")
+                                        dist_ws.append_row(["التاريخ", "رقم الطلب", "المندوب", "الزبون", "المنطقة", "الأصناف", "حالة الشحن"])
+                                    
+                                    # 2. جلب منطقة الزبون من شيت الزبائن لتسهيل الفرز لاحقاً
+                                    cust_zone = "غير محدد"
+                                    try:
+                                        cust_ws = sh.worksheet("الزبائن")
+                                        cell_c = cust_ws.find(customer_target.strip())
+                                        if cell_c:
+                                            # جلب المنطقة من العمود C (رقم 3) في شيت الزبائن
+                                            cust_zone = cust_ws.cell(cell_c.row, 3).value
+                                    except: pass
+                                    
+                                    # 3. إدخال البيانات شيت التوزيع
+                                    now_beirut = datetime.now(beirut_tz).strftime("%Y-%m-%d %H:%M")
+                                    items_text = " | ".join(khodor_items) # تجميع الأصناف بسطر واحد
+                                    
+                                    # سطر التوزيع: [التاريخ، رقم الطلب، المندوب، الزبون، المنطقة، الأصناف، الحالة اللوجستية]
+                                    dist_ws.append_row([now_beirut, str(order_id), selected_rep, customer_target, cust_zone, items_text, "قيد الجدولة"])
+                                except Exception as dist_err:
+                                    st.error(f"⚠️ الطلب تصدق لكن فشل نقله لجدول التوزيع: {dist_err}")
                         
-                        st.success("✅ تم التصديق! (تم تصفير الكميات الملغية في الشيت)")
+                        st.success("✅ تم التصديق! (وتم تحويل طلبية خضر إلى قسم جدولة التوزيع)")
                         st.session_state.orders = [o for o in st.session_state.orders if o['name'] != selected_rep]
                         if 'active_rep' in st.session_state: del st.session_state.active_rep
                         time.sleep(1)
                         st.rerun()
+
 
 # --- 4. قسم الأرشيف (باقي الكود كما هو) ---
 st.divider()
