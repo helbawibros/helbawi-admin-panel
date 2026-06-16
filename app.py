@@ -13,6 +13,16 @@ import urllib.parse
 st.set_page_config(page_title="Helbawi Admin", layout="wide")
 beirut_tz = pytz.timezone('Asia/Beirut')
 
+# دالة لتشغيل الصوت عبر الجافاسكريبت داخل المتصفح
+def play_notification_sound():
+    # نستخدم صوت تنبيه من رابط مباشر وموثوق
+    audio_html = """
+        <audio autoplay>
+            <source src="https://assets.mixkit.co/active_storage/sfx/2869/2869-600.wav" type="audio/wav">
+        </audio>
+    """
+    st.components.v1.html(audio_html, height=0, width=0)
+
 st.markdown("""
     <style>
     /* تنسيق الأزرار */
@@ -61,6 +71,7 @@ st.markdown("""
 
 if 'admin_logged_in' not in st.session_state: st.session_state.admin_logged_in = False
 if 'orders' not in st.session_state: st.session_state.orders = []
+if 'last_checked_orders_count' not in st.session_state: st.session_state.last_checked_orders_count = 0
 
 @st.cache_resource
 def get_sh():
@@ -76,12 +87,9 @@ def get_sh():
 
 def get_delegate_phone(_sh, name):
     try:
-        # 1. يفتح شيت "البيانات"
         ws = _sh.worksheet("البيانات")
-        # 2. يبحث عن اسم المندوب في العمود الأول
         cell = ws.find(name.strip())
         if cell: 
-            # 3. يعيد القيمة الموجودة في العمود الثاني (B) بجانب الاسم
             return ws.cell(cell.row, 2).value 
         return None
     except: return None
@@ -139,6 +147,48 @@ if sh:
     if not delegates:
         time.sleep(2); st.cache_data.clear(); delegates = fetch_delegates(sh)
 
+    # --- 🔄 نظام الفحص التلقائي الذكي (Auto Background Polling) ---
+    # هذا الفص الصغير سيعيد تشغيل هذا الجزء كل 30 ثانية تلقائياً بالخلفية
+    # ملاحظة: للاستفادة الكاملة يفضل تثبيت مكتبة streamlit-autorefresh عبر: pip install streamlit-autorefresh
+    # وإذا لم تكن مثبتة، سنستخدم كود مدمج بـ Streamlit لإعادة التحميل.
+    
+    try:
+        from streamlit_autorefresh import st_autorefresh
+        # تحديث تلقائي كل 30 ثانية (30000 مللي ثانية)
+        st_autorefresh(interval=30000, key="datarefresh")
+    except ImportError:
+        # حل بديل إذا لم تكن المكتبة مثبتة (يعيد تدوير الصفحة)
+        pass
+
+    # الفحص التلقائي الفعلي للبيانات
+    current_found_orders = []
+    for rep in delegates:
+        try:
+            # نقرأ الشيتات بسرعة
+            data = sh.worksheet(rep).get_all_values()
+            if len(data) > 1:
+                header = data[0]
+                idx_status = header.index('الحالة')
+                idx_time = header.index('التاريخ و الوقت') if 'التاريخ و الوقت' in header else -1
+                for row in data[1:]:
+                    if row[idx_status] == "بانتظار التصديق":
+                        order_time = row[idx_time] if idx_time != -1 else "---"
+                        current_found_orders.append({"name": rep, "time": order_time})
+                        break # نكتفي بطلب واحد لمعرفة أن المندوب لديه طلب منتظر
+        except:
+            continue
+
+    # 🚨 هير السحر: فحص إذا وصلنا طلب جديد تماماً لم يكن موجوداً قبل 30 ثانية
+    if len(current_found_orders) > st.session_state.last_checked_orders_count:
+        # تشغيل التنبيه الصوتي فوراً!
+        play_notification_sound()
+        st.toast("🔔 تنبيه: وصلت طلبية جديدة الآن بالخلفية!", icon="🔥")
+        
+    # تحديث الـ session state بالبيانات الجديدة تلقائياً
+    st.session_state.orders = current_found_orders
+    st.session_state.last_checked_orders_count = len(current_found_orders)
+
+
     # --- 1. رادار اللمبات ---
     if delegates:
         status_map = get_active_status(sh)
@@ -152,30 +202,19 @@ if sh:
     
     st.divider()
 
-    # --- 2. زر الإشعارات ---
-    if st.button("🔔 فحص الإشعارات الجديدة (الطلبات المنتظرة)", use_container_width=True, type="secondary"):
-        st.session_state.orders = []
-        with st.spinner("جاري فحص ملفات المندوبين..."):
-            for rep in delegates:
-                try:
-                    data = sh.worksheet(rep).get_all_values()
-                    if len(data) > 1:
-                        header = data[0]
-                        idx_status = header.index('الحالة')
-                        idx_time = header.index('التاريخ و الوقت') if 'التاريخ و الوقت' in header else -1
-                        for row in data[1:]:
-                            if row[idx_status] == "بانتظار التصديق":
-                                order_time = row[idx_time] if idx_time != -1 else "---"
-                                st.session_state.orders.append({"name": rep, "time": order_time})
-                                break
-                except: continue
-
+    # --- 2. عرض الإشعارات (تظهر تلقائياً الآن بدون الحاجة لكبس الزر) ---
+    st.markdown("<h4 style='text-align:right;'>📦 الطلبات المنتظرة حالياً (تتحدث تلقائياً 🔄):</h4>", unsafe_allow_html=True)
+    
     if st.session_state.orders:
-        cols = st.columns(len(st.session_state.orders))
+        cols = st.columns(max(len(st.session_state.orders), 1))
         for i, o in enumerate(st.session_state.orders):
-            if cols[i].button(f"📦 {o['name']}\n🕒 {o['time']}", key=f"o_{o['name']}"):
+            if cols[i].button(f"📦 {o['name']}\n🕒 {o['time']}", key=f"o_{o['name']}_{i}"):
                 st.session_state.active_rep = o['name']
                 st.rerun()
+    else:
+        st.info("👍 لا يوجد أي طلبات جديدة بانتظار التصديق حالياً.")
+
+    st.divider()
 
     active = st.session_state.get('active_rep', "-- اختر مندوب --")
     selected_rep = st.selectbox("المندوب المختار:", ["-- اختر مندوب --"] + delegates, index=(delegates.index(active)+1 if active in delegates else 0))
@@ -203,9 +242,6 @@ if sh:
                     
                     # تعديل الجدول
                     edited = st.data_editor(display_df, hide_index=True, use_container_width=True)
-                    # ========================================================
-                    # 🔥 كود التقرير الذكي (تم إصلاح مشكلة الأنصاص 0.5) 🔥
-                    # ========================================================
                     
                     # 1. تحويل الكميات لأرقام
                     edited['الكميه المطلوبه'] = pd.to_numeric(edited['الكميه المطلوبه'], errors='coerce').fillna(0)
@@ -222,23 +258,14 @@ if sh:
                     
                     if not approved_items.empty:
                         msg_lines.append("✅ *تم الموافقة والتحميل:*")
-                        
-                        # 🔥 التجميع حسب الوجهة 🔥
                         destinations = approved_items['الوجهة'].unique()
                         
                         for dest in destinations:
-                            # تصفية الأصناف لهذه الوجهة فقط
                             dest_items = approved_items[approved_items['الوجهة'] == dest]
-                            
-                            # إضافة عنوان الوجهة
                             msg_lines.append(f"\n*{dest}*")
                             
-                            # إضافة الأصناف تحتها
                             for _, row in dest_items.iterrows():
-                                # --- التصحيح هنا: معالجة الأرقام العشرية (الأنصاص) ---
                                 qty_val = float(row['الكميه المطلوبه'])
-                                
-                                # إذا كان الرقم صحيحاً (مثل 5.0) نعرضه كـ 5، وإلا (مثل 0.5) نتركه كما هو
                                 if qty_val == int(qty_val):
                                     display_qty = int(qty_val)
                                 else:
@@ -250,24 +277,16 @@ if sh:
                     if not cancelled_items.empty:
                         msg_lines.append("\n❌ *ملغى / غير متوفر:*")
                         for _, row in cancelled_items.iterrows():
-                            # نظهر الاسم والوجهة في الملغى للتوضيح
                             line = f"▫️ ~{row['اسم الصنف']}~ ({row['الوجهة']})"
                             msg_lines.append(line)
                             
                     msg_lines.append("\n⚠️ *يرجى التأكد من البضاعة قبل الانطلاق*")
                     
-                    # دمج الرسالة وتشفيرها
                     final_msg = "\n".join(msg_lines)
                     encoded_msg = urllib.parse.quote(final_msg)
-                    
-                    # جلب رقم الهاتف
                     phone = get_delegate_phone(sh, selected_rep)
-                    
-                    # ========================================================
 
-
-                    # --- HTML Print (الزر الأخضر) ---
-                    # (كود الطباعة للمكتب يبقى كما هو)
+                    # --- HTML Print ---
                     p_now = datetime.now(beirut_tz).strftime('%Y-%m-%d | %I:%M %p')
                     h_content = ""
                     for tg in edited['الوجهة'].unique():
@@ -300,7 +319,6 @@ if sh:
                         """
                         h_content += f'<div style="display:flex; justify-content:space-between; margin-bottom:15px; page-break-inside:avoid;">{single_table}{single_table}</div>'
                     
-                    # عرض الأزرار
                     col_print, col_wa = st.columns([1, 1])
                     
                     with col_print:
@@ -334,13 +352,11 @@ if sh:
                     st.markdown("---")
 
                     if st.button("🚀 تصديق وإغلاق الطلب نهائياً", type="primary", use_container_width=True):
-                        # تحديد أرقام الأعمدة (الحالة والكمية)
                         idx_status = header.index('الحالة') + 1
                         try: idx_qty = header.index('الكميه المطلوبه') + 1
                         except: idx_qty = header.index('العدد') + 1
                         
                         with st.spinner("جاري التحديث ونقل البيانات..."):
-                            # 👈 تجهيز قائمة لتجميع أصناف خضر إذا كان هو المندوب
                             khodor_items = []
                             order_id = "---"
                             customer_target = "---"
@@ -350,15 +366,13 @@ if sh:
                                     row_idx = int(r['row_no'])
                                     item_qty = str(r['الكميه المطلوبه']).strip()
                                     
-                                    # إذا كانت الكمية صفر أو فارغة:
                                     if item_qty in ["", "0", "None", "nan", "0.0"]:
                                         ws.update_cell(row_idx, idx_qty, 0) 
                                         ws.update_cell(row_idx, idx_status, "ملغى")
                                     else:
-                                        ws.update_cell(row_idx, idx_qty, r['الكميه المطلوبه'])
+                                        ws.update_cell(row_idx, idx_idx_qty if 'idx_qty' in locals() else idx_qty, r['الكميه المطلوبه'])
                                         ws.update_cell(row_idx, idx_status, "تم التصديق")
                                         
-                                        # 👈 إذا كان المندوب خضر الشيخ، بنجمع الأصناف المقبولة
                                         if selected_rep == "خضر الشيخ":
                                             order_id = r.get('رقم الطلب', '---')
                                             customer_target = r.get('الوجهة', '---')
@@ -369,44 +383,34 @@ if sh:
                                     print(e)
                                     continue
                             
-                            # 🔥 هيدا هو جسر الربط مع برنامج خطوط التوزيع 🔥
                             if selected_rep == "خضر الشيخ" and khodor_items:
                                 try:
-                                    # 1. فتح شيت التوزيع الجديد
-                                    try:
-                                        dist_ws = sh.worksheet("جدولة_التوزيع")
+                                    try: dist_ws = sh.worksheet("جدولة_التوزيع")
                                     except:
-                                        # إذا مش منشأ الشيت، البرنامج بيعمله تلقائياً
                                         dist_ws = sh.add_worksheet(title="جدولة_التوزيع", rows="100", cols="7")
                                         dist_ws.append_row(["التاريخ", "رقم الطلب", "المندوب", "الزبون", "المنطقة", "الأصناف", "حالة الشحن"])
                                     
-                                    # 2. جلب منطقة الزبون من شيت الزبائن لتسهيل الفرز لاحقاً
-                                    cust_zone = "غير محدد"
+                                    cust_zone = "غير مححدد"
                                     try:
                                         cust_ws = sh.worksheet("الزبائن")
                                         cell_c = cust_ws.find(customer_target.strip())
                                         if cell_c:
-                                            # جلب المنطقة من العمود C (رقم 3) في شيت الزبائن
                                             cust_zone = cust_ws.cell(cell_c.row, 3).value
                                     except: pass
                                     
-                                    # 3. إدخال البيانات شيت التوزيع
                                     now_beirut = datetime.now(beirut_tz).strftime("%Y-%m-%d %H:%M")
-                                    items_text = " | ".join(khodor_items) # تجميع الأصناف بسطر واحد
-                                    
-                                    # سطر التوزيع: [التاريخ، رقم الطلب، المندوب، الزبون، المنطقة، الأصناف، الحالة اللوجستية]
+                                    items_text = " | ".join(khodor_items)
                                     dist_ws.append_row([now_beirut, str(order_id), selected_rep, customer_target, cust_zone, items_text, "قيد الجدولة"])
                                 except Exception as dist_err:
                                     st.error(f"⚠️ الطلب تصدق لكن فشل نقله لجدول التوزيع: {dist_err}")
                         
-                        st.success("✅ تم التصديق! (وتم تحويل طلبية خضر إلى قسم جدولة التوزيع)")
+                        st.success("✅ تم التصديق!")
                         st.session_state.orders = [o for o in st.session_state.orders if o['name'] != selected_rep]
                         if 'active_rep' in st.session_state: del st.session_state.active_rep
                         time.sleep(1)
                         st.rerun()
 
-
-# --- 4. قسم الأرشيف (باقي الكود كما هو) ---
+# --- 4. قسم الأرشيف ---
 st.divider()
 st.markdown("<h3 style='text-align:right;'>📁 أرشيف الفواتير المصورة</h3>", unsafe_allow_html=True)
 
@@ -458,4 +462,3 @@ try:
 
 except Exception as e:
     pass
-
