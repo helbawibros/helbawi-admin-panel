@@ -146,7 +146,7 @@ if sh:
     if not delegates:
         time.sleep(2); st.cache_data.clear(); delegates = fetch_delegates(sh)
 
-    # --- 🔄 نظام الفحص التلقائي السريع جداً (Central Inbox) ---
+    # --- 🔄 نظام الفحص التلقائي السريع جداً بالخلفية ---
     try:
         from streamlit_autorefresh import st_autorefresh
         st_autorefresh(interval=30000, key="datarefresh") # تحديث تلقائي كل 30 ثانية
@@ -154,22 +154,23 @@ if sh:
 
     current_found_orders = []
     try:
-        # فحص شيت الإشعارات المركزي فقط لسرعة البرق وتفادي حظر جوجل
+        # محاولة جلب الإشعارات التلقائية السريعة أولاً
         notif_ws = sh.worksheet("إشعارات_الطلبات")
         notif_data = notif_ws.get_all_records()
         for row in notif_data:
             if str(row.get('الحالة')).strip() == "جديد":
                 current_found_orders.append({"name": row.get('المندوب'), "time": row.get('التاريخ و الوقت')})
-    except Exception as ne:
-        pass
+    except: pass
 
-    # 🚨 إذا تم رصد طلب جديد تماماً، شغل صوت التنبيه فوراً
+    # إذا تم رصد طلب تلقائي جديد، شغل صوت التنبيه فوراً
     if len(current_found_orders) > st.session_state.get('last_checked_orders_count', 0):
         play_notification_sound()
         st.toast("🔔 تنبيه: وصلت طلبية جديدة الآن بالخلفية!", icon="🔥")
         
-    st.session_state.orders = current_found_orders
-    st.session_state.last_checked_orders_count = len(current_found_orders)
+    # إذا كانت القائمة التلقائية فارغة، لا نمسح القديم المخزن يدوياً لضمان عدم الاختفاء
+    if current_found_orders:
+        st.session_state.orders = current_found_orders
+        st.session_state.last_checked_orders_count = len(current_found_orders)
 
     # --- 1. رادار اللمبات ---
     if delegates:
@@ -184,8 +185,38 @@ if sh:
     
     st.divider()
 
-    # --- 2. عرض الإشعارات الذكي (محدث تلقائياً) ---
-    st.markdown("<h4 style='text-align:right;'>📦 الطلبات المنتظرة حالياً (تتحدث تلقائياً 🔄):</h4>", unsafe_allow_html=True)
+    # --- 2. زر الفحص اليدوي (البحث العميق الاحتياطي اللّي طلبته - الزر الأحمر) ---
+    if st.button("🔔 فحص الإشعارات الجديدة (بحث عميق يدوي)", use_container_width=True, type="secondary"):
+        st.session_state.orders = []
+        with st.spinner("جاري فحص جميع ملفات المندوبين بدقة..."):
+            # 1. جلب السريع من شيت الإشعارات أولاً
+            try:
+                notif_ws = sh.worksheet("إشعارات_الطلبات")
+                for row in notif_ws.get_all_records():
+                    if str(row.get('الحالة')).strip() == "جديد":
+                        st.session_state.orders.append({"name": row.get('المندوب'), "time": row.get('التاريخ و الوقت')})
+            except: pass
+            
+            # 2. الفحص العميق بملفات المندوبين كلهم كاحتياط أمان مطلق
+            for rep in delegates:
+                if any(o['name'] == rep for o in st.session_state.orders): continue
+                try:
+                    data = sh.worksheet(rep).get_all_values()
+                    if len(data) > 1:
+                        header = data[0]
+                        idx_status = header.index('الحالة')
+                        idx_time = header.index('التاريخ و الوقت') if 'التاريخ و الوقت' in header else -1
+                        for row in data[1:]:
+                            if row[idx_status] == "بانتظار التصديق":
+                                order_time = row[idx_time] if idx_time != -1 else "---"
+                                st.session_state.orders.append({"name": rep, "time": order_time})
+                                break
+                except: continue
+        st.session_state.last_checked_orders_count = len(st.session_state.orders)
+        st.rerun()
+
+    # --- 3. عرض أزرار الإشعارات المكتشفة ---
+    st.markdown("<h4 style='text-align:right;'>📦 الطلبات المنتظرة حالياً (تتحدث تلقائياً 🔄 أو عبر الفحص اليدوي):</h4>", unsafe_allow_html=True)
     
     if st.session_state.orders:
         cols = st.columns(max(len(st.session_state.orders), 1))
