@@ -188,7 +188,7 @@ if sh:
     # --- 2. زر الفحص اليدوي (البحث العميق الاحتياطي اللّي طلبته - الزر الأحمر) ---
     if st.button("🔔 فحص الإشعارات الجديدة (بحث عميق يدوي)", use_container_width=True, type="secondary"):
         st.session_state.orders = []
-        with st.spinner("جاري فحص جميع ملفات المندوبين بدقة..."):
+        with st.spinner("جاري فحص جميع ملفات المندوبين بدقة (يرجى الانتظار)..."):
             # 1. جلب السريع من شيت الإشعارات أولاً
             try:
                 notif_ws = sh.worksheet("إشعارات_الطلبات")
@@ -197,7 +197,7 @@ if sh:
                         st.session_state.orders.append({"name": row.get('المندوب'), "time": row.get('التاريخ و الوقت')})
             except: pass
             
-            # 2. الفحص العميق بملفات المندوبين كلهم كاحتياط أمان مطلق
+            # 2. الفحص العميق بملفات المندوبين كلهم (مع إضافة time.sleep لحماية السيرفر من الحظر)
             for rep in delegates:
                 if any(o['name'] == rep for o in st.session_state.orders): continue
                 try:
@@ -211,7 +211,11 @@ if sh:
                                 order_time = row[idx_time] if idx_time != -1 else "---"
                                 st.session_state.orders.append({"name": rep, "time": order_time})
                                 break
-                except: continue
+                    time.sleep(1) # 🔥 فرام ضروري جداً عشان جوجل ما يوقف الاتصال 🔥
+                except: 
+                    time.sleep(1)
+                    continue
+                    
         st.session_state.last_checked_orders_count = len(st.session_state.orders)
         st.rerun()
 
@@ -233,203 +237,209 @@ if sh:
     selected_rep = st.selectbox("المندوب المختار:", ["-- اختر مندوب --"] + delegates, index=(delegates.index(active)+1 if active in delegates else 0))
 
     if selected_rep != "-- اختر مندوب --":
-        ws = sh.worksheet(selected_rep)
-        raw = ws.get_all_values()
-        if len(raw) > 1:
-            header = raw[0]
-            df = pd.DataFrame(raw[1:], columns=header)
-            df.columns = df.columns.str.strip()
+        # 🔥 حماية فتح ملف المندوب من مشاكل جوجل 🔥
+        try:
+            ws = sh.worksheet(selected_rep)
+            raw = ws.get_all_values()
             
-            if len(df.columns) >= 6:
-                df.columns.values[5] = "رقم الطلب"
-            
-            if 'الحالة' in df.columns:
-                df['row_no'] = range(2, len(df) + 2)
-                pending = df[df['الحالة'] == "بانتظار التصديق"].copy()
+            if len(raw) > 1:
+                header = raw[0]
+                df = pd.DataFrame(raw[1:], columns=header)
+                df.columns = df.columns.str.strip()
                 
-                if not pending.empty:
-                    pending['الوجهة'] = pending['اسم الزبون'].astype(str).replace(['nan', '', 'None'], 'جردة سيارة').str.strip()
+                if len(df.columns) >= 6:
+                    df.columns.values[5] = "رقم الطلب"
+                
+                if 'الحالة' in df.columns:
+                    df['row_no'] = range(2, len(df) + 2)
+                    pending = df[df['الحالة'] == "بانتظار التصديق"].copy()
                     
-                    cols_to_show = ['row_no', 'رقم الطلب', 'اسم الصنف', 'الكميه المطلوبه', 'الوجهة']
-                    display_df = pending[[c for c in cols_to_show if c in pending.columns]]
-                    
-                    # تعديل الجدول
-                    edited = st.data_editor(display_df, hide_index=True, use_container_width=True)
-                    
-                    # 1. تحويل الكميات لأرقام
-                    edited['الكميه المطلوبه'] = pd.to_numeric(edited['الكميه المطلوبه'], errors='coerce').fillna(0)
-
-                    # 2. فصل المقبول عن الملغى
-                    approved_items = edited[edited['الكميه المطلوبه'] > 0]
-                    cancelled_items = edited[edited['الكميه المطلوبه'] <= 0]
-                    
-                    # 3. بناء نص الرسالة
-                    msg_lines = []
-                    msg_lines.append(f"📦 *تقرير تحميل: {selected_rep}*")
-                    msg_lines.append(f"📅 {datetime.now(beirut_tz).strftime('%Y-%m-%d | %I:%M %p')}")
-                    msg_lines.append("------------------")
-                    
-                    if not approved_items.empty:
-                        msg_lines.append("✅ *تم الموافقة والتحميل:*")
-                        destinations = approved_items['الوجهة'].unique()
+                    if not pending.empty:
+                        pending['الوجهة'] = pending['اسم الزبون'].astype(str).replace(['nan', '', 'None'], 'جردة سيارة').str.strip()
                         
-                        for dest in destinations:
-                            dest_items = approved_items[approved_items['الوجهة'] == dest]
-                            msg_lines.append(f"\n*{dest}*")
+                        cols_to_show = ['row_no', 'رقم الطلب', 'اسم الصنف', 'الكميه المطلوبه', 'الوجهة']
+                        display_df = pending[[c for c in cols_to_show if c in pending.columns]]
+                        
+                        # تعديل الجدول
+                        edited = st.data_editor(display_df, hide_index=True, use_container_width=True)
+                        
+                        # 1. تحويل الكميات لأرقام
+                        edited['الكميه المطلوبه'] = pd.to_numeric(edited['الكميه المطلوبه'], errors='coerce').fillna(0)
+    
+                        # 2. فصل المقبول عن الملغى
+                        approved_items = edited[edited['الكميه المطلوبه'] > 0]
+                        cancelled_items = edited[edited['الكميه المطلوبه'] <= 0]
+                        
+                        # 3. بناء نص الرسالة
+                        msg_lines = []
+                        msg_lines.append(f"📦 *تقرير تحميل: {selected_rep}*")
+                        msg_lines.append(f"📅 {datetime.now(beirut_tz).strftime('%Y-%m-%d | %I:%M %p')}")
+                        msg_lines.append("------------------")
+                        
+                        if not approved_items.empty:
+                            msg_lines.append("✅ *تم الموافقة والتحميل:*")
+                            destinations = approved_items['الوجهة'].unique()
                             
-                            for _, row in dest_items.iterrows():
-                                qty_val = float(row['الكميه المطلوبه'])
-                                if qty_val == int(qty_val):
-                                    display_qty = int(qty_val)
-                                else:
-                                    display_qty = qty_val
+                            for dest in destinations:
+                                dest_items = approved_items[approved_items['الوجهة'] == dest]
+                                msg_lines.append(f"\n*{dest}*")
                                 
-                                line = f"▪️ {row['اسم الصنف']}: *{display_qty}*"
-                                msg_lines.append(line)
-                    
-                    if not cancelled_items.empty:
-                        msg_lines.append("\n❌ *ملغى / غير متوفر:*")
-                        for _, row in cancelled_items.iterrows():
-                            line = f"▫️ ~{row['اسم الصنف']}~ ({row['الوجهة']})"
-                            msg_lines.append(line)
-                            
-                    msg_lines.append("\n⚠️ *يرجى التأكد من البضاعة قبل الانطلاق*")
-                    
-                    final_msg = "\n".join(msg_lines)
-                    encoded_msg = urllib.parse.quote(final_msg)
-                    phone = get_delegate_phone(sh, selected_rep)
-
-                    # --- HTML Print ---
-                    p_now = datetime.now(beirut_tz).strftime('%Y-%m-%d | %I:%M %p')
-                    h_content = ""
-                    for tg in edited['الوجهة'].unique():
-                        curr_rows = edited[edited['الوجهة'] == tg]
-                        curr_rows_print = curr_rows[pd.to_numeric(curr_rows['الكميه المطلوبه'], errors='coerce') > 0]
-                        if curr_rows_print.empty: continue
-
-                        o_id = curr_rows['رقم الطلب'].iloc[0] if 'رقم الطلب' in curr_rows.columns else "---"
-                        rows_html = "".join([f"<tr><td style='width:30px;'>{i+1}</td><td style='text-align:right; padding-right:5px; font-size:14px;'>{r['اسم الصنف']}</td><td style='font-size:16px; font-weight:bold; width:50px;'>{r['الكميه المطلوبه']}</td></tr>" for i, (_, r) in enumerate(curr_rows_print.iterrows())])
-                        
-                        single_table = f"""
-                        <div style="width: 49%; border: 1.5px solid black; padding: 5px; box-sizing: border-box; background-color: white; color: black;">
-                            <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid black; padding-bottom: 3px; margin-bottom: 5px;">
-                                <div style="text-align: right; font-size: 14px; font-weight: bold; width: 33%;">🔢 طلب: {o_id}</div>
-                                <div style="text-align: center; font-size: 16px; font-weight: bold; width: 34%;">{tg}</div>
-                                <div style="text-align: left; font-size: 11px; width: 33%;">{p_now}</div>
-                            </div>
-                            <div style="text-align: right; font-size: 12px; margin-bottom: 3px;">👤 المندوب: {selected_rep}</div>
-                            <table style="width:100%; border-collapse:collapse; table-layout: fixed;">
-                                <thead style="background:#eee;">
-                                    <tr>
-                                        <th style="width:35px; border:1px solid black; font-size:12px;">ت</th>
-                                        <th style="border:1px solid black; text-align:right; padding-right:5px; font-size:12px;">اسم الصنف</th>
-                                        <th style="width:55px; border:1px solid black; font-size:12px;">العدد</th>
-                                    </tr>
-                                </thead>
-                                <tbody>{rows_html}</tbody>
-                            </table>
-                        </div>
-                        """
-                        h_content += f'<div style="display:flex; justify-content:space-between; margin-bottom:15px; page-break-inside:avoid;">{single_table}{single_table}</div>'
-                    
-                    col_print, col_wa = st.columns([1, 1])
-                    
-                    with col_print:
-                        final_style = """<style>table, th, td { border: 1px solid black; border-collapse: collapse; padding: 3px; text-align: center; } body { font-family: Arial, sans-serif; margin: 0; padding: 10px; } @media print { .no-print { display: none; } }</style>"""
-                        print_html = f"""
-                        <script>
-                        function doPrint() {{ 
-                            var w = window.open('', '', 'width=1000,height=1000'); 
-                            w.document.write(`<html><head><title>طباعة</title>{final_style}</head><body dir="rtl"> {h_content} <script>setTimeout(function() {{ window.print(); window.close(); }}, 800);<\\/script></body></html>`); 
-                            w.document.close(); 
-                        }}
-                        </script>
-                        <button onclick="doPrint()" style="width:100%; height:80px; background-color:#28a745; color:white; border:none; border-radius:12px; font-weight:bold; font-size:20px; cursor:pointer; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
-                            🖨️ طباعة الورقة للمكتب
-                        </button>
-                        """
-                        st.components.v1.html(print_html, height=100)
-                    
-                    with col_wa:
-                        if phone:
-                            wa_url = f"https://api.whatsapp.com/send?phone={phone}&text={encoded_msg}"
-                            st.markdown(f'''
-                                <a href="{wa_url}" target="_blank" class="wa-btn">
-                                    📲 إرسال تقرير التحميل المفصل (واتساب)
-                                    <br><span style="font-size:14px; font-weight:normal;">(مبوب حسب الوجهة)</span>
-                                </a>
-                            ''', unsafe_allow_html=True)
-                        else:
-                            st.error("⚠️ رقم المندوب غير مسجل في شيت 'البيانات'")
-
-                    st.markdown("---")
-
-                    if st.button("🚀 تصديق وإغلاق الطلب نهائياً", type="primary", use_container_width=True):
-                        idx_status = header.index('الحالة') + 1
-                        try: idx_qty = header.index('الكميه المطلوبه') + 1
-                        except: idx_qty = header.index('العدد') + 1
-                        
-                        with st.spinner("جاري التحديث ونقل البيانات..."):
-                            khodor_items = []
-                            order_id = "---"
-                            customer_target = "---"
-                            
-                            for _, r in edited.iterrows():
-                                try:
-                                    row_idx = int(r['row_no'])
-                                    item_qty = str(r['الكميه المطلوبه']).strip()
-                                    
-                                    if item_qty in ["", "0", "None", "nan", "0.0"]:
-                                        ws.update_cell(row_idx, idx_qty, 0) 
-                                        ws.update_cell(row_idx, idx_status, "ملغى")
+                                for _, row in dest_items.iterrows():
+                                    qty_val = float(row['الكميه المطلوبه'])
+                                    if qty_val == int(qty_val):
+                                        display_qty = int(qty_val)
                                     else:
-                                        ws.update_cell(row_idx, idx_qty, r['الكميه المطلوبه'])
-                                        ws.update_cell(row_idx, idx_status, "تم التصديق")
-                                        
-                                        if selected_rep == "خضر الشيخ":
-                                            order_id = r.get('رقم الطلب', '---')
-                                            customer_target = r.get('الوجهة', '---')
-                                            khodor_items.append(f"{r['اسم الصنف']}: {r['الكميه المطلوبه']}")
+                                        display_qty = qty_val
                                     
-                                    time.sleep(0.4) 
-                                except Exception as e:
-                                    print(e)
-                                    continue
-                            
-                            if selected_rep == "خضر الشيخ" and khodor_items:
-                                try:
-                                    try: dist_ws = sh.worksheet("جدولة_التوزيع")
-                                    except:
-                                        dist_ws = sh.add_worksheet(title="جدولة_التوزيع", rows="100", cols="7")
-                                        dist_ws.append_row(["التاريخ", "رقم الطلب", "المندوب", "الزبون", "المنطقة", "الأصناف", "حالة الشحن"])
-                                    
-                                    cust_zone = "غير محدد"
-                                    try:
-                                        cust_ws = sh.worksheet("الزبائن")
-                                        cell_c = cust_ws.find(customer_target.strip())
-                                        if cell_c:
-                                            cust_zone = cust_ws.cell(cell_c.row, 3).value
-                                    except: pass
-                                    
-                                    now_beirut = datetime.now(beirut_tz).strftime("%Y-%m-%d %H:%M")
-                                    items_text = " | ".join(khodor_items)
-                                    dist_ws.append_row([now_beirut, str(order_id), selected_rep, customer_target, cust_zone, items_text, "قيد الجدولة"])
-                                except Exception as dist_err:
-                                    st.error(f"⚠️ الطلب تصدق لكن فشل نقله لجدول التوزيع: {dist_err}")
-                                    
-                            # 🔥 إغلاق وتحديث سطر الإشعار بشيت الإشعارات المركزي ليختفي من لوحة التحكم
-                            try:
-                                notif_ws_update = sh.worksheet("إشعارات_الطلبات")
-                                cell_n = notif_ws_update.find(selected_rep)
-                                if cell_n:
-                                    notif_ws_update.update_cell(cell_n.row, 3, "تم")
-                            except: pass
+                                    line = f"▪️ {row['اسم الصنف']}: *{display_qty}*"
+                                    msg_lines.append(line)
                         
-                        st.success("✅ تم التصديق!")
-                        st.session_state.orders = [o for o in st.session_state.orders if o['name'] != selected_rep]
-                        if 'active_rep' in st.session_state: del st.session_state.active_rep
-                        time.sleep(1)
-                        st.rerun()
+                        if not cancelled_items.empty:
+                            msg_lines.append("\n❌ *ملغى / غير متوفر:*")
+                            for _, row in cancelled_items.iterrows():
+                                line = f"▫️ ~{row['اسم الصنف']}~ ({row['الوجهة']})"
+                                msg_lines.append(line)
+                                
+                        msg_lines.append("\n⚠️ *يرجى التأكد من البضاعة قبل الانطلاق*")
+                        
+                        final_msg = "\n".join(msg_lines)
+                        encoded_msg = urllib.parse.quote(final_msg)
+                        phone = get_delegate_phone(sh, selected_rep)
+    
+                        # --- HTML Print ---
+                        p_now = datetime.now(beirut_tz).strftime('%Y-%m-%d | %I:%M %p')
+                        h_content = ""
+                        for tg in edited['الوجهة'].unique():
+                            curr_rows = edited[edited['الوجهة'] == tg]
+                            curr_rows_print = curr_rows[pd.to_numeric(curr_rows['الكميه المطلوبه'], errors='coerce') > 0]
+                            if curr_rows_print.empty: continue
+    
+                            o_id = curr_rows['رقم الطلب'].iloc[0] if 'رقم الطلب' in curr_rows.columns else "---"
+                            rows_html = "".join([f"<tr><td style='width:30px;'>{i+1}</td><td style='text-align:right; padding-right:5px; font-size:14px;'>{r['اسم الصنف']}</td><td style='font-size:16px; font-weight:bold; width:50px;'>{r['الكميه المطلوبه']}</td></tr>" for i, (_, r) in enumerate(curr_rows_print.iterrows())])
+                            
+                            single_table = f"""
+                            <div style="width: 49%; border: 1.5px solid black; padding: 5px; box-sizing: border-box; background-color: white; color: black;">
+                                <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid black; padding-bottom: 3px; margin-bottom: 5px;">
+                                    <div style="text-align: right; font-size: 14px; font-weight: bold; width: 33%;">🔢 طلب: {o_id}</div>
+                                    <div style="text-align: center; font-size: 16px; font-weight: bold; width: 34%;">{tg}</div>
+                                    <div style="text-align: left; font-size: 11px; width: 33%;">{p_now}</div>
+                                </div>
+                                <div style="text-align: right; font-size: 12px; margin-bottom: 3px;">👤 المندوب: {selected_rep}</div>
+                                <table style="width:100%; border-collapse:collapse; table-layout: fixed;">
+                                    <thead style="background:#eee;">
+                                        <tr>
+                                            <th style="width:35px; border:1px solid black; font-size:12px;">ت</th>
+                                            <th style="border:1px solid black; text-align:right; padding-right:5px; font-size:12px;">اسم الصنف</th>
+                                            <th style="width:55px; border:1px solid black; font-size:12px;">العدد</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>{rows_html}</tbody>
+                                </table>
+                            </div>
+                            """
+                            h_content += f'<div style="display:flex; justify-content:space-between; margin-bottom:15px; page-break-inside:avoid;">{single_table}{single_table}</div>'
+                        
+                        col_print, col_wa = st.columns([1, 1])
+                        
+                        with col_print:
+                            final_style = """<style>table, th, td { border: 1px solid black; border-collapse: collapse; padding: 3px; text-align: center; } body { font-family: Arial, sans-serif; margin: 0; padding: 10px; } @media print { .no-print { display: none; } }</style>"""
+                            print_html = f"""
+                            <script>
+                            function doPrint() {{ 
+                                var w = window.open('', '', 'width=1000,height=1000'); 
+                                w.document.write(`<html><head><title>طباعة</title>{final_style}</head><body dir="rtl"> {h_content} <script>setTimeout(function() {{ window.print(); window.close(); }}, 800);<\\/script></body></html>`); 
+                                w.document.close(); 
+                            }}
+                            </script>
+                            <button onclick="doPrint()" style="width:100%; height:80px; background-color:#28a745; color:white; border:none; border-radius:12px; font-weight:bold; font-size:20px; cursor:pointer; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
+                                🖨️ طباعة الورقة للمكتب
+                            </button>
+                            """
+                            st.components.v1.html(print_html, height=100)
+                        
+                        with col_wa:
+                            if phone:
+                                wa_url = f"https://api.whatsapp.com/send?phone={phone}&text={encoded_msg}"
+                                st.markdown(f'''
+                                    <a href="{wa_url}" target="_blank" class="wa-btn">
+                                        📲 إرسال تقرير التحميل المفصل (واتساب)
+                                        <br><span style="font-size:14px; font-weight:normal;">(مبوب حسب الوجهة)</span>
+                                    </a>
+                                ''', unsafe_allow_html=True)
+                            else:
+                                st.error("⚠️ رقم المندوب غير مسجل في شيت 'البيانات'")
+    
+                        st.markdown("---")
+    
+                        if st.button("🚀 تصديق وإغلاق الطلب نهائياً", type="primary", use_container_width=True):
+                            idx_status = header.index('الحالة') + 1
+                            try: idx_qty = header.index('الكميه المطلوبه') + 1
+                            except: idx_qty = header.index('العدد') + 1
+                            
+                            with st.spinner("جاري التحديث ونقل البيانات..."):
+                                khodor_items = []
+                                order_id = "---"
+                                customer_target = "---"
+                                
+                                for _, r in edited.iterrows():
+                                    try:
+                                        row_idx = int(r['row_no'])
+                                        item_qty = str(r['الكميه المطلوبه']).strip()
+                                        
+                                        if item_qty in ["", "0", "None", "nan", "0.0"]:
+                                            ws.update_cell(row_idx, idx_qty, 0) 
+                                            ws.update_cell(row_idx, idx_status, "ملغى")
+                                        else:
+                                            ws.update_cell(row_idx, idx_qty, r['الكميه المطلوبه'])
+                                            ws.update_cell(row_idx, idx_status, "تم التصديق")
+                                            
+                                            if selected_rep == "خضر الشيخ":
+                                                order_id = r.get('رقم الطلب', '---')
+                                                customer_target = r.get('الوجهة', '---')
+                                                khodor_items.append(f"{r['اسم الصنف']}: {r['الكميه المطلوبه']}")
+                                        
+                                        time.sleep(0.4) 
+                                    except Exception as e:
+                                        print(e)
+                                        continue
+                                
+                                if selected_rep == "خضر الشيخ" and khodor_items:
+                                    try:
+                                        try: dist_ws = sh.worksheet("جدولة_التوزيع")
+                                        except:
+                                            dist_ws = sh.add_worksheet(title="جدولة_التوزيع", rows="100", cols="7")
+                                            dist_ws.append_row(["التاريخ", "رقم الطلب", "المندوب", "الزبون", "المنطقة", "الأصناف", "حالة الشحن"])
+                                        
+                                        cust_zone = "غير محدد"
+                                        try:
+                                            cust_ws = sh.worksheet("الزبائن")
+                                            cell_c = cust_ws.find(customer_target.strip())
+                                            if cell_c:
+                                                cust_zone = cust_ws.cell(cell_c.row, 3).value
+                                        except: pass
+                                        
+                                        now_beirut = datetime.now(beirut_tz).strftime("%Y-%m-%d %H:%M")
+                                        items_text = " | ".join(khodor_items)
+                                        dist_ws.append_row([now_beirut, str(order_id), selected_rep, customer_target, cust_zone, items_text, "قيد الجدولة"])
+                                    except Exception as dist_err:
+                                        st.error(f"⚠️ الطلب تصدق لكن فشل نقله لجدول التوزيع: {dist_err}")
+                                        
+                                # 🔥 إغلاق وتحديث سطر الإشعار بشيت الإشعارات المركزي ليختفي من لوحة التحكم
+                                try:
+                                    notif_ws_update = sh.worksheet("إشعارات_الطلبات")
+                                    cell_n = notif_ws_update.find(selected_rep)
+                                    if cell_n:
+                                        notif_ws_update.update_cell(cell_n.row, 3, "تم")
+                                except: pass
+                            
+                            st.success("✅ تم التصديق!")
+                            st.session_state.orders = [o for o in st.session_state.orders if o['name'] != selected_rep]
+                            if 'active_rep' in st.session_state: del st.session_state.active_rep
+                            time.sleep(1)
+                            st.rerun()
+        except Exception as sheet_err:
+            st.error("⚠️ سيرفرات جوجل عليها ضغط مؤقت (Rate Limit). يرجى الانتظار 30 ثانية ثم تحديث الصفحة.")
+            st.info(f"رسالة النظام: {sheet_err}")
 
 # --- 4. قسم الأرشيف ---
 st.divider()
