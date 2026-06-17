@@ -154,7 +154,6 @@ if sh:
 
     current_found_orders = []
     try:
-        # محاولة جلب الإشعارات التلقائية السريعة أولاً
         notif_ws = sh.worksheet("إشعارات_الطلبات")
         notif_data = notif_ws.get_all_records()
         for row in notif_data:
@@ -162,12 +161,10 @@ if sh:
                 current_found_orders.append({"name": row.get('المندوب'), "time": row.get('التاريخ و الوقت')})
     except: pass
 
-    # إذا تم رصد طلب تلقائي جديد، شغل صوت التنبيه فوراً
     if len(current_found_orders) > st.session_state.get('last_checked_orders_count', 0):
         play_notification_sound()
         st.toast("🔔 تنبيه: وصلت طلبية جديدة الآن بالخلفية!", icon="🔥")
         
-    # إذا كانت القائمة التلقائية فارغة، لا نمسح القديم المخزن يدوياً لضمان عدم الاختفاء
     if current_found_orders:
         st.session_state.orders = current_found_orders
         st.session_state.last_checked_orders_count = len(current_found_orders)
@@ -185,11 +182,10 @@ if sh:
     
     st.divider()
 
-    # --- 2. زر الفحص اليدوي (البحث العميق الاحتياطي اللّي طلبته - الزر الأحمر) ---
+    # --- 2. زر الفحص اليدوي ---
     if st.button("🔔 فحص الإشعارات الجديدة (بحث عميق يدوي)", use_container_width=True, type="secondary"):
         st.session_state.orders = []
         with st.spinner("جاري فحص جميع ملفات المندوبين بدقة (يرجى الانتظار)..."):
-            # 1. جلب السريع من شيت الإشعارات أولاً
             try:
                 notif_ws = sh.worksheet("إشعارات_الطلبات")
                 for row in notif_ws.get_all_records():
@@ -197,7 +193,6 @@ if sh:
                         st.session_state.orders.append({"name": row.get('المندوب'), "time": row.get('التاريخ و الوقت')})
             except: pass
             
-            # 2. الفحص العميق بملفات المندوبين كلهم (مع إضافة time.sleep لحماية السيرفر من الحظر)
             for rep in delegates:
                 if any(o['name'] == rep for o in st.session_state.orders): continue
                 try:
@@ -211,7 +206,7 @@ if sh:
                                 order_time = row[idx_time] if idx_time != -1 else "---"
                                 st.session_state.orders.append({"name": rep, "time": order_time})
                                 break
-                    time.sleep(1) # 🔥 فرام ضروري جداً عشان جوجل ما يوقف الاتصال 🔥
+                    time.sleep(1) 
                 except: 
                     time.sleep(1)
                     continue
@@ -237,7 +232,6 @@ if sh:
     selected_rep = st.selectbox("المندوب المختار:", ["-- اختر مندوب --"] + delegates, index=(delegates.index(active)+1 if active in delegates else 0))
 
     if selected_rep != "-- اختر مندوب --":
-        # 🔥 حماية فتح ملف المندوب من مشاكل جوجل 🔥
         try:
             ws = sh.worksheet(selected_rep)
             raw = ws.get_all_values()
@@ -260,17 +254,13 @@ if sh:
                         cols_to_show = ['row_no', 'رقم الطلب', 'اسم الصنف', 'الكميه المطلوبه', 'الوجهة']
                         display_df = pending[[c for c in cols_to_show if c in pending.columns]]
                         
-                        # تعديل الجدول
                         edited = st.data_editor(display_df, hide_index=True, use_container_width=True)
                         
-                        # 1. تحويل الكميات لأرقام
                         edited['الكميه المطلوبه'] = pd.to_numeric(edited['الكميه المطلوبه'], errors='coerce').fillna(0)
     
-                        # 2. فصل المقبول عن الملغى
                         approved_items = edited[edited['الكميه المطلوبه'] > 0]
                         cancelled_items = edited[edited['الكميه المطلوبه'] <= 0]
                         
-                        # 3. بناء نص الرسالة
                         msg_lines = []
                         msg_lines.append(f"📦 *تقرير تحميل: {selected_rep}*")
                         msg_lines.append(f"📅 {datetime.now(beirut_tz).strftime('%Y-%m-%d | %I:%M %p')}")
@@ -306,7 +296,6 @@ if sh:
                         encoded_msg = urllib.parse.quote(final_msg)
                         phone = get_delegate_phone(sh, selected_rep)
     
-                        # --- HTML Print ---
                         p_now = datetime.now(beirut_tz).strftime('%Y-%m-%d | %I:%M %p')
                         h_content = ""
                         for tg in edited['الوجهة'].unique():
@@ -393,7 +382,8 @@ if sh:
                                             ws.update_cell(row_idx, idx_qty, r['الكميه المطلوبه'])
                                             ws.update_cell(row_idx, idx_status, "تم التصديق")
                                             
-                                            if selected_rep == "خضر الشيخ":
+                                            # --- التعديل الجوهري هنا ---
+                                            if selected_rep.strip() == "خضر":
                                                 order_id = r.get('رقم الطلب', '---')
                                                 customer_target = r.get('الوجهة', '---')
                                                 khodor_items.append(f"{r['اسم الصنف']}: {r['الكميه المطلوبه']}")
@@ -403,7 +393,8 @@ if sh:
                                         print(e)
                                         continue
                                 
-                                if selected_rep == "خضر الشيخ" and khodor_items:
+                                # --- التعديل الجوهري هنا ---
+                                if selected_rep.strip() == "خضر" and khodor_items:
                                     try:
                                         try: dist_ws = sh.worksheet("جدولة_التوزيع")
                                         except:
@@ -424,7 +415,6 @@ if sh:
                                     except Exception as dist_err:
                                         st.error(f"⚠️ الطلب تصدق لكن فشل نقله لجدول التوزيع: {dist_err}")
                                         
-                                # 🔥 إغلاق وتحديث سطر الإشعار بشيت الإشعارات المركزي ليختفي من لوحة التحكم
                                 try:
                                     notif_ws_update = sh.worksheet("إشعارات_الطلبات")
                                     cell_n = notif_ws_update.find(selected_rep)
