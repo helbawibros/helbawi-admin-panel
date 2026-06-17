@@ -13,7 +13,6 @@ import urllib.parse
 st.set_page_config(page_title="Helbawi Admin", layout="wide")
 beirut_tz = pytz.timezone('Asia/Beirut')
 
-# دالة تشغيل صوت التنبيه داخل المتصفح تلقائياً
 def play_notification_sound():
     audio_html = """
         <audio autoplay>
@@ -24,7 +23,6 @@ def play_notification_sound():
 
 st.markdown("""
     <style>
-    /* تنسيق الأزرار */
     div.stButton > button:first-child[kind="secondary"] {
         background-color: #ff4b4b; color: white; border: none;
         box-shadow: 0 0 15px rgba(255, 75, 75, 0.6); font-weight: bold; height: 50px;
@@ -39,8 +37,6 @@ st.markdown("""
         color: #D4AF37; text-align: center; font-size: 40px;
         text-shadow: 2px 2px 4px #000000; margin-bottom: 5px;
     }
-    
-    /* --- ستايل اللمبات الجديد (3D Bubble) --- */
     .status-bar {
         display: flex; justify-content: center; gap: 12px; margin-bottom: 20px;
         background: #161b26; padding: 12px; border-radius: 50px; border: 1px solid #333;
@@ -53,18 +49,14 @@ st.markdown("""
         border: 1px solid rgba(0,0,0,0.5);
     }
     .bulb:hover { transform: scale(1.3); }
-    
     .bulb-on { background: radial-gradient(circle at 30% 30%, #4bff88, #00e676); box-shadow: 0 0 15px #00e676; }
     .bulb-off { background: radial-gradient(circle at 30% 30%, #ff6b6b, #b71c1c); opacity: 0.6; }
-    
-    /* زر الواتساب الجديد */
     .wa-btn {
         background-color: #25D366; color: white; padding: 15px; text-align: center;
         border-radius: 12px; text-decoration: none; display: block; font-weight: bold; margin-top: 10px;
         font-size: 18px; border: 2px solid #128c7e; transition: 0.3s; box-shadow: 0 4px 6px rgba(0,0,0,0.1);
     }
     .wa-btn:hover { background-color: #128c7e; transform: scale(1.02); color: white; text-decoration: none; }
-    
     </style>
 """, unsafe_allow_html=True)
 
@@ -82,14 +74,11 @@ def get_sh():
         st.error(f"⚠️ خطأ اتصال بجوجل: {e}")
         return None
 
-# --- دوال المساعدة ---
-
 def get_delegate_phone(_sh, name):
     try:
         ws = _sh.worksheet("البيانات")
         cell = ws.find(name.strip())
-        if cell: 
-            return ws.cell(cell.row, 2).value 
+        if cell: return ws.cell(cell.row, 2).value 
         return None
     except: return None
 
@@ -104,13 +93,11 @@ def get_active_status(_sh):
             last_time = row.get('آخر_ظهور') or row.get('time')
             try:
                 t = datetime.strptime(str(last_time), "%Y-%m-%d %H:%M")
-                if (now - t).total_seconds() < 900: 
-                    status[str(name).strip()] = True
+                if (now - t).total_seconds() < 900: status[str(name).strip()] = True
             except: continue
         return status
     except: return {}
 
-# --- 2. نظام الدخول ---
 if not st.session_state.admin_logged_in:
     col_l = st.columns([1, 2, 1])[1]
     with col_l:
@@ -146,10 +133,9 @@ if sh:
     if not delegates:
         time.sleep(2); st.cache_data.clear(); delegates = fetch_delegates(sh)
 
-    # --- 🔄 نظام الفحص التلقائي السريع جداً بالخلفية ---
     try:
         from streamlit_autorefresh import st_autorefresh
-        st_autorefresh(interval=30000, key="datarefresh") # تحديث تلقائي كل 30 ثانية
+        st_autorefresh(interval=30000, key="datarefresh") 
     except: pass
 
     current_found_orders = []
@@ -169,7 +155,6 @@ if sh:
         st.session_state.orders = current_found_orders
         st.session_state.last_checked_orders_count = len(current_found_orders)
 
-    # --- 1. رادار اللمبات ---
     if delegates:
         status_map = get_active_status(sh)
         lights_html = '<div class="status-bar">'
@@ -182,7 +167,6 @@ if sh:
     
     st.divider()
 
-    # --- 2. زر الفحص اليدوي ---
     if st.button("🔔 فحص الإشعارات الجديدة (بحث عميق يدوي)", use_container_width=True, type="secondary"):
         st.session_state.orders = []
         with st.spinner("جاري فحص جميع ملفات المندوبين بدقة (يرجى الانتظار)..."):
@@ -214,8 +198,7 @@ if sh:
         st.session_state.last_checked_orders_count = len(st.session_state.orders)
         st.rerun()
 
-    # --- 3. عرض أزرار الإشعارات المكتشفة ---
-    st.markdown("<h4 style='text-align:right;'>📦 الطلبات المنتظرة حالياً (تتحدث تلقائياً 🔄 أو عبر الفحص اليدوي):</h4>", unsafe_allow_html=True)
+    st.markdown("<h4 style='text-align:right;'>📦 الطلبات المنتظرة حالياً:</h4>", unsafe_allow_html=True)
     
     if st.session_state.orders:
         cols = st.columns(max(len(st.session_state.orders), 1))
@@ -269,29 +252,20 @@ if sh:
                         if not approved_items.empty:
                             msg_lines.append("✅ *تم الموافقة والتحميل:*")
                             destinations = approved_items['الوجهة'].unique()
-                            
                             for dest in destinations:
                                 dest_items = approved_items[approved_items['الوجهة'] == dest]
                                 msg_lines.append(f"\n*{dest}*")
-                                
                                 for _, row in dest_items.iterrows():
                                     qty_val = float(row['الكميه المطلوبه'])
-                                    if qty_val == int(qty_val):
-                                        display_qty = int(qty_val)
-                                    else:
-                                        display_qty = qty_val
-                                    
-                                    line = f"▪️ {row['اسم الصنف']}: *{display_qty}*"
-                                    msg_lines.append(line)
+                                    display_qty = int(qty_val) if qty_val == int(qty_val) else qty_val
+                                    msg_lines.append(f"▪️ {row['اسم الصنف']}: *{display_qty}*")
                         
                         if not cancelled_items.empty:
                             msg_lines.append("\n❌ *ملغى / غير متوفر:*")
                             for _, row in cancelled_items.iterrows():
-                                line = f"▫️ ~{row['اسم الصنف']}~ ({row['الوجهة']})"
-                                msg_lines.append(line)
+                                msg_lines.append(f"▫️ ~{row['اسم الصنف']}~ ({row['الوجهة']})")
                                 
                         msg_lines.append("\n⚠️ *يرجى التأكد من البضاعة قبل الانطلاق*")
-                        
                         final_msg = "\n".join(msg_lines)
                         encoded_msg = urllib.parse.quote(final_msg)
                         phone = get_delegate_phone(sh, selected_rep)
@@ -315,48 +289,23 @@ if sh:
                                 </div>
                                 <div style="text-align: right; font-size: 12px; margin-bottom: 3px;">👤 المندوب: {selected_rep}</div>
                                 <table style="width:100%; border-collapse:collapse; table-layout: fixed;">
-                                    <thead style="background:#eee;">
-                                        <tr>
-                                            <th style="width:35px; border:1px solid black; font-size:12px;">ت</th>
-                                            <th style="border:1px solid black; text-align:right; padding-right:5px; font-size:12px;">اسم الصنف</th>
-                                            <th style="width:55px; border:1px solid black; font-size:12px;">العدد</th>
-                                        </tr>
-                                    </thead>
+                                    <thead style="background:#eee;"><tr><th style="width:35px; border:1px solid black; font-size:12px;">ت</th><th style="border:1px solid black; text-align:right; padding-right:5px; font-size:12px;">اسم الصنف</th><th style="width:55px; border:1px solid black; font-size:12px;">العدد</th></tr></thead>
                                     <tbody>{rows_html}</tbody>
                                 </table>
-                            </div>
-                            """
+                            </div>"""
                             h_content += f'<div style="display:flex; justify-content:space-between; margin-bottom:15px; page-break-inside:avoid;">{single_table}{single_table}</div>'
                         
                         col_print, col_wa = st.columns([1, 1])
-                        
                         with col_print:
                             final_style = """<style>table, th, td { border: 1px solid black; border-collapse: collapse; padding: 3px; text-align: center; } body { font-family: Arial, sans-serif; margin: 0; padding: 10px; } @media print { .no-print { display: none; } }</style>"""
-                            print_html = f"""
-                            <script>
-                            function doPrint() {{ 
-                                var w = window.open('', '', 'width=1000,height=1000'); 
-                                w.document.write(`<html><head><title>طباعة</title>{final_style}</head><body dir="rtl"> {h_content} <script>setTimeout(function() {{ window.print(); window.close(); }}, 800);<\\/script></body></html>`); 
-                                w.document.close(); 
-                            }}
-                            </script>
-                            <button onclick="doPrint()" style="width:100%; height:80px; background-color:#28a745; color:white; border:none; border-radius:12px; font-weight:bold; font-size:20px; cursor:pointer; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
-                                🖨️ طباعة الورقة للمكتب
-                            </button>
-                            """
+                            print_html = f"""<script>function doPrint() {{ var w = window.open('', '', 'width=1000,height=1000'); w.document.write(`<html><head><title>طباعة</title>{final_style}</head><body dir="rtl"> {h_content} <script>setTimeout(function() {{ window.print(); window.close(); }}, 800);<\\/script></body></html>`); w.document.close(); }}</script><button onclick="doPrint()" style="width:100%; height:80px; background-color:#28a745; color:white; border:none; border-radius:12px; font-weight:bold; font-size:20px; cursor:pointer; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">🖨️ طباعة الورقة للمكتب</button>"""
                             st.components.v1.html(print_html, height=100)
                         
                         with col_wa:
                             if phone:
                                 wa_url = f"https://api.whatsapp.com/send?phone={phone}&text={encoded_msg}"
-                                st.markdown(f'''
-                                    <a href="{wa_url}" target="_blank" class="wa-btn">
-                                        📲 إرسال تقرير التحميل المفصل (واتساب)
-                                        <br><span style="font-size:14px; font-weight:normal;">(مبوب حسب الوجهة)</span>
-                                    </a>
-                                ''', unsafe_allow_html=True)
-                            else:
-                                st.error("⚠️ رقم المندوب غير مسجل في شيت 'البيانات'")
+                                st.markdown(f'<a href="{wa_url}" target="_blank" class="wa-btn">📲 إرسال تقرير التحميل المفصل (واتساب)<br><span style="font-size:14px; font-weight:normal;">(مبوب حسب الوجهة)</span></a>', unsafe_allow_html=True)
+                            else: st.error("⚠️ رقم المندوب غير مسجل في شيت 'البيانات'")
     
                         st.markdown("---")
     
@@ -382,18 +331,13 @@ if sh:
                                             ws.update_cell(row_idx, idx_qty, r['الكميه المطلوبه'])
                                             ws.update_cell(row_idx, idx_status, "تم التصديق")
                                             
-                                            # --- التعديل الجوهري هنا ---
                                             if selected_rep.strip() == "خضر":
                                                 order_id = r.get('رقم الطلب', '---')
                                                 customer_target = r.get('الوجهة', '---')
                                                 khodor_items.append(f"{r['اسم الصنف']}: {r['الكميه المطلوبه']}")
-                                        
                                         time.sleep(0.4) 
-                                    except Exception as e:
-                                        print(e)
-                                        continue
+                                    except Exception as e: print(e); continue
                                 
-                                # --- التعديل الجوهري هنا ---
                                 if selected_rep.strip() == "خضر" and khodor_items:
                                     try:
                                         try: dist_ws = sh.worksheet("جدولة_التوزيع")
@@ -405,8 +349,7 @@ if sh:
                                         try:
                                             cust_ws = sh.worksheet("الزبائن")
                                             cell_c = cust_ws.find(customer_target.strip())
-                                            if cell_c:
-                                                cust_zone = cust_ws.cell(cell_c.row, 3).value
+                                            if cell_c: cust_zone = cust_ws.cell(cell_c.row, 3).value
                                         except: pass
                                         
                                         now_beirut = datetime.now(beirut_tz).strftime("%Y-%m-%d %H:%M")
@@ -415,12 +358,14 @@ if sh:
                                     except Exception as dist_err:
                                         st.error(f"⚠️ الطلب تصدق لكن فشل نقله لجدول التوزيع: {dist_err}")
                                         
+                                # 🔥 التعديل الجوهري: البحث الدقيق لإقفال الطلب الجديد فقط 🔥
                                 try:
                                     notif_ws_update = sh.worksheet("إشعارات_الطلبات")
-                                    cell_n = notif_ws_update.find(selected_rep)
-                                    if cell_n:
-                                        notif_ws_update.update_cell(cell_n.row, 3, "تم")
-                                except: pass
+                                    all_notifs = notif_ws_update.get_all_values()
+                                    for i_row, row_data in enumerate(all_notifs):
+                                        if len(row_data) >= 3 and row_data[0].strip() == selected_rep.strip() and row_data[2].strip() == "جديد":
+                                            notif_ws_update.update_cell(i_row + 1, 3, "تم")
+                                except Exception as e: print("Notif Error:", e)
                             
                             st.success("✅ تم التصديق!")
                             st.session_state.orders = [o for o in st.session_state.orders if o['name'] != selected_rep]
@@ -428,20 +373,16 @@ if sh:
                             time.sleep(1)
                             st.rerun()
         except Exception as sheet_err:
-            st.error("⚠️ سيرفرات جوجل عليها ضغط مؤقت (Rate Limit). يرجى الانتظار 30 ثانية ثم تحديث الصفحة.")
-            st.info(f"رسالة النظام: {sheet_err}")
+            st.error("⚠️ سيرفرات جوجل عليها ضغط مؤقت. يرجى الانتظار 30 ثانية ثم التحديث.")
 
-# --- 4. قسم الأرشيف ---
 st.divider()
 st.markdown("<h3 style='text-align:right;'>📁 أرشيف الفواتير المصورة</h3>", unsafe_allow_html=True)
 
 try:
     archive_ws = sh.worksheet("بيانات المندوبين")
     all_data = archive_ws.get_all_values()
-    
     if len(all_data) > 1:
         df_raw = pd.DataFrame(all_data[1:]) 
-        
         c1, c2 = st.columns(2)
         with c1: search_no = st.text_input("🔍 رقم الفاتورة للبحث", key="final_search_inv")
         with c2: search_rep = st.text_input("👤 اسم المندوب للبحث", key="final_search_rep")
@@ -449,17 +390,11 @@ try:
         if st.button("🚀 ابدأ البحث في الأرشيف", use_container_width=True):
             mask_html = df_raw.iloc[:, 6].str.contains("<div", na=False)
             df_filtered = df_raw[mask_html].copy()
-
-            if search_no:
-                df_filtered = df_filtered[df_filtered.iloc[:, 2].astype(str).str.strip().str.contains(search_no.strip())]
-            if search_rep:
-                df_filtered = df_filtered[df_filtered.iloc[:, 4].astype(str).str.contains(search_rep)]
+            if search_no: df_filtered = df_filtered[df_filtered.iloc[:, 2].astype(str).str.strip().str.contains(search_no.strip())]
+            if search_rep: df_filtered = df_filtered[df_filtered.iloc[:, 4].astype(str).str.contains(search_rep)]
 
             if not df_filtered.empty:
-                invoice_options = []
-                for idx, r in df_filtered.iterrows():
-                    invoice_options.append(f"📄 #{r[2]} | {r[5]} | {r[3]}")
-                
+                invoice_options = [f"📄 #{r[2]} | {r[5]} | {r[3]}" for idx, r in df_filtered.iterrows()]
                 st.session_state.found_invoices = df_filtered
                 st.session_state.invoice_labels = invoice_options[::-1]
             else:
@@ -468,18 +403,13 @@ try:
 
         if 'found_invoices' in st.session_state:
             selected = st.selectbox("👇 اختر الفاتورة:", ["-- اختر --"] + st.session_state.invoice_labels)
-
             if selected != "-- اختر --":
                 inv_id = selected.split('|')[0].replace('📄 #', '').strip()
                 target_data = st.session_state.found_invoices[st.session_state.found_invoices.iloc[:, 2].astype(str).str.strip() == inv_id].iloc[0]
                 html_content = target_data[6]
-
                 st.markdown("---")
                 st.markdown(html_content, unsafe_allow_html=True)
-                
                 if st.button("🖨️ طباعة النسخة"):
                     p_script = f"""<script>var w=window.open('','','width=900,height=900');w.document.write(`{html_content}`);setTimeout(function(){{w.print();w.close();}},500);</script>"""
                     st.components.v1.html(p_script, height=0)
-
-except Exception as e:
-    pass
+except: pass
