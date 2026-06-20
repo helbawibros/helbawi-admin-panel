@@ -200,14 +200,26 @@ if sh:
 
     st.markdown("<h4 style='text-align:right;'>📦 الطلبات المنتظرة حالياً:</h4>", unsafe_allow_html=True)
     
+    # --- التعديل 2: تجميع الإشعارات لزر واحد لكل مندوب ---
     if st.session_state.orders:
-        cols = st.columns(max(len(st.session_state.orders), 1))
-        for i, o in enumerate(st.session_state.orders):
-            if cols[i].button(f"📦 {o['name']}\n🕒 {o['time']}", key=f"o_{o['name']}_{i}"):
-                st.session_state.active_rep = o['name']
+        grouped_orders = {}
+        for o in st.session_state.orders:
+            rep = o['name']
+            if rep not in grouped_orders:
+                grouped_orders[rep] = {"count": 1, "last_time": o['time']}
+            else:
+                grouped_orders[rep]["count"] += 1
+                grouped_orders[rep]["last_time"] = o['time']
+                
+        cols = st.columns(max(len(grouped_orders), 1))
+        for i, (rep, data) in enumerate(grouped_orders.items()):
+            btn_text = f"📦 {rep}\n({data['count']} طلبيات جديدة)\n🕒 {data['last_time']}"
+            if cols[i].button(btn_text, key=f"grp_{rep}_{i}"):
+                st.session_state.active_rep = rep
                 st.rerun()
     else:
         st.info("👍 لا يوجد أي طلبات جديدة بانتظار التصديق حالياً.")
+    # ----------------------------------------------------
 
     st.divider()
 
@@ -297,10 +309,9 @@ if sh:
                         
                         col_print, col_wa = st.columns([1, 1])
                         
+                        # --- التعديل 1: زر الطباعة الأخضر مع التحديث المخفي ---
                         with col_print:
-                            final_style = """<style>table, th, td { border: 1px solid black; border-collapse: collapse; padding: 3px; text-align: center; } body { font-family: Arial, sans-serif; margin: 0; padding: 10px; } @media print { .no-print { display: none; } }</style>"""
-                            
-                            if st.button("🖨️ طباعة الورقة (وتحويلها للتحضير بالصالة)", use_container_width=True, type="primary"):
+                            if st.button("زر_الطباعة_المخفي", key=f"hidden_print_{selected_rep}"):
                                 try:
                                     dist_ws = sh.worksheet("جدولة_التوزيع")
                                     all_dist = dist_ws.get_all_values()
@@ -310,11 +321,41 @@ if sh:
                                             dist_ws.update_cell(i+1, 7, f"مجدولة: سيارة {selected_rep}")
                                             break
                                 except Exception as e:
-                                    print("Dist Error:", e)
+                                    pass
+                                    
+                            final_style = """<style>table, th, td { border: 1px solid black; border-collapse: collapse; padding: 3px; text-align: center; } body { font-family: Arial, sans-serif; margin: 0; padding: 10px; } @media print { .no-print { display: none; } }</style>"""
+                            print_html = f"""
+                            <script>
+                            setInterval(() => {{
+                                const allButtons = window.parent.document.querySelectorAll('button');
+                                allButtons.forEach(btn => {{
+                                    if (btn.innerText.includes('زر_الطباعة_المخفي')) {{
+                                        if(btn.closest('div[data-testid="stButton"]')) {{
+                                            btn.closest('div[data-testid="stButton"]').style.display = 'none';
+                                        }}
+                                    }}
+                                }});
+                            }}, 100);
+
+                            function doPrintAndUpdate() {{ 
+                                var w = window.open('', '', 'width=1000,height=1000'); 
+                                w.document.write(`<html><head><title>طباعة</title>{final_style}</head><body dir="rtl"> {h_content} <script>setTimeout(function() {{ window.print(); window.close(); }}, 800);<\\/script></body></html>`); 
+                                w.document.close(); 
                                 
-                                print_html = f"""<script>var w = window.open('', '', 'width=1000,height=1000'); w.document.write(`<html><head><title>طباعة</title>{final_style}</head><body dir="rtl"> {h_content} <script>setTimeout(function() {{ window.print(); window.close(); }}, 800);<\\/script></body></html>`); w.document.close();</script>"""
-                                st.components.v1.html(print_html, height=0)
-                                st.success("✅ تم إرسال أمر الطباعة وتحويل الطلب للتحضير على شاشة الصالة لتتمكن من إنهائه!")
+                                const allButtons = window.parent.document.querySelectorAll('button');
+                                allButtons.forEach(btn => {{
+                                    if (btn.innerText.includes('زر_الطباعة_المخفي')) {{
+                                        btn.click();
+                                    }}
+                                }});
+                            }}
+                            </script>
+                            <button onclick="doPrintAndUpdate()" style="width:100%; height:80px; background-color:#28a745; color:white; border:none; border-radius:12px; font-weight:bold; font-size:20px; cursor:pointer; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
+                                🖨️ طباعة الورقة للمكتب
+                            </button>
+                            """
+                            st.components.v1.html(print_html, height=100)
+                        # ----------------------------------------------------
                         
                         with col_wa:
                             if phone:
