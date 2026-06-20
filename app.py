@@ -295,11 +295,28 @@ if sh:
                             </div>"""
                             h_content += f'<div style="display:flex; justify-content:space-between; margin-bottom:15px; page-break-inside:avoid;">{single_table}{single_table}</div>'
                         
-                        col_print, col_wa = st.columns([1, 1])
+                                                col_print, col_wa = st.columns([1, 1])
+                        
+                        # 🔥 التعديل: تحديث جدول التوزيع عند الطباعة 🔥
                         with col_print:
                             final_style = """<style>table, th, td { border: 1px solid black; border-collapse: collapse; padding: 3px; text-align: center; } body { font-family: Arial, sans-serif; margin: 0; padding: 10px; } @media print { .no-print { display: none; } }</style>"""
-                            print_html = f"""<script>function doPrint() {{ var w = window.open('', '', 'width=1000,height=1000'); w.document.write(`<html><head><title>طباعة</title>{final_style}</head><body dir="rtl"> {h_content} <script>setTimeout(function() {{ window.print(); window.close(); }}, 800);<\\/script></body></html>`); w.document.close(); }}</script><button onclick="doPrint()" style="width:100%; height:80px; background-color:#28a745; color:white; border:none; border-radius:12px; font-weight:bold; font-size:20px; cursor:pointer; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">🖨️ طباعة الورقة للمكتب</button>"""
-                            st.components.v1.html(print_html, height=100)
+                            
+                            if st.button("🖨️ طباعة الورقة (وتحويلها للتحضير بالصالة)", use_container_width=True, type="primary"):
+                                try:
+                                    dist_ws = sh.worksheet("جدولة_التوزيع")
+                                    all_dist = dist_ws.get_all_values()
+                                    for i, r in enumerate(all_dist):
+                                        if len(r) > 6 and selected_rep.strip() in str(r[3]) and "بانتظار الطباعة" in str(r[3]):
+                                            dist_ws.update_cell(i+1, 4, f"🚨 طلبية : {selected_rep} (قيد التحضير ⏳)")
+                                            dist_ws.update_cell(i+1, 7, f"مجدولة: سيارة {selected_rep}")
+                                            break
+                                except Exception as e:
+                                    print("Dist Error:", e)
+                                
+                                print_html = f"""<script>var w = window.open('', '', 'width=1000,height=1000'); w.document.write(`<html><head><title>طباعة</title>{final_style}</head><body dir="rtl"> {h_content} <script>setTimeout(function() {{ window.print(); window.close(); }}, 800);<\\/script></body></html>`); w.document.close();</script>"""
+                                st.components.v1.html(print_html, height=0)
+                                st.success("✅ تم إرسال أمر الطباعة وتحويل الطلب للتحضير على شاشة الصالة لتتمكن من إنهائه!")
+
                         
                         with col_wa:
                             if phone:
