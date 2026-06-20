@@ -295,9 +295,8 @@ if sh:
                             </div>"""
                             h_content += f'<div style="display:flex; justify-content:space-between; margin-bottom:15px; page-break-inside:avoid;">{single_table}{single_table}</div>'
                         
-                                                col_print, col_wa = st.columns([1, 1])
+                        col_print, col_wa = st.columns([1, 1])
                         
-                        # 🔥 التعديل: تحديث جدول التوزيع عند الطباعة 🔥
                         with col_print:
                             final_style = """<style>table, th, td { border: 1px solid black; border-collapse: collapse; padding: 3px; text-align: center; } body { font-family: Arial, sans-serif; margin: 0; padding: 10px; } @media print { .no-print { display: none; } }</style>"""
                             
@@ -316,7 +315,6 @@ if sh:
                                 print_html = f"""<script>var w = window.open('', '', 'width=1000,height=1000'); w.document.write(`<html><head><title>طباعة</title>{final_style}</head><body dir="rtl"> {h_content} <script>setTimeout(function() {{ window.print(); window.close(); }}, 800);<\\/script></body></html>`); w.document.close();</script>"""
                                 st.components.v1.html(print_html, height=0)
                                 st.success("✅ تم إرسال أمر الطباعة وتحويل الطلب للتحضير على شاشة الصالة لتتمكن من إنهائه!")
-
                         
                         with col_wa:
                             if phone:
@@ -336,7 +334,6 @@ if sh:
                                 order_id = "---"
                                 customer_target = "---"
                                 
-                                # 🔥 التعديل الجوهري: تجميع كل التعديلات لإرسالها بطلب واحد لمنع حظر جوجل
                                 cells_list = []
                                 
                                 for _, r in edited.iterrows():
@@ -357,7 +354,6 @@ if sh:
                                                 khodor_items.append(f"{r['اسم الصنف']}: {r['الكميه المطلوبه']}")
                                     except Exception as e: print(e); continue
                                 
-                                # إرسال كل الخلايا المعدلة دفعة واحدة لجوجل شيت
                                 if cells_list:
                                     ws.update_cells(cells_list)
                                 
@@ -381,7 +377,6 @@ if sh:
                                     except Exception as dist_err:
                                         st.error(f"⚠️ الطلب تصدق لكن فشل نقله لجدول التوزيع: {dist_err}")
                                         
-                                # تحديث صفحة الإشعارات لإزالة التنبيه
                                 try:
                                     notif_ws_update = sh.worksheet("إشعارات_الطلبات")
                                     all_notifs = notif_ws_update.get_all_values()
