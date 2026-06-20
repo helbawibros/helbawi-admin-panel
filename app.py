@@ -314,10 +314,13 @@ if sh:
                             try: idx_qty = header.index('الكميه المطلوبه') + 1
                             except: idx_qty = header.index('العدد') + 1
                             
-                            with st.spinner("جاري التحديث ونقل البيانات..."):
+                            with st.spinner("جاري التحديث ونقل البيانات (تحديث جماعي سريع)..."):
                                 khodor_items = []
                                 order_id = "---"
                                 customer_target = "---"
+                                
+                                # 🔥 التعديل الجوهري: تجميع كل التعديلات لإرسالها بطلب واحد لمنع حظر جوجل
+                                cells_list = []
                                 
                                 for _, r in edited.iterrows():
                                     try:
@@ -325,18 +328,21 @@ if sh:
                                         item_qty = str(r['الكميه المطلوبه']).strip()
                                         
                                         if item_qty in ["", "0", "None", "nan", "0.0"]:
-                                            ws.update_cell(row_idx, idx_qty, 0) 
-                                            ws.update_cell(row_idx, idx_status, "ملغى")
+                                            cells_list.append(gspread.Cell(row_idx, idx_qty, 0))
+                                            cells_list.append(gspread.Cell(row_idx, idx_status, "ملغى"))
                                         else:
-                                            ws.update_cell(row_idx, idx_qty, r['الكميه المطلوبه'])
-                                            ws.update_cell(row_idx, idx_status, "تم التصديق")
+                                            cells_list.append(gspread.Cell(row_idx, idx_qty, float(r['الكميه المطلوبه'])))
+                                            cells_list.append(gspread.Cell(row_idx, idx_status, "تم التصديق"))
                                             
                                             if selected_rep.strip() == "خضر":
                                                 order_id = r.get('رقم الطلب', '---')
                                                 customer_target = r.get('الوجهة', '---')
                                                 khodor_items.append(f"{r['اسم الصنف']}: {r['الكميه المطلوبه']}")
-                                        time.sleep(0.4) 
                                     except Exception as e: print(e); continue
+                                
+                                # إرسال كل الخلايا المعدلة دفعة واحدة لجوجل شيت
+                                if cells_list:
+                                    ws.update_cells(cells_list)
                                 
                                 if selected_rep.strip() == "خضر" and khodor_items:
                                     try:
@@ -358,7 +364,7 @@ if sh:
                                     except Exception as dist_err:
                                         st.error(f"⚠️ الطلب تصدق لكن فشل نقله لجدول التوزيع: {dist_err}")
                                         
-                                # 🔥 التعديل الجوهري: البحث الدقيق لإقفال الطلب الجديد فقط 🔥
+                                # تحديث صفحة الإشعارات لإزالة التنبيه
                                 try:
                                     notif_ws_update = sh.worksheet("إشعارات_الطلبات")
                                     all_notifs = notif_ws_update.get_all_values()
@@ -367,7 +373,7 @@ if sh:
                                             notif_ws_update.update_cell(i_row + 1, 3, "تم")
                                 except Exception as e: print("Notif Error:", e)
                             
-                            st.success("✅ تم التصديق!")
+                            st.success("✅ تم التصديق والتحديث بنجاح وبسرعة فائقة!")
                             st.session_state.orders = [o for o in st.session_state.orders if o['name'] != selected_rep]
                             if 'active_rep' in st.session_state: del st.session_state.active_rep
                             time.sleep(1)
