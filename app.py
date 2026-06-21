@@ -329,7 +329,10 @@ if sh:
                                                     rows_to_delete.append(row_idx)
                                                     
                                     for r_idx in sorted(rows_to_delete, reverse=True):
-                                        dist_ws.delete_row(r_idx)
+                                        try: dist_ws.delete_rows(r_idx)
+                                        except: 
+                                            try: dist_ws.delete_row(r_idx)
+                                            except: pass
                                 except Exception as e:
                                     pass
                                     
@@ -431,18 +434,26 @@ if sh:
                                     except Exception as dist_err:
                                         pass
                                 
-                                # التعديل السحري هنا: حذف أسطر المندوب من شيت التوزيع (إذا لم يكن خضر)
+                                # الحذف الشامل والذكي لأسطر المندوب من شاشة التوزيع
                                 if selected_rep.strip() != "خضر":
                                     try:
                                         dist_ws = sh.worksheet("جدولة_التوزيع")
                                         all_dist = dist_ws.get_all_values()
                                         rows_to_delete = []
+                                        
                                         for i, r in enumerate(all_dist):
-                                            if len(r) > 3 and selected_rep.strip() in str(r[3]):
+                                            row_str = " ".join([str(cell) for cell in r])
+                                            if selected_rep.strip() in row_str and ("🚨" in row_str or "طلبية" in row_str or "حمولة" in row_str or "سيارة" in row_str):
                                                 rows_to_delete.append(i + 1)
                                         
                                         for r_idx in sorted(rows_to_delete, reverse=True):
-                                            dist_ws.delete_row(r_idx)
+                                            try:
+                                                dist_ws.delete_rows(r_idx)
+                                            except:
+                                                try:
+                                                    dist_ws.delete_row(r_idx)
+                                                except:
+                                                    pass
                                     except Exception as dist_err:
                                         pass
                                         
