@@ -200,7 +200,6 @@ if sh:
 
     st.markdown("<h4 style='text-align:right;'>📦 الطلبات المنتظرة حالياً:</h4>", unsafe_allow_html=True)
     
-    # --- التعديل: تجميع الإشعارات لزر واحد لكل مندوب (لعدم حشو الشاشة) ---
     if st.session_state.orders:
         grouped_orders = {}
         for o in st.session_state.orders:
@@ -219,7 +218,6 @@ if sh:
                 st.rerun()
     else:
         st.info("👍 لا يوجد أي طلبات جديدة بانتظار التصديق حالياً.")
-    # ----------------------------------------------------
 
     st.divider()
 
@@ -309,7 +307,6 @@ if sh:
                         
                         col_print, col_wa = st.columns([1, 1])
                         
-                        # --- التعديل: زر الطباعة المخفي ينظف الشاشة ويحول الطلبات بشكل صحيح ---
                         with col_print:
                             if st.button("زر_الطباعة_المخفي", key=f"hidden_print_{selected_rep}"):
                                 try:
@@ -322,16 +319,13 @@ if sh:
                                         if len(r) > 6 and selected_rep.strip() in str(r[3]) and "بانتظار الطباعة" in str(r[3]):
                                             row_idx = i + 1
                                             if selected_rep.strip() == "خضر":
-                                                # خضر لا يحتاج لسطر وهمي، نمسح الإشعارات تبعيته
                                                 rows_to_delete.append(row_idx)
                                             else:
                                                 if not first_found:
-                                                    # تحديث أول إشعار للكاش فان ليصبح حمولة مجمعة
                                                     dist_ws.update_cell(row_idx, 4, f"🚨 حمولة سيارة : {selected_rep} (قيد التحضير ⏳)")
                                                     dist_ws.update_cell(row_idx, 7, f"مجدولة: سيارة {selected_rep}")
                                                     first_found = True
                                                 else:
-                                                    # مسح الإشعارات المكررة لنفس المندوب لتنظيف الشاشة
                                                     rows_to_delete.append(row_idx)
                                                     
                                     for r_idx in sorted(rows_to_delete, reverse=True):
@@ -371,7 +365,6 @@ if sh:
                             </button>
                             """
                             st.components.v1.html(print_html, height=100)
-                        # -----------------------------------------------------------------
                         
                         with col_wa:
                             if phone:
@@ -386,9 +379,8 @@ if sh:
                             try: idx_qty = header.index('الكميه المطلوبه') + 1
                             except: idx_qty = header.index('العدد') + 1
                             
-                            with st.spinner("جاري التحديث ونقل البيانات (تحديث جماعي سريع)..."):
-                                khodor_orders = {} # لتجميع طلبات خضر حسب الزبون
-                                
+                            with st.spinner("جاري التحديث ونقل البيانات وحذف الطلبية من شاشة التوزيع..."):
+                                khodor_orders = {}
                                 cells_list = []
                                 
                                 for _, r in edited.iterrows():
@@ -414,7 +406,6 @@ if sh:
                                 if cells_list:
                                     ws.update_cells(cells_list)
                                 
-                                # --- التعديل: إرسال كل زبون لخضر بسطر مستقل على شاشة التوزيع ---
                                 if selected_rep.strip() == "خضر" and khodor_orders:
                                     try:
                                         try: dist_ws = sh.worksheet("جدولة_التوزيع")
@@ -438,8 +429,22 @@ if sh:
                                             items_text = " | ".join(data_dict['items'])
                                             dist_ws.append_row([now_beirut, data_dict['order_id'], selected_rep, cust_target, cust_zone, items_text, "قيد الجدولة"])
                                     except Exception as dist_err:
-                                        st.error(f"⚠️ الطلب تصدق لكن فشل نقله لجدول التوزيع: {dist_err}")
-                                # -----------------------------------------------------------------
+                                        pass
+                                
+                                # التعديل السحري هنا: حذف أسطر المندوب من شيت التوزيع (إذا لم يكن خضر)
+                                if selected_rep.strip() != "خضر":
+                                    try:
+                                        dist_ws = sh.worksheet("جدولة_التوزيع")
+                                        all_dist = dist_ws.get_all_values()
+                                        rows_to_delete = []
+                                        for i, r in enumerate(all_dist):
+                                            if len(r) > 3 and selected_rep.strip() in str(r[3]):
+                                                rows_to_delete.append(i + 1)
+                                        
+                                        for r_idx in sorted(rows_to_delete, reverse=True):
+                                            dist_ws.delete_row(r_idx)
+                                    except Exception as dist_err:
+                                        pass
                                         
                                 try:
                                     notif_ws_update = sh.worksheet("إشعارات_الطلبات")
@@ -449,10 +454,10 @@ if sh:
                                             notif_ws_update.update_cell(i_row + 1, 3, "تم")
                                 except Exception as e: print("Notif Error:", e)
                             
-                            st.success("✅ تم التصديق والتحديث بنجاح وبسرعة فائقة!")
+                            st.success("✅ تم التصديق وحذف الطلبية من شاشة التوزيع بنجاح!")
                             st.session_state.orders = [o for o in st.session_state.orders if o['name'] != selected_rep]
                             if 'active_rep' in st.session_state: del st.session_state.active_rep
-                            time.sleep(1)
+                            time.sleep(1.5)
                             st.rerun()
         except Exception as sheet_err:
             st.error("⚠️ سيرفرات جوجل عليها ضغط مؤقت. يرجى الانتظار 30 ثانية ثم التحديث.")
