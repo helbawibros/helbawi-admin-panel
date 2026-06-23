@@ -281,21 +281,27 @@ if sh:
                         phone = get_delegate_phone(sh, selected_rep)
     
                         p_now = datetime.now(beirut_tz).strftime('%Y-%m-%d | %I:%M %p')
-                        h_content = ""
+                        
+                        # 1. بناء جهة اليمين (جداول التحضير المفصلة حسب الزبون)
+                        right_column_html = ""
                         for tg in edited['الوجهة'].unique():
                             curr_rows = edited[edited['الوجهة'] == tg]
-                            curr_rows_print = curr_rows[pd.to_numeric(curr_rows['الكميه المطلوبه'], errors='coerce') > 0]
+                            curr_rows_print = curr_rows[pd.to_numeric(curr_rows['الكميه المطلوبه'], errors='coerce') > 0].copy()
                             if curr_rows_print.empty: continue
-    
+
                             o_id = curr_rows['رقم الطلب'].iloc[0] if 'رقم الطلب' in curr_rows.columns else "---"
+                            
+                            # تنظيف الأرقام للطباعة (إزالة الفواصل الصفرية)
+                            curr_rows_print['الكميه المطلوبه'] = pd.to_numeric(curr_rows_print['الكميه المطلوبه']).apply(lambda x: int(x) if x == int(x) else x)
+                            
                             rows_html = "".join([f"<tr><td style='width:30px;'>{i+1}</td><td style='text-align:right; padding-right:5px; font-size:14px;'>{r['اسم الصنف']}</td><td style='font-size:16px; font-weight:bold; width:50px;'>{r['الكميه المطلوبه']}</td></tr>" for i, (_, r) in enumerate(curr_rows_print.iterrows())])
                             
-                            single_table = f"""
-                            <div style="width: 49%; border: 1.5px solid black; padding: 5px; box-sizing: border-box; background-color: white; color: black;">
+                            right_column_html += f"""
+                            <div style="border: 1.5px solid black; padding: 5px; box-sizing: border-box; background-color: white; color: black; margin-bottom: 15px; page-break-inside: avoid;">
                                 <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid black; padding-bottom: 3px; margin-bottom: 5px;">
                                     <div style="text-align: right; font-size: 14px; font-weight: bold; width: 33%;">🔢 طلب: {o_id}</div>
                                     <div style="text-align: center; font-size: 16px; font-weight: bold; width: 34%;">{tg}</div>
-                                    <div style="text-align: left; font-size: 11px; width: 33%;">{p_now}</div>
+                                    <div style="text-align: left; font-size: 11px; width: 33%; direction: ltr;">{p_now}</div>
                                 </div>
                                 <div style="text-align: right; font-size: 12px; margin-bottom: 3px;">👤 المندوب: {selected_rep}</div>
                                 <table style="width:100%; border-collapse:collapse; table-layout: fixed;">
@@ -303,8 +309,44 @@ if sh:
                                     <tbody>{rows_html}</tbody>
                                 </table>
                             </div>"""
-                            h_content += f'<div style="display:flex; justify-content:space-between; margin-bottom:15px; page-break-inside:avoid;">{single_table}{single_table}</div>'
+
+                        # 2. بناء جهة اليسار (جدول المكتب المجمع لكل الأصناف)
+                        valid_items = edited[pd.to_numeric(edited['الكميه المطلوبه'], errors='coerce') > 0].copy()
+                        valid_items['الكميه المطلوبه'] = pd.to_numeric(valid_items['الكميه المطلوبه'])
                         
+                        # تجميع الكميات حسب اسم الصنف
+                        grouped_items = valid_items.groupby('اسم الصنف', as_index=False)['الكميه المطلوبه'].sum()
+                        grouped_items['الكميه المطلوبه'] = grouped_items['الكميه المطلوبه'].apply(lambda x: int(x) if x == int(x) else x)
+                        
+                        left_rows_html = "".join([f"<tr><td style='width:30px;'>{i+1}</td><td style='text-align:right; padding-right:5px; font-size:14px;'>{r['اسم الصنف']}</td><td style='font-size:16px; font-weight:bold; width:50px;'>{r['الكميه المطلوبه']}</td></tr>" for i, (_, r) in enumerate(grouped_items.iterrows())])
+                        
+                        left_column_html = f"""
+                        <div style="border: 1.5px solid black; padding: 5px; box-sizing: border-box; background-color: white; color: black; margin-bottom: 15px; page-break-inside: avoid;">
+                            <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid black; padding-bottom: 3px; margin-bottom: 5px;">
+                                <div style="text-align: right; font-size: 14px; font-weight: bold; width: 33%;">تجميع الأصناف</div>
+                                <div style="text-align: center; font-size: 16px; font-weight: bold; width: 34%;">نسخة المكتب</div>
+                                <div style="text-align: left; font-size: 11px; width: 33%; direction: ltr;">{p_now}</div>
+                            </div>
+                            <div style="text-align: right; font-size: 12px; margin-bottom: 3px;">👤 مجموع حمولة المندوب: {selected_rep}</div>
+                            <table style="width:100%; border-collapse:collapse; table-layout: fixed;">
+                                <thead style="background:#eee;"><tr><th style="width:35px; border:1px solid black; font-size:12px;">ت</th><th style="border:1px solid black; text-align:right; padding-right:5px; font-size:12px;">اسم الصنف</th><th style="width:55px; border:1px solid black; font-size:12px;">العدد الكلي</th></tr></thead>
+                                <tbody>{left_rows_html}</tbody>
+                            </table>
+                        </div>"""
+
+                        # 3. دمج الجهتين في الهيكل الأساسي للطباعة
+                        # بما أن اتجاه الصفحة الأساسي (RTL)، القسم الأول سيظهر على اليمين والثاني على اليسار
+                        h_content = f"""
+                        <div style="display:flex; justify-content:space-between; width:100%; align-items:flex-start;">
+                            <div style="width:48%;">
+                                {right_column_html}
+                            </div>
+                            <div style="width:48%;">
+                                {left_column_html}
+                            </div>
+                        </div>
+                        """
+
                         col_print, col_wa = st.columns([1, 1])
                         
                         with col_print:
