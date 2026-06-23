@@ -314,8 +314,15 @@ if sh:
                         valid_items = edited[pd.to_numeric(edited['الكميه المطلوبه'], errors='coerce') > 0].copy()
                         valid_items['الكميه المطلوبه'] = pd.to_numeric(valid_items['الكميه المطلوبه'])
                         
-                        # تجميع الكميات حسب اسم الصنف
-                        grouped_items = valid_items.groupby('اسم الصنف', as_index=False)['الكميه المطلوبه'].sum()
+                        # 🔥 التعديل هون: نجمع الكميات ونأخذ "أصغر رقم سطر" لكل صنف لنحافظ على الترتيب الأصلي 🔥
+                        grouped_items = valid_items.groupby('اسم الصنف', as_index=False).agg({
+                            'الكميه المطلوبه': 'sum',
+                            'row_no': 'min'
+                        })
+                        
+                        # ترتيب الأصناف بناءً على رقم السطر (نفس ترتيب شيت الأسعار/الطلبات)
+                        grouped_items = grouped_items.sort_values(by='row_no')
+                        
                         grouped_items['الكميه المطلوبه'] = grouped_items['الكميه المطلوبه'].apply(lambda x: int(x) if x == int(x) else x)
                         
                         left_rows_html = "".join([f"<tr><td style='width:30px;'>{i+1}</td><td style='text-align:right; padding-right:5px; font-size:14px;'>{r['اسم الصنف']}</td><td style='font-size:16px; font-weight:bold; width:50px;'>{r['الكميه المطلوبه']}</td></tr>" for i, (_, r) in enumerate(grouped_items.iterrows())])
@@ -333,6 +340,7 @@ if sh:
                                 <tbody>{left_rows_html}</tbody>
                             </table>
                         </div>"""
+
 
                         # 3. دمج الجهتين في الهيكل الأساسي للطباعة
                         # بما أن اتجاه الصفحة الأساسي (RTL)، القسم الأول سيظهر على اليمين والثاني على اليسار
