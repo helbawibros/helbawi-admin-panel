@@ -641,7 +641,7 @@ if sh:
                             time.sleep(1.5)
                             st.rerun()
         except Exception as sheet_err:
-            st.error("⚠️ سيرفرات جوجل عليها ضغط مؤقت. يرجى الانتظار 30 ثانية ثم التحديث.")
+            st.error(f"⚠️ تفاصيل الخطأ الحقيقي: {sheet_err}")
 
 st.divider()
 st.markdown("<h3 style='text-align:right;'>📁 أرشيف الفواتير المصورة</h3>", unsafe_allow_html=True)
