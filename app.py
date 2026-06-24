@@ -279,10 +279,10 @@ if sh:
                         final_msg = "\n".join(msg_lines)
                         encoded_msg = urllib.parse.quote(final_msg)
                         phone = get_delegate_phone(sh, selected_rep)
-    
+
+                        # --- بداية قسم الطباعة المعدل ---
                         p_now = datetime.now(beirut_tz).strftime('%Y-%m-%d | %I:%M %p')
                         
-                        # 1. تجهيز بيانات المجموع الكلي (نفس الترتيب حسب الشيت)
                         valid_items = edited[pd.to_numeric(edited['الكميه المطلوبه'], errors='coerce') > 0].copy()
                         valid_items['الكميه المطلوبه'] = pd.to_numeric(valid_items['الكميه المطلوبه'])
                         
@@ -295,8 +295,7 @@ if sh:
                         
                         summary_rows_html = "".join([f"<tr><td style='width:30px;'>{i+1}</td><td style='text-align:right; padding-right:5px; font-size:14px;'>{r['اسم الصنف']}</td><td style='font-size:16px; font-weight:bold; width:50px;'>{r['الكميه المطلوبه']}</td></tr>" for i, (_, r) in enumerate(grouped_items.iterrows())])
 
-                        # 2. بناء صندوق نسخة المكتب (سيوضع في الأعلى يساراً)
-                        left_column_html = f"""
+                        office_summary_html = f"""
                         <div style="border: 1.5px solid black; padding: 5px; box-sizing: border-box; background-color: white; color: black; page-break-inside: avoid; height: 100%;">
                             <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid black; padding-bottom: 3px; margin-bottom: 5px;">
                                 <div style="text-align: right; font-size: 14px; font-weight: bold; width: 33%;">تجميع الأصناف</div>
@@ -310,68 +309,6 @@ if sh:
                             </table>
                         </div>"""
 
-                        # 3. بناء صندوق التحضير الشامل (سيوضع في الأعلى يميناً)
-                        right_column_html = f"""
-                        <div style="border: 2px solid black; padding: 5px; box-sizing: border-box; background-color: white; color: black; page-break-inside: avoid; height: 100%;">
-                            <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid black; padding-bottom: 3px; margin-bottom: 5px;">
-                                <div style="text-align: right; font-size: 14px; font-weight: bold; width: 33%;">🛒 للتحضير الشامل</div>
-                                <div style="text-align: center; font-size: 16px; font-weight: bold; width: 34%;">نسخة المستودع</div>
-                                <div style="text-align: left; font-size: 11px; width: 33%; direction: ltr;">{p_now}</div>
-                            </div>
-                            <div style="text-align: right; font-size: 12px; margin-bottom: 3px;">👤 تجميع أصناف المندوب: {selected_rep}</div>
-                            <table style="width:100%; border-collapse:collapse; table-layout: fixed;">
-                                <thead style="background:#e6f2ff;"><tr><th style="width:35px; border:1px solid black; font-size:12px;">ت</th><th style="border:1px solid black; text-align:right; padding-right:5px; font-size:12px;">اسم الصنف</th><th style="width:55px; border:1px solid black; font-size:12px;">العدد الكلي</th></tr></thead>
-                                <tbody>{summary_rows_html}</tbody>
-                            </table>
-                        </div>"""
-                        
-                        # 4. تفريغ الزبائن (فواتير تفصيلية تتوزع على عمودين لتوفير الورق)
-                        customers_html = ""
-                        for tg in edited['الوجهة'].unique():
-                            curr_rows = edited[edited['الوجهة'] == tg]
-                            curr_rows_print = curr_rows[pd.to_numeric(curr_rows['الكميه المطلوبه'], errors='coerce') > 0].copy()
-                            if curr_rows_print.empty: continue
-
-                            o_id = curr_rows['رقم الطلب'].iloc[0] if 'رقم الطلب' in curr_rows.columns else "---"
-                            curr_rows_print['الكميه المطلوبه'] = pd.to_numeric(curr_rows_print['الكميه المطلوبه']).apply(lambda x: int(x) if x == int(x) else x)
-                            
-                            rows_html = "".join([f"<tr><td style='width:30px;'>{i+1}</td><td style='text-align:right; padding-right:5px; font-size:14px;'>{r['اسم الصنف']}</td><td style='font-size:16px; font-weight:bold; width:50px;'>{r['الكميه المطلوبه']}</td></tr>" for i, (_, r) in enumerate(curr_rows_print.iterrows())])
-                            
-                            customers_html += f"""
-                            <div style="width: 49%; border: 1.5px solid black; padding: 5px; box-sizing: border-box; background-color: white; color: black; margin-bottom: 15px; page-break-inside: avoid;">
-                                <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid black; padding-bottom: 3px; margin-bottom: 5px;">
-                                    <div style="text-align: right; font-size: 14px; font-weight: bold; width: 33%;">🔢 طلب: {o_id}</div>
-                                    <div style="text-align: center; font-size: 16px; font-weight: bold; width: 34%;">{tg}</div>
-                                    <div style="text-align: left; font-size: 11px; width: 33%; direction: ltr;">{p_now}</div>
-                                </div>
-                                <table style="width:100%; border-collapse:collapse; table-layout: fixed;">
-                                    <thead style="background:#eee;"><tr><th style="width:35px; border:1px solid black; font-size:12px;">ت</th><th style="border:1px solid black; text-align:right; padding-right:5px; font-size:12px;">اسم الصنف</th><th style="width:55px; border:1px solid black; font-size:12px;">العدد</th></tr></thead>
-                                    <tbody>{rows_html}</tbody>
-                                </table>
-                            </div>"""
-
-                        # 5. تجميع الهيكل النهائي (مرن ليعبئ الصفحة بالكامل)
-                        h_content = f"""
-                        <div style="display:flex; justify-content:space-between; width:100%; align-items:stretch; margin-bottom: 15px;">
-                            <div style="width:49%;">
-                                {right_column_html}
-                            </div>
-                            <div style="width:49%;">
-                                {left_column_html}
-                            </div>
-                        </div>
-                        
-                        <div style="text-align: center; font-weight: bold; font-size: 14px; margin-bottom: 15px; border-top: 2px dashed black; padding-top: 10px; width: 100%; clear: both;">
-                            📦 تفصيل الطلبيات للتحميل في السيارة (الزباين) 📦
-                        </div>
-                        
-                        <div style="display:flex; flex-wrap:wrap; justify-content:space-between; width:100%;">
-                            {customers_html}
-                        </div>
-                        """
-
-
-                        # 3. بناء صندوق التحضير الشامل (سيوضع في الأعلى يميناً)
                         prep_summary_html = f"""
                         <div style="border: 2px solid black; padding: 5px; box-sizing: border-box; background-color: white; color: black; page-break-inside: avoid; height: 100%;">
                             <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid black; padding-bottom: 3px; margin-bottom: 5px;">
@@ -386,7 +323,6 @@ if sh:
                             </table>
                         </div>"""
                         
-                        # 4. تفريغ الزبائن (فواتير تفصيلية تتوزع على عمودين لتوفير الورق)
                         customers_html = ""
                         for tg in edited['الوجهة'].unique():
                             curr_rows = edited[edited['الوجهة'] == tg]
@@ -398,7 +334,6 @@ if sh:
                             
                             rows_html = "".join([f"<tr><td style='width:30px;'>{i+1}</td><td style='text-align:right; padding-right:5px; font-size:14px;'>{r['اسم الصنف']}</td><td style='font-size:16px; font-weight:bold; width:50px;'>{r['الكميه المطلوبه']}</td></tr>" for i, (_, r) in enumerate(curr_rows_print.iterrows())])
                             
-                            # أضفنا width: 49% لكل فاتورة لتأخذ نصف الصفحة
                             customers_html += f"""
                             <div style="width: 49%; border: 1.5px solid black; padding: 5px; box-sizing: border-box; background-color: white; color: black; margin-bottom: 15px; page-break-inside: avoid;">
                                 <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid black; padding-bottom: 3px; margin-bottom: 5px;">
@@ -412,7 +347,6 @@ if sh:
                                 </table>
                             </div>"""
 
-                        # 5. تجميع الهيكل النهائي (مرن ليعبئ الصفحة بالكامل)
                         h_content = f"""
                         <div style="display:flex; justify-content:space-between; width:100%; align-items:stretch; margin-bottom: 15px;">
                             <div style="width:49%;">
@@ -422,120 +356,15 @@ if sh:
                                 {office_summary_html}
                             </div>
                         </div>
-                        
                         <div style="text-align: center; font-weight: bold; font-size: 14px; margin-bottom: 15px; border-top: 2px dashed black; padding-top: 10px; width: 100%; clear: both;">
                             📦 تفصيل الطلبيات للتحميل في السيارة (الزباين) 📦
                         </div>
-                        
                         <div style="display:flex; flex-wrap:wrap; justify-content:space-between; width:100%;">
                             {customers_html}
                         </div>
                         """
-
-
-                        # 3. بناء جهة اليمين (نسخة التحضير: المجموع الشامل أولاً، ثم خط فاصل، ثم تفريغ الزبائن)
-                        prep_summary_html = f"""
-                        <div style="border: 2px solid black; padding: 5px; box-sizing: border-box; background-color: white; color: black; margin-bottom: 10px; page-break-inside: avoid;">
-                            <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid black; padding-bottom: 3px; margin-bottom: 5px;">
-                                <div style="text-align: right; font-size: 14px; font-weight: bold; width: 33%;">🛒 للتحضير الشامل</div>
-                                <div style="text-align: center; font-size: 16px; font-weight: bold; width: 34%;">نسخة المستودع</div>
-                                <div style="text-align: left; font-size: 11px; width: 33%; direction: ltr;">{p_now}</div>
-                            </div>
-                            <div style="text-align: right; font-size: 12px; margin-bottom: 3px;">👤 تجميع أصناف المندوب: {selected_rep}</div>
-                            <table style="width:100%; border-collapse:collapse; table-layout: fixed;">
-                                <thead style="background:#e6f2ff;"><tr><th style="width:35px; border:1px solid black; font-size:12px;">ت</th><th style="border:1px solid black; text-align:right; padding-right:5px; font-size:12px;">اسم الصنف</th><th style="width:55px; border:1px solid black; font-size:12px;">العدد الكلي</th></tr></thead>
-                                <tbody>{summary_rows_html}</tbody>
-                            </table>
-                        </div>
+                        # --- نهاية قسم الطباعة المعدل ---
                         
-                        <div style="text-align: center; font-weight: bold; font-size: 14px; margin-bottom: 10px; border-top: 2px dashed black; padding-top: 10px;">📦 تفصيل الطلبيات للتحميل في السيارة 📦</div>
-                        """
-                        
-                        customers_html = ""
-                        for tg in edited['الوجهة'].unique():
-                            curr_rows = edited[edited['الوجهة'] == tg]
-                            curr_rows_print = curr_rows[pd.to_numeric(curr_rows['الكميه المطلوبه'], errors='coerce') > 0].copy()
-                            if curr_rows_print.empty: continue
-
-                            o_id = curr_rows['رقم الطلب'].iloc[0] if 'رقم الطلب' in curr_rows.columns else "---"
-                            curr_rows_print['الكميه المطلوبه'] = pd.to_numeric(curr_rows_print['الكميه المطلوبه']).apply(lambda x: int(x) if x == int(x) else x)
-                            
-                            rows_html = "".join([f"<tr><td style='width:30px;'>{i+1}</td><td style='text-align:right; padding-right:5px; font-size:14px;'>{r['اسم الصنف']}</td><td style='font-size:16px; font-weight:bold; width:50px;'>{r['الكميه المطلوبه']}</td></tr>" for i, (_, r) in enumerate(curr_rows_print.iterrows())])
-                            
-                            customers_html += f"""
-                            <div style="border: 1.5px solid black; padding: 5px; box-sizing: border-box; background-color: white; color: black; margin-bottom: 15px; page-break-inside: avoid;">
-                                <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid black; padding-bottom: 3px; margin-bottom: 5px;">
-                                    <div style="text-align: right; font-size: 14px; font-weight: bold; width: 33%;">🔢 طلب: {o_id}</div>
-                                    <div style="text-align: center; font-size: 16px; font-weight: bold; width: 34%;">{tg}</div>
-                                    <div style="text-align: left; font-size: 11px; width: 33%; direction: ltr;">{p_now}</div>
-                                </div>
-                                <table style="width:100%; border-collapse:collapse; table-layout: fixed;">
-                                    <thead style="background:#eee;"><tr><th style="width:35px; border:1px solid black; font-size:12px;">ت</th><th style="border:1px solid black; text-align:right; padding-right:5px; font-size:12px;">اسم الصنف</th><th style="width:55px; border:1px solid black; font-size:12px;">العدد</th></tr></thead>
-                                    <tbody>{rows_html}</tbody>
-                                </table>
-                            </div>"""
-                            
-                        # تجميع جهة اليمين بالكامل
-                        right_column_html = prep_summary_html + customers_html
-
-                        # 4. دمج الجهتين في الهيكل الأساسي للطباعة
-                        h_content = f"""
-                        <div style="display:flex; justify-content:space-between; width:100%; align-items:flex-start;">
-                            <div style="width:48%;">
-                                {right_column_html}
-                            </div>
-                            <div style="width:48%;">
-                                {left_column_html}
-                            </div>
-                        </div>
-                        """
-
-
-                        # 2. بناء جهة اليسار (جدول المكتب المجمع لكل الأصناف)
-                        valid_items = edited[pd.to_numeric(edited['الكميه المطلوبه'], errors='coerce') > 0].copy()
-                        valid_items['الكميه المطلوبه'] = pd.to_numeric(valid_items['الكميه المطلوبه'])
-                        
-                        # 🔥 التعديل هون: نجمع الكميات ونأخذ "أصغر رقم سطر" لكل صنف لنحافظ على الترتيب الأصلي 🔥
-                        grouped_items = valid_items.groupby('اسم الصنف', as_index=False).agg({
-                            'الكميه المطلوبه': 'sum',
-                            'row_no': 'min'
-                        })
-                        
-                        # ترتيب الأصناف بناءً على رقم السطر (نفس ترتيب شيت الأسعار/الطلبات)
-                        grouped_items = grouped_items.sort_values(by='row_no')
-                        
-                        grouped_items['الكميه المطلوبه'] = grouped_items['الكميه المطلوبه'].apply(lambda x: int(x) if x == int(x) else x)
-                        
-                        left_rows_html = "".join([f"<tr><td style='width:30px;'>{i+1}</td><td style='text-align:right; padding-right:5px; font-size:14px;'>{r['اسم الصنف']}</td><td style='font-size:16px; font-weight:bold; width:50px;'>{r['الكميه المطلوبه']}</td></tr>" for i, (_, r) in enumerate(grouped_items.iterrows())])
-                        
-                        left_column_html = f"""
-                        <div style="border: 1.5px solid black; padding: 5px; box-sizing: border-box; background-color: white; color: black; margin-bottom: 15px; page-break-inside: avoid;">
-                            <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid black; padding-bottom: 3px; margin-bottom: 5px;">
-                                <div style="text-align: right; font-size: 14px; font-weight: bold; width: 33%;">تجميع الأصناف</div>
-                                <div style="text-align: center; font-size: 16px; font-weight: bold; width: 34%;">نسخة المكتب</div>
-                                <div style="text-align: left; font-size: 11px; width: 33%; direction: ltr;">{p_now}</div>
-                            </div>
-                            <div style="text-align: right; font-size: 12px; margin-bottom: 3px;">👤 مجموع حمولة المندوب: {selected_rep}</div>
-                            <table style="width:100%; border-collapse:collapse; table-layout: fixed;">
-                                <thead style="background:#eee;"><tr><th style="width:35px; border:1px solid black; font-size:12px;">ت</th><th style="border:1px solid black; text-align:right; padding-right:5px; font-size:12px;">اسم الصنف</th><th style="width:55px; border:1px solid black; font-size:12px;">العدد الكلي</th></tr></thead>
-                                <tbody>{left_rows_html}</tbody>
-                            </table>
-                        </div>"""
-
-
-                        # 3. دمج الجهتين في الهيكل الأساسي للطباعة
-                        # بما أن اتجاه الصفحة الأساسي (RTL)، القسم الأول سيظهر على اليمين والثاني على اليسار
-                        h_content = f"""
-                        <div style="display:flex; justify-content:space-between; width:100%; align-items:flex-start;">
-                            <div style="width:48%;">
-                                {right_column_html}
-                            </div>
-                            <div style="width:48%;">
-                                {left_column_html}
-                            </div>
-                        </div>
-                        """
-
                         col_print, col_wa = st.columns([1, 1])
                         
                         with col_print:
@@ -665,7 +494,6 @@ if sh:
                                     except Exception as dist_err:
                                         pass
                                 
-                                # الحذف الشامل والذكي لأسطر المندوب من شاشة التوزيع
                                 if selected_rep.strip() != "خضر":
                                     try:
                                         dist_ws = sh.worksheet("جدولة_التوزيع")
