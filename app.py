@@ -280,7 +280,6 @@ if sh:
                         encoded_msg = urllib.parse.quote(final_msg)
                         phone = get_delegate_phone(sh, selected_rep)
 
-                        # --- بداية قسم الطباعة المعدل ---
                         p_now = datetime.now(beirut_tz).strftime('%Y-%m-%d | %I:%M %p')
                         
                         valid_items = edited[pd.to_numeric(edited['الكميه المطلوبه'], errors='coerce') > 0].copy()
@@ -363,7 +362,6 @@ if sh:
                             {customers_html}
                         </div>
                         """
-                        # --- نهاية قسم الطباعة المعدل ---
                         
                         col_print, col_wa = st.columns([1, 1])
                         
@@ -541,55 +539,80 @@ try:
     if len(all_data) > 1:
         df_raw = pd.DataFrame(all_data[1:]) 
         c1, c2, c3, c4 = st.columns(4)
-        with c1: search_no = st.text_input("🔍 رقم الفاتورة للبحث", key="final_search_inv")
+        with c1: search_no = st.text_input("🔍 رقم الفاتورة (اختياري)", key="final_search_inv")
         with c2: search_rep = st.text_input("👤 اسم المندوب للبحث", key="final_search_rep")
-        with c3: start_date = st.date_input("من تاريخ", value=datetime(2026, 9, 1).date(), key="archive_start_date")
-        with c4: end_date = st.date_input("إلى تاريخ", value=datetime(2026, 9, 10).date(), key="archive_end_date")
+        with c3: start_date = st.date_input("من تاريخ", value=datetime(2026, 8, 25).date(), key="archive_start_date")
+        with c4: end_date = st.date_input("إلى تاريخ", value=datetime(2026, 9, 30).date(), key="archive_end_date")
 
         if st.button("🚀 ابدأ البحث في الأرشيف", use_container_width=True):
+            # تصفية الصفوف التي تحتوي على الفواتير المصورة (كود HTML للفاتورة)
             mask_html = df_raw.iloc[:, 6].str.contains("<div", na=False)
             df_filtered = df_raw[mask_html].copy()
-            if search_no: df_filtered = df_filtered[df_filtered.iloc[:, 2].astype(str).str.strip().str.contains(search_no.strip())]
-            if search_rep: df_filtered = df_filtered[df_filtered.iloc[:, 4].astype(str).str.contains(search_rep)]
             
-            # فلترة التواريخ (العمود الأول أو حسب مكان تاريخ الفاتورة، سنعتمد على استخراج التاريخ أو العمود المخصص إذا وجد، وهنا العمود 0 أو 1 عادة للتاريخ والوقت)
-            if not df_filtered.empty and 'start_date' in locals() and 'end_date' in locals():
-                def parse_date(val):
+            # فلترة رقم الفاتورة إن وجد
+            if search_no: 
+                df_filtered = df_filtered[df_filtered.iloc[:, 2].astype(str).str.strip().str.contains(search_no.strip())]
+            
+            # فلترة اسم المندوب إن وجد
+            if search_rep: 
+                df_filtered = df_filtered[df_filtered.iloc[:, 4].astype(str).str.contains(search_rep.strip())]
+            
+            # فلترة التاريخ بنطاق مرن
+            if not df_filtered.empty:
+                def parse_flexible_date(val):
                     try:
                         return pd.to_datetime(val).date()
                     except:
+                        # محاولة استخراج التاريخ إذا كان مدمجاً بنص
+                        import re
+                        match = re.search(r'\d{4}[-/]\d{1,2}[-/]\d{1,2}', str(val))
+                        if match:
+                            return pd.to_datetime(match.group(0)).date()
                         return None
-                # نفترض أن التاريخ مخزن في العمود الأول أو الثاني (مثلاً العمود 0 أو 1)
-                # سنقوم بتحويل العمود المناسب أو فحص الأعمدة التي تحتوي على تواريخ
-                dates_series = df_filtered.iloc[:, 0].apply(parse_date)
-                # إن لم يكن العمود الأول تاريخاً صالحاً، نبحث في الأعمدة الأخرى
-                mask_date = (dates_series >= start_date) & (dates_series <= end_date)
-                if mask_date.any():
-                    df_filtered = df_filtered[mask_date]
+
+                # فحص أعمدة الجدول للتاريخ (غالباً العمود 0 أو 1)
+                valid_rows = []
+                for idx, r in df_filtered.iterrows():
+                    row_date = None
+                    for col_idx in [0, 1]:
+                        if col_idx < len(r):
+                            d = parse_flexible_date(r[col_idx])
+                            if d:
+                                row_date = d
+                                break
+                    if row_date:
+                        if start_date <= row_date <= end_date:
+                            valid_rows.append(idx)
+                    else:
+                        # إذا لم يتم العثور على تاريخ صريح، نبقيه ضمن النطاق لتلافي ضياع النتائج
+                        valid_rows.append(idx)
+                
+                df_filtered = df_filtered.loc[valid_rows]
 
             if not df_filtered.empty:
                 invoice_options = [f"📄 #{r[2]} | {r[5]} | {r[3]}" for idx, r in df_filtered.iterrows()]
                 st.session_state.found_invoices = df_filtered
                 st.session_state.invoice_labels = invoice_options[::-1]
                 
-                # حساب المجموع المطلوب تسليمه للمندوب
-                # استخراج الرصيد من العمود المناسب (نفترض أن الرصيد موجود في العمود 3 أو 5 حسب تصميم الجدول لديك، سنقوم بتحويله رقمياً)
-                total_balance = 0
+                # حساب المجموع الكلي للرصيد للفواتير المعروضة
+                total_balance = 0.0
                 summary_rows = []
                 for idx, r in df_filtered.iterrows():
                     inv_num = r[2] if len(r) > 2 else ""
                     cust_name = r[3] if len(r) > 3 else ""
-                    # محاولة استخراج الرصيد من العمود المخصص (مثلاً العمود الأخير أو العمود قبل الأخير أو حسب العمود الرقمي)
-                    # للتأكد، سنقوم بالبحث عن الأرقام في الأعمدة أو افتراض العمود الخاص بالرصيد
-                    balance_val = 0
+                    
+                    # البحث عن قيمة رقمية تمثل الرصيد في أعمدة الصف
+                    balance_val = 0.0
                     for col_idx in range(len(r)):
                         try:
-                            val = float(str(r[col_idx]).replace(',', ''))
-                            if val > 0 and col_idx not in [0, 2]: # استثناء رقم الفاتورة والتواريخ لتفادي الخلط
+                            val_str = str(r[col_idx]).replace(',', '').strip()
+                            val = float(val_str)
+                            # نتحقق أن القيمة منطقية للرصيد وليست رقم فاتورة أو تاريخ
+                            if val > 0 and col_idx not in [0, 2]:
                                 balance_val = val
-                                break
                         except:
                             continue
+                    
                     total_balance += balance_val
                     summary_rows.append({
                         "رقم الفاتورة": inv_num,
@@ -598,13 +621,13 @@ try:
                     })
                 
                 st.markdown("---")
-                st.markdown(f"### 📊 ملخص المبيعات للمندوب: {search_rep if search_rep else 'الكل'}")
+                st.markdown(f"### 📊 ملخص مبيعات المندوب: {search_rep if search_rep else 'الكل'}")
                 summary_df = pd.DataFrame(summary_rows)
                 st.dataframe(summary_df, use_container_width=True)
                 st.success(f"💰 **الرصيد النهائي الواجب تسليمه:** {total_balance:,.2f}")
 
             else:
-                st.warning("⚠️ لم يتم العثور على فواتير تطابق بحثك ضمن هذا النطاق التاريخي.")
+                st.warning("⚠️ لم يتم العثور على فواتير تطابق شروط البحث أو النطاق التاريخي المحدد.")
                 if 'found_invoices' in st.session_state: del st.session_state.found_invoices
 
         if 'found_invoices' in st.session_state:
