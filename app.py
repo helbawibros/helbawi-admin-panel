@@ -576,11 +576,9 @@ try:
                 for idx, r in df_filtered.iterrows():
                     row_date = extract_date_from_row(r)
                     if row_date:
-                        # التحقق حصراً أن التاريخ يقع ضمن النطاق المحدد
                         if start_date <= row_date <= end_date:
                             valid_rows.append(idx)
                     else:
-                        # إذا لم يتم العثور على تاريخ صريح داخل الصف، نتخطاه لضمان عدم إظهار فواتير خارج الفترة
                         continue
                 
                 if valid_rows:
@@ -598,7 +596,6 @@ try:
                     cust_name = r[3] if len(r) > 3 else "---"
                     rep_name_val = r[4] if len(r) > 4 else "---"
                     
-                    # استخراج الرصيد بدقة
                     balance_val = 0.0
                     for col_idx in range(len(r)):
                         try:
@@ -620,6 +617,13 @@ try:
 
                 st.session_state.found_invoices = df_filtered
                 st.session_state.invoice_labels = invoice_options[::-1]
+                st.session_state.summary_print_data = {
+                    "rep": search_rep if search_rep else "الكل",
+                    "start": start_date.strftime('%Y-%m-%d'),
+                    "end": end_date.strftime('%Y-%m-%d'),
+                    "rows": summary_rows,
+                    "total": total_balance
+                }
                 
                 st.markdown("---")
                 st.markdown(f"### 📊 ملخص مبيعات المندوب للفترة المحددة: {search_rep if search_rep else 'الكل'}")
@@ -627,9 +631,64 @@ try:
                 st.dataframe(summary_df, use_container_width=True)
                 st.success(f"💰 **الرصيد النهائي الواجب تسليمه:** {total_balance:,.2f}")
 
+                # --- زر طباعة الكشف والمجموع النهائي ---
+                print_data = st.session_state.summary_print_data
+                table_rows_html = "".join([f"<tr><td style='border:1px solid black; padding:5px; text-align:center;'>{i+1}</td><td style='border:1px solid black; padding:5px; text-align:center;'>{r['رقم الفاتورة']}</td><td style='border:1px solid black; padding:5px; text-align:right;'>{r['اسم الزبون']}</td><td style='border:1px solid black; padding:5px; text-align:center;'>{r['الرصيد']:,.2f}</td></tr>" for i, r in enumerate(print_data['rows'])])
+                
+                print_report_html = f"""
+                <script>
+                function printSummaryReport() {{
+                    var w = window.open('', '', 'width=900,height=900');
+                    w.document.write(`
+                        <html dir="rtl">
+                        <head>
+                            <title>كشف حساب المندوب</title>
+                            <style>
+                                body {{ font-family: Arial, sans-serif; padding: 20px; color: black; }}
+                                h2, h4 {{ text-align: center; margin: 5px 0; }}
+                                table {{ width: 100%; border-collapse: collapse; margin-top: 15px; }}
+                                th, td {{ border: 1px solid black; padding: 8px; font-size: 14px; }}
+                                th {{ background-color: #f2f2f2; }}
+                                .total-box {{ margin-top: 20px; font-size: 18px; font-weight: bold; text-align: left; padding: 10px; border: 2px solid black; display: inline-block; width: 100%; box-sizing: border-box; background-color: #e6f2ff; }}
+                            </style>
+                        </head>
+                        <body>
+                            <h2>Helbawi Bros</h2>
+                            <h4>كشف مبيعات وأرصدة المندوب: {print_data['rep']}</h4>
+                            <p style="text-align: center; font-size: 12px;">الفترة من: {print_data['start']} إلى: {print_data['end']} | تاريخ الطباعة: {datetime.now(beirut_tz).strftime('%Y-%m-%d %I:%M %p')}</p>
+                            <table>
+                                <thead>
+                                    <tr>
+                                        <th style="width: 40px;">ت</th>
+                                        <th>رقم الفاتورة</th>
+                                        <th>اسم الزبون</th>
+                                        <th>الرصيد</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {table_rows_html}
+                                </tbody>
+                            </table>
+                            <div class="total-box">
+                                الرصيد النهائي الواجب تسليمه: {print_data['total']:,.2f}
+                            </div>
+                        </body>
+                        </html>
+                    `);
+                    w.document.close();
+                    setTimeout(function() {{ w.print(); w.close(); }}, 800);
+                }}
+                </script>
+                <button onclick="printSummaryReport()" style="width:100%; height:50px; background-color:#007bff; color:white; border:none; border-radius:8px; font-weight:bold; font-size:16px; cursor:pointer; margin-top: 10px;">
+                    🖨️ طباعة كشف المندوب والمجموع النهائي
+                </button>
+                """
+                st.components.v1.html(print_report_html, height=70)
+
             else:
                 st.warning("⚠️ لا توجد أي فواتير مطابقة لاسم المندوب ضمن النطاق التاريخي المحدد.")
                 if 'found_invoices' in st.session_state: del st.session_state.found_invoices
+                if 'summary_print_data' in st.session_state: del st.session_state.summary_print_data
 
         if 'found_invoices' in st.session_state:
             selected = st.selectbox("👇 اختر الفاتورة لعرض تفاصيلها المصورة:", ["-- اختر --"] + st.session_state.invoice_labels)
@@ -649,8 +708,10 @@ try:
                 else:
                     st.error("⚠️ تعذر العثور على محتوى الفاتورة المصورة.")
 
-                if st.button("🖨️ طباعة النسخة"):
+                if st.button("🖨️ طباعة النسخة الفردية"):
                     p_script = f"""<script>var w=window.open('','','width=900,height=900');w.document.write(`{html_content}`);setTimeout(function(){{w.print();w.close();}},500);</script>"""
                     st.components.v1.html(p_script, height=0)
 except Exception as e:
     st.error(f"⚠️ حدث خطأ أثناء البحث: {e}")
+
+                
