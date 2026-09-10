@@ -540,26 +540,75 @@ try:
     all_data = archive_ws.get_all_values()
     if len(all_data) > 1:
         df_raw = pd.DataFrame(all_data[1:]) 
-        c1, c2 = st.columns(2)
+        c1, c2, c3, c4 = st.columns(4)
         with c1: search_no = st.text_input("🔍 رقم الفاتورة للبحث", key="final_search_inv")
         with c2: search_rep = st.text_input("👤 اسم المندوب للبحث", key="final_search_rep")
+        with c3: start_date = st.date_input("من تاريخ", value=datetime(2026, 9, 1).date(), key="archive_start_date")
+        with c4: end_date = st.date_input("إلى تاريخ", value=datetime(2026, 9, 10).date(), key="archive_end_date")
 
         if st.button("🚀 ابدأ البحث في الأرشيف", use_container_width=True):
             mask_html = df_raw.iloc[:, 6].str.contains("<div", na=False)
             df_filtered = df_raw[mask_html].copy()
             if search_no: df_filtered = df_filtered[df_filtered.iloc[:, 2].astype(str).str.strip().str.contains(search_no.strip())]
             if search_rep: df_filtered = df_filtered[df_filtered.iloc[:, 4].astype(str).str.contains(search_rep)]
+            
+            # فلترة التواريخ (العمود الأول أو حسب مكان تاريخ الفاتورة، سنعتمد على استخراج التاريخ أو العمود المخصص إذا وجد، وهنا العمود 0 أو 1 عادة للتاريخ والوقت)
+            if not df_filtered.empty and 'start_date' in locals() and 'end_date' in locals():
+                def parse_date(val):
+                    try:
+                        return pd.to_datetime(val).date()
+                    except:
+                        return None
+                # نفترض أن التاريخ مخزن في العمود الأول أو الثاني (مثلاً العمود 0 أو 1)
+                # سنقوم بتحويل العمود المناسب أو فحص الأعمدة التي تحتوي على تواريخ
+                dates_series = df_filtered.iloc[:, 0].apply(parse_date)
+                # إن لم يكن العمود الأول تاريخاً صالحاً، نبحث في الأعمدة الأخرى
+                mask_date = (dates_series >= start_date) & (dates_series <= end_date)
+                if mask_date.any():
+                    df_filtered = df_filtered[mask_date]
 
             if not df_filtered.empty:
                 invoice_options = [f"📄 #{r[2]} | {r[5]} | {r[3]}" for idx, r in df_filtered.iterrows()]
                 st.session_state.found_invoices = df_filtered
                 st.session_state.invoice_labels = invoice_options[::-1]
+                
+                # حساب المجموع المطلوب تسليمه للمندوب
+                # استخراج الرصيد من العمود المناسب (نفترض أن الرصيد موجود في العمود 3 أو 5 حسب تصميم الجدول لديك، سنقوم بتحويله رقمياً)
+                total_balance = 0
+                summary_rows = []
+                for idx, r in df_filtered.iterrows():
+                    inv_num = r[2] if len(r) > 2 else ""
+                    cust_name = r[3] if len(r) > 3 else ""
+                    # محاولة استخراج الرصيد من العمود المخصص (مثلاً العمود الأخير أو العمود قبل الأخير أو حسب العمود الرقمي)
+                    # للتأكد، سنقوم بالبحث عن الأرقام في الأعمدة أو افتراض العمود الخاص بالرصيد
+                    balance_val = 0
+                    for col_idx in range(len(r)):
+                        try:
+                            val = float(str(r[col_idx]).replace(',', ''))
+                            if val > 0 and col_idx not in [0, 2]: # استثناء رقم الفاتورة والتواريخ لتفادي الخلط
+                                balance_val = val
+                                break
+                        except:
+                            continue
+                    total_balance += balance_val
+                    summary_rows.append({
+                        "رقم الفاتورة": inv_num,
+                        "اسم الزبون": cust_name,
+                        "الرصيد": balance_val
+                    })
+                
+                st.markdown("---")
+                st.markdown(f"### 📊 ملخص المبيعات للمندوب: {search_rep if search_rep else 'الكل'}")
+                summary_df = pd.DataFrame(summary_rows)
+                st.dataframe(summary_df, use_container_width=True)
+                st.success(f"💰 **الرصيد النهائي الواجب تسليمه:** {total_balance:,.2f}")
+
             else:
-                st.warning("⚠️ لم يتم العثور على فواتير.")
+                st.warning("⚠️ لم يتم العثور على فواتير تطابق بحثك ضمن هذا النطاق التاريخي.")
                 if 'found_invoices' in st.session_state: del st.session_state.found_invoices
 
         if 'found_invoices' in st.session_state:
-            selected = st.selectbox("👇 اختر الفاتورة:", ["-- اختر --"] + st.session_state.invoice_labels)
+            selected = st.selectbox("👇 اختر الفاتورة لعرض تفاصيلها المصورة:", ["-- اختر --"] + st.session_state.invoice_labels)
             if selected != "-- اختر --":
                 inv_id = selected.split('|')[0].replace('📄 #', '').strip()
                 target_data = st.session_state.found_invoices[st.session_state.found_invoices.iloc[:, 2].astype(str).str.strip() == inv_id].iloc[0]
@@ -569,4 +618,5 @@ try:
                 if st.button("🖨️ طباعة النسخة"):
                     p_script = f"""<script>var w=window.open('','','width=900,height=900');w.document.write(`{html_content}`);setTimeout(function(){{w.print();w.close();}},500);</script>"""
                     st.components.v1.html(p_script, height=0)
-except: pass
+except Exception as e:
+    pass
