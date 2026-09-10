@@ -545,19 +545,48 @@ try:
         with c4: end_date = st.date_input("إلى تاريخ", value=datetime(2026, 9, 30).date(), key="archive_end_date")
 
         if st.button("🚀 ابدأ البحث في الأرشيف", use_container_width=True):
-            # التأكد من الصفوف التي تحتوي على الفواتير المصورة (كود HTML في العمود الأخير أو السادس)
+            # 1. فلترة الصفوف التي تحتوي على الفواتير المصورة (كود HTML)
             mask_html = df_raw.iloc[:, 6].str.contains("<div", na=False) | df_raw.iloc[:, -1].str.contains("<div", na=False)
             df_filtered = df_raw[mask_html].copy()
             
-            # فلترة رقم الفاتورة إذا تم إدخاله
+            # 2. فلترة رقم الفاتورة إن وجد
             if search_no and search_no.strip(): 
                 df_filtered = df_filtered[df_filtered.iloc[:, 2].astype(str).str.strip().str.contains(search_no.strip())]
             
-            # فلترة اسم المندوب (بحث مرن يشمل أي عمود يحتوي على الاسم لضمان عدم ضياع النتائج)
+            # 3. فلترة اسم المندوب
             if search_rep and search_rep.strip():
                 rep_query = search_rep.strip()
                 mask_rep = df_filtered.apply(lambda row: row.astype(str).str.contains(rep_query).any(), axis=1)
                 df_filtered = df_filtered[mask_rep]
+
+            # 4. الفلترة الصارمة حسب نطاق التاريخ المحدد (من تاريخ - إلى تاريخ)
+            if not df_filtered.empty:
+                import re
+                def extract_date_from_row(row_series):
+                    for val in row_series:
+                        match = re.search(r'20\d{2}[-/]\d{1,2}[-/]\d{1,2}', str(val))
+                        if match:
+                            try:
+                                return pd.to_datetime(match.group(0)).date()
+                            except:
+                                pass
+                    return None
+
+                valid_rows = []
+                for idx, r in df_filtered.iterrows():
+                    row_date = extract_date_from_row(r)
+                    if row_date:
+                        # التحقق حصراً أن التاريخ يقع ضمن النطاق المحدد
+                        if start_date <= row_date <= end_date:
+                            valid_rows.append(idx)
+                    else:
+                        # إذا لم يتم العثور على تاريخ صريح داخل الصف، نتخطاه لضمان عدم إظهار فواتير خارج الفترة
+                        continue
+                
+                if valid_rows:
+                    df_filtered = df_filtered.loc[valid_rows]
+                else:
+                    df_filtered = pd.DataFrame(columns=df_filtered.columns)
 
             if not df_filtered.empty:
                 invoice_options = []
@@ -569,7 +598,7 @@ try:
                     cust_name = r[3] if len(r) > 3 else "---"
                     rep_name_val = r[4] if len(r) > 4 else "---"
                     
-                    # استخراج الرصيد الرقمي بدقة من أي عمود بالصف
+                    # استخراج الرصيد بدقة
                     balance_val = 0.0
                     for col_idx in range(len(r)):
                         try:
@@ -593,23 +622,21 @@ try:
                 st.session_state.invoice_labels = invoice_options[::-1]
                 
                 st.markdown("---")
-                st.markdown(f"### 📊 ملخص مبيعات المندوب: {search_rep if search_rep else 'الكل'}")
+                st.markdown(f"### 📊 ملخص مبيعات المندوب للفترة المحددة: {search_rep if search_rep else 'الكل'}")
                 summary_df = pd.DataFrame(summary_rows)
                 st.dataframe(summary_df, use_container_width=True)
                 st.success(f"💰 **الرصيد النهائي الواجب تسليمه:** {total_balance:,.2f}")
 
             else:
-                st.warning("⚠️ لم يتم العثور على أي فواتير مطابقة لاسم المندوب المدخل. تأكد من كتابة الاسم تماماً كما هو مسجل في الأرشيف.")
+                st.warning("⚠️ لا توجد أي فواتير مطابقة لاسم المندوب ضمن النطاق التاريخي المحدد.")
                 if 'found_invoices' in st.session_state: del st.session_state.found_invoices
 
         if 'found_invoices' in st.session_state:
             selected = st.selectbox("👇 اختر الفاتورة لعرض تفاصيلها المصورة:", ["-- اختر --"] + st.session_state.invoice_labels)
             if selected != "-- اختر --":
-                # استخراج رقم الفاتورة من الخيار المحدد
                 inv_id = selected.split('|')[0].replace('📄 #', '').strip()
                 target_data = st.session_state.found_invoices[st.session_state.found_invoices.iloc[:, 2].astype(str).str.strip() == inv_id].iloc[0]
                 
-                # البحث عن محتوى الـ HTML الخاص بالفاتورة في أي عمود يحتوي على <div
                 html_content = ""
                 for val in target_data:
                     if "<div" in str(val):
