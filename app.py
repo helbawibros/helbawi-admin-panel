@@ -539,38 +539,36 @@ try:
     if len(all_data) > 1:
         df_raw = pd.DataFrame(all_data[1:]) 
         c1, c2, c3, c4 = st.columns(4)
-        with c1: search_no = st.text_input("🔍 رقم الفاتورة (اختياري)", key="final_search_inv")
+        with c1: search_no = st.text_input("🔍 رقم الفاتورة (اختياري تماماً)", key="final_search_inv")
         with c2: search_rep = st.text_input("👤 اسم المندوب للبحث", key="final_search_rep")
         with c3: start_date = st.date_input("من تاريخ", value=datetime(2026, 8, 25).date(), key="archive_start_date")
         with c4: end_date = st.date_input("إلى تاريخ", value=datetime(2026, 9, 30).date(), key="archive_end_date")
 
         if st.button("🚀 ابدأ البحث في الأرشيف", use_container_width=True):
-            # تصفية الصفوف التي تحتوي على الفواتير المصورة (كود HTML للفاتورة)
+            # تصفية الصفوف التي تحتوي على الفواتير المصورة (كود HTML للفاتورة في العمود 6)
             mask_html = df_raw.iloc[:, 6].str.contains("<div", na=False)
             df_filtered = df_raw[mask_html].copy()
             
-            # فلترة رقم الفاتورة إن وجد
-            if search_no: 
+            # فلترة رقم الفاتورة إذا تم إدخاله فقط
+            if search_no and search_no.strip(): 
                 df_filtered = df_filtered[df_filtered.iloc[:, 2].astype(str).str.strip().str.contains(search_no.strip())]
             
-            # فلترة اسم المندوب إن وجد
-            if search_rep: 
+            # فلترة اسم المندوب إذا تم إدخاله
+            if search_rep and search_rep.strip(): 
                 df_filtered = df_filtered[df_filtered.iloc[:, 4].astype(str).str.contains(search_rep.strip())]
             
-            # فلترة التاريخ بنطاق مرن
+            # فلترة مرنة جداً للتاريخ لضمان عدم ضياع أي فاتورة للمندوب ضمن النطاق
             if not df_filtered.empty:
                 def parse_flexible_date(val):
                     try:
                         return pd.to_datetime(val).date()
                     except:
-                        # محاولة استخراج التاريخ إذا كان مدمجاً بنص
                         import re
                         match = re.search(r'\d{4}[-/]\d{1,2}[-/]\d{1,2}', str(val))
                         if match:
                             return pd.to_datetime(match.group(0)).date()
                         return None
 
-                # فحص أعمدة الجدول للتاريخ (غالباً العمود 0 أو 1)
                 valid_rows = []
                 for idx, r in df_filtered.iterrows():
                     row_date = None
@@ -584,30 +582,30 @@ try:
                         if start_date <= row_date <= end_date:
                             valid_rows.append(idx)
                     else:
-                        # إذا لم يتم العثور على تاريخ صريح، نبقيه ضمن النطاق لتلافي ضياع النتائج
+                        # إذا لم يتم العثور على تاريخ مسجل بالعمود، يتم ضمها للمندوب لتجنب إخفاء النتائج
                         valid_rows.append(idx)
                 
-                df_filtered = df_filtered.loc[valid_rows]
+                if valid_rows:
+                    df_filtered = df_filtered.loc[valid_rows]
 
             if not df_filtered.empty:
                 invoice_options = [f"📄 #{r[2]} | {r[5]} | {r[3]}" for idx, r in df_filtered.iterrows()]
                 st.session_state.found_invoices = df_filtered
                 st.session_state.invoice_labels = invoice_options[::-1]
                 
-                # حساب المجموع الكلي للرصيد للفواتير المعروضة
+                # حساب المجموع الكلي للرصيد وتكوين الجدول الشامل
                 total_balance = 0.0
                 summary_rows = []
                 for idx, r in df_filtered.iterrows():
                     inv_num = r[2] if len(r) > 2 else ""
                     cust_name = r[3] if len(r) > 3 else ""
                     
-                    # البحث عن قيمة رقمية تمثل الرصيد في أعمدة الصف
+                    # استخراج قيمة الرصيد الرقمية من أعمدة الصف
                     balance_val = 0.0
                     for col_idx in range(len(r)):
                         try:
                             val_str = str(r[col_idx]).replace(',', '').strip()
                             val = float(val_str)
-                            # نتحقق أن القيمة منطقية للرصيد وليست رقم فاتورة أو تاريخ
                             if val > 0 and col_idx not in [0, 2]:
                                 balance_val = val
                         except:
@@ -627,7 +625,7 @@ try:
                 st.success(f"💰 **الرصيد النهائي الواجب تسليمه:** {total_balance:,.2f}")
 
             else:
-                st.warning("⚠️ لم يتم العثور على فواتير تطابق شروط البحث أو النطاق التاريخي المحدد.")
+                st.warning("⚠️ لم يتم العثور على فواتير تطابق اسم المندوب أو النطاق التاريخي المحدد.")
                 if 'found_invoices' in st.session_state: del st.session_state.found_invoices
 
         if 'found_invoices' in st.session_state:
